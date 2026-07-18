@@ -38,7 +38,7 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
   return (
     <div ref={ref} className="floating" style={{ position: 'fixed', top: 16, left: 16 }}>
       <button
-        className="floating-btn"
+        className="floating-btn icon"
         title="Menu"
         aria-label="Menu"
         aria-haspopup="menu"

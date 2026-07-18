@@ -76,11 +76,18 @@ svg text.room-area {
   border-radius: 6px;
   padding: 6px 14px;
 }
+/* square icon-only variant; anchors the .key-hint shortcut digit */
+.floating-btn.icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
 .floating-btn.active {
   background: #2563eb;
   color: #fff;
 }
-.floating-btn.active .kbd {
+.floating-btn.active .key-hint {
   color: #cfdcff;
 }
 /* dropdown panel; composes with .floating for the shared chrome */
@@ -116,13 +123,13 @@ svg text.room-area {
   background: #e5e7eb;
   margin: 4px 6px;
 }
-.kbd {
-  font-size: 11px;
+/* bare shortcut digit in the corner of a mode button (Excalidraw-style) */
+.key-hint {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
   color: #999;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 0 4px;
-  margin-left: 2px;
 }
 .hint {
   background: rgba(255, 255, 255, 0.9);

@@ -601,13 +601,13 @@ export default function Editor() {
         ).map(([m, label, key, Icon]) => (
           <button
             key={m}
-            className={mode === m ? 'floating-btn active' : 'floating-btn'}
+            className={mode === m ? 'floating-btn icon active' : 'floating-btn icon'}
             title={`${label} (${key})`}
             aria-label={label}
             onClick={() => switchMode(m)}
           >
             <Icon size={16} aria-hidden />
-            <span className="kbd">{key}</span>
+            <span className="key-hint">{key}</span>
           </button>
         ))}
       </div>
@@ -630,7 +630,7 @@ export default function Editor() {
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
         <div className="floating">
           <button
-            className="floating-btn"
+            className="floating-btn icon"
             title="Zoom out"
             aria-label="Zoom out"
             onClick={() => zoomCenter(1.25)}
@@ -641,7 +641,7 @@ export default function Editor() {
             {Math.round(pxPerCm() * 100)}%
           </button>
           <button
-            className="floating-btn"
+            className="floating-btn icon"
             title="Zoom in"
             aria-label="Zoom in"
             onClick={() => zoomCenter(1 / 1.25)}
@@ -651,7 +651,7 @@ export default function Editor() {
         </div>
         <div className="floating">
           <button
-            className="floating-btn"
+            className="floating-btn icon"
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
             disabled={!canUndo}
@@ -660,7 +660,7 @@ export default function Editor() {
             <Undo2 size={16} aria-hidden />
           </button>
           <button
-            className="floating-btn"
+            className="floating-btn icon"
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo"
             disabled={!canRedo}
