@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BrickWall,
-  DoorOpen,
+  DoorClosed,
   FlipHorizontal2,
   FlipVertical2,
   Grid2x2,
@@ -595,7 +595,7 @@ export default function Editor() {
           [
             ['select', 'Select', '1', MousePointer2],
             ['wall', 'Wall', '2', BrickWall],
-            ['door', 'Door', '3', DoorOpen],
+            ['door', 'Door', '3', DoorClosed],
             ['window', 'Window', '4', Grid2x2],
           ] as const
         ).map(([m, label, key, Icon]) => (
