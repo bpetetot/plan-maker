@@ -24,7 +24,7 @@ describe('detectRooms after planar insertion (ADR 0002)', () => {
     )
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(2)
-    for (const room of rooms) expect(room.areaCm2).toBe(200 * 400)
+    for (const room of rooms) expect(room.areaCm2).toBe(190 * 390)
   })
 })
 
@@ -54,7 +54,7 @@ describe('detectRooms', () => {
     })
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
-    expect(rooms[0].areaCm2).toBe(400 * 300)
+    expect(rooms[0].areaCm2).toBe(390 * 290)
     expect(rooms[0].centroid).toEqual({ x: 200, y: 150 })
   })
 
@@ -78,10 +78,33 @@ describe('detectRooms', () => {
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(2)
     const areas = rooms.map((r) => r.areaCm2).sort((x, y) => x - y)
-    expect(areas).toEqual([250 * 300, 350 * 300])
+    expect(areas).toEqual([240 * 290, 340 * 290])
   })
 
-  it('ignores a dangling wall inside a room', () => {
+  it('subtracts the footprint of a dangling wall from the room area', () => {
+    // 400×300 room, stub from the middle of the bottom wall down to (200,100):
+    // the floor wraps around the stub slab (10 wide, from the bottom wall's
+    // inner face at y=5 to the stub tip at y=100 — free end stops at the Point)
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m = b.point(200, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      const tip = b.point(200, 100)
+      b.wall(a, m)
+      b.wall(m, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      b.wall(m, tip)
+    })
+    const rooms = detectRooms(plan)
+    expect(rooms).toHaveLength(1)
+    expect(rooms[0].areaCm2).toBe(390 * 290 - 10 * 95)
+  })
+
+  it('still detects a single room around a diagonal spur from a corner', () => {
     const plan = buildPlan((b) => {
       const a = b.point(0, 0)
       const c = b.point(400, 0)
@@ -96,7 +119,10 @@ describe('detectRooms', () => {
     })
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
-    expect(rooms[0].areaCm2).toBe(400 * 300)
+    // the spur slab eats into the interior-face area (390×290) without
+    // breaking detection; exact value depends on the diagonal footprint
+    expect(rooms[0].areaCm2).toBeLessThan(390 * 290)
+    expect(rooms[0].areaCm2).toBeGreaterThan(390 * 290 - 10 * 250 - 100)
   })
 
   it('detects rooms in disconnected components', () => {
@@ -121,7 +147,7 @@ describe('detectRooms', () => {
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(2)
     const areas = rooms.map((r) => r.areaCm2).sort((x, y) => x - y)
-    expect(areas).toEqual([100 * 100, 200 * 200])
+    expect(areas).toEqual([90 * 90, 190 * 190])
   })
 
   it('detects a concave (L-shaped) room', () => {
@@ -141,7 +167,7 @@ describe('detectRooms', () => {
     })
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
-    expect(rooms[0].areaCm2).toBe(400 * 200 + 200 * 200)
+    expect(rooms[0].areaCm2).toBe(390 * 190 + 190 * 200)
   })
 })
 

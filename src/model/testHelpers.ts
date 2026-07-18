@@ -44,3 +44,18 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
   build(builder)
   return plan
 }
+
+// A closed 4×4 m room drawn axis-to-axis, walls 10 cm thick — the recurring
+// face-measure scenario: interior faces run 3,90 m, exterior faces 4,10 m.
+export function squareRoomPlan(): Plan {
+  return buildPlan((b) => {
+    const p1 = b.point(0, 0)
+    const p2 = b.point(400, 0)
+    const p3 = b.point(400, 400)
+    const p4 = b.point(0, 400)
+    b.wall(p1, p2)
+    b.wall(p2, p3)
+    b.wall(p3, p4)
+    b.wall(p4, p1)
+  })
+}

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
+import { squareRoomPlan } from '../model/testHelpers'
 import type { Plan, Wall } from '../model/types'
-import { DimLabel, labelAngle } from './render'
+import { DimLabel, labelAngle, WallLine } from './render'
 
 afterEach(cleanup)
 
@@ -49,6 +50,52 @@ describe('labelAngle', () => {
     expect(labelAngle(-100, -1)).toBeCloseTo(0.57, 1)
     expect(labelAngle(1, 100)).toBeCloseTo(89.43, 1)
     expect(labelAngle(-1, 100)).toBeCloseTo(-89.43, 1)
+  })
+})
+
+describe('DimLabel value', () => {
+  // Dimensions measure the face they run along — 3,90 m inside, 4,10 m
+  // outside a 4×4 m axis square, 4,00 m only when the wall is free.
+  it('shows the axis length on a free-standing wall', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const { text } = renderDim(plan, wall)
+    expect(text.textContent).toBe('4,00 m')
+  })
+
+  it('measures the face on the side it sits on', () => {
+    const plan = squareRoomPlan()
+    const bottom = Object.values(plan.walls)[0]
+    // default side for a horizontal wall is the upper one — outside the room
+    expect(renderDim(plan, bottom).text.textContent).toBe('4,10 m')
+    cleanup()
+    // dragged inside the room (side +1, below in screen coords): interior face
+    bottom.dimPlacement = { t: 0.5, side: 1 }
+    expect(renderDim(plan, bottom).text.textContent).toBe('3,90 m')
+  })
+})
+
+describe('WallLine', () => {
+  function renderWall(plan: Plan, wall: Wall) {
+    const { container } = render(
+      <svg>
+        <WallLine plan={plan} wall={wall} />
+      </svg>,
+    )
+    return container.querySelector('polygon')!
+  }
+
+  it('draws a free-standing wall as a rectangle capped at its Points', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const polygon = renderWall(plan, wall)
+    expect(polygon.getAttribute('points')).toBe('0,5 400,5 400,-5 0,-5')
+  })
+
+  it('miters a square-room corner: faces meet where the dimensions measure', () => {
+    const plan = squareRoomPlan()
+    const bottom = Object.values(plan.walls)[0]
+    const polygon = renderWall(plan, bottom)
+    // interior face (y=5) from 5 to 395, exterior face (y=-5) from -5 to 405
+    expect(polygon.getAttribute('points')).toBe('5,5 395,5 405,-5 -5,-5')
   })
 })
 

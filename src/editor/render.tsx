@@ -1,4 +1,5 @@
 // Presentational SVG pieces, shared by the editor and the PNG export (WYSIWYG).
+import { faceLength, faceSpan, wallOutline } from '../model/faces'
 import { wallLength, wallPoints } from '../model/geometry'
 import { formatArea, formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
@@ -29,16 +30,11 @@ export const labelAngle = (dx: number, dy: number) => {
 }
 
 export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?: string }) {
-  const [a, b] = wallPoints(plan, wall)
+  const outline = wallOutline(plan, wall)
   return (
-    <line
-      x1={a.x}
-      y1={a.y}
-      x2={b.x}
-      y2={b.y}
-      stroke={color ?? COLORS.wall}
-      strokeWidth={wall.thickness}
-      strokeLinecap="round"
+    <polygon
+      points={outline.map((p) => `${p.x},${p.y}`).join(' ')}
+      fill={color ?? COLORS.wall}
       pointerEvents="none"
     />
   )
@@ -245,6 +241,8 @@ export function DimLabel({
 }) {
   const { a, length, ux, uy, angle, flipped, side, off } = dimLineFrame(plan, wall)
   if (length < 20) return null
+  // a dimension measures what it runs along: the face on the side it sits on
+  const value = faceLength(plan, wall, side)
   // labelAngle keeps the text readable; when it flips the frame, local +y
   // points along -n (n = left normal of start→end), so map the side back
   // into the rotated frame.
@@ -259,7 +257,7 @@ export function DimLabel({
     >
       {onPointerDown && <rect x={-30} y={y - 8} width={60} height={16} fill="transparent" />}
       <text y={y} textAnchor="middle" dominantBaseline="central" className="dim">
-        {formatLength(length)}
+        {formatLength(value)}
       </text>
     </g>
   )
@@ -307,13 +305,16 @@ export function PlacementDims({ plan, opening }: { plan: Plan; opening: Opening 
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
-  const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
+  const { a, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
   // point on the dimension line at distance t along the wall axis
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const half = opening.width / 2
+  // like any dimension, each side measures what it runs along: the face on
+  // the side the dims sit on (the Point when the wall end is free)
+  const span = faceSpan(plan, wall, side as 1 | -1)
   const segments = [
-    { key: 'start', from: 0, to: placement.offset - half },
-    { key: 'end', from: placement.offset + half, to: length },
+    { key: 'start', from: span.from, to: placement.offset - half },
+    { key: 'end', from: placement.offset + half, to: span.to },
   ]
   return (
     <g pointerEvents="none">

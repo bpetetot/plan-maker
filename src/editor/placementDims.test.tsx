@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { squareRoomPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import type { Opening, Plan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
@@ -75,6 +76,24 @@ describe('PlacementDims', () => {
     const container = renderDims(plan, opening)
     const group = container.querySelector('g[transform]')!
     expect(group.getAttribute('transform')).toBe('translate(30,18) rotate(0)')
+  })
+
+  it('measures from the face it runs along when the wall ends at junctions', () => {
+    // 4×4 m square room; window (80) centered on the bottom wall. Like any
+    // dimension, each side measures what it runs along: the exterior face
+    // reaches the miter at -5, the interior face starts at +5.
+    const plan = squareRoomPlan()
+    const bottom = Object.values(plan.walls)[0]
+    const opening: Opening = { id: 'o', wallId: bottom.id, type: 'window', offset: 200, width: 80 }
+    plan.openings.o = opening
+    // default side for a horizontal wall: upper — outside the room
+    let texts = Array.from(renderDims(plan, opening).querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['1,65 m', '1,65 m'])
+    cleanup()
+    // dragged inside the room: both sides measure to the interior faces
+    bottom.dimPlacement = { t: 0.5, side: 1 }
+    texts = Array.from(renderDims(plan, opening).querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['1,55 m', '1,55 m'])
   })
 
   it('draws a broken line with a tick at each end, dropped when the segment is too short', () => {

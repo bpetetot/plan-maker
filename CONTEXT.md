@@ -19,8 +19,17 @@ _Avoid_: Vertex, node, corner
 A straight edge between two points, with a thickness. The only thing the user
 draws to shape the plan. Walls only meet at Points: drawing a wall onto or
 across another wall splits the existing wall at the junction — no wall ever
-crosses or overlaps another away from a shared Point.
+crosses or overlaps another away from a shared Point. Drawing and snapping
+happen on the axis — the line between the two Points; the thickness spreads
+half on each side of it.
 _Avoid_: Segment, edge, line
+
+**Face**:
+One of the two long sides of a wall, offset half its thickness from the axis.
+At a junction, the faces of adjacent walls meet each other; at a free wall
+end, the face stops at the Point. Faces are what Dimensions measure along and
+what bounds a Room's area.
+_Avoid_: Side, edge
 
 **Opening**:
 Something set into a wall — a door or a window. Belongs to exactly one wall,
@@ -45,7 +54,10 @@ position. A room without a label shows its area at its centroid.
 _Avoid_: Room name, tag
 
 **Dimension**:
-The displayed length of a wall, measured along its axis between its two points.
+The displayed length of a wall, measured along the Face it runs along: the
+value follows the side of the wall the dimension sits on. A dimension measures
+what it runs along — at a junction it stops where that Face meets the adjacent
+wall's Face; at a free wall end it reaches the Point.
 The value is computed from the plan, never stored. Its placement — where along
 the wall it sits and on which side — belongs to the plan, like any edit. Its
 text always reads from the bottom or the right of the sheet (ISO convention) —
@@ -53,7 +65,8 @@ the reading direction never depends on which side of the wall it sits.
 _Avoid_: Measurement, cote
 
 **Room area**:
-The surface of a detected room in square meters, computed from its wall loop.
+The surface of a detected room in square meters, bounded by the interior
+Faces of its walls — the real floor surface, not the wall-axis loop.
 _Avoid_: Surface, square footage
 
 **Tool**:
@@ -85,8 +98,10 @@ _Avoid_: Free mode, no-grid mode
 
 **Placement dimension**:
 The pair of temporary dimensions flanking an Opening while it is being placed
-or moved — each runs from a wall end to the near edge of the opening, ignoring
-neighbouring openings. They replace the wall's Dimension on its line for the
+or moved — each runs from the Face at a wall end (the Point when the end is
+free) to the near edge of the opening, ignoring neighbouring openings. Like
+any Dimension, it measures what it runs along: the Face on the side it sits
+on. They replace the wall's Dimension on its line for the
 duration of the gesture; a side reduced to nothing shows no dimension. Pure
 editor feedback, like the Rail: never part of the plan, never exported.
 _Avoid_: Side measure, clearance, flanking dimension

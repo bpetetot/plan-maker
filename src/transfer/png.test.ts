@@ -51,9 +51,13 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('width="1000"')
     expect(svg).toContain('height="800"')
     expect(svg).toContain('fill="#ffffff"')
-    expect(svg).toContain('4,00 m')
-    expect(svg).toContain('3,00 m')
-    expect(svg).toContain('12,00 m²')
+    // dimensions measure the face they run along (default sides), the room
+    // area its interior faces: a 4×3 m axis rectangle with 10 cm walls
+    expect(svg).toContain('4,10 m')
+    expect(svg).toContain('3,90 m')
+    expect(svg).toContain('3,10 m')
+    expect(svg).toContain('2,90 m')
+    expect(svg).toContain('11,31 m²')
   })
 
   it('returns null for an empty plan', () => {

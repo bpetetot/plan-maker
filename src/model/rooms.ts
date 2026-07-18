@@ -1,3 +1,4 @@
+import { interiorPolygon } from './faces'
 import type { Vec } from './geometry'
 import { pointInPolygon, polygonArea, polygonCentroid } from './geometry'
 import type { Plan } from './types'
@@ -81,8 +82,10 @@ export function detectRooms(plan: Plan): Room[] {
         v = w
       }
       const polygon = facePointIds.map((id) => ({ x: plan.points[id].x, y: plan.points[id].y }))
-      const area = polygonArea(polygon)
-      if (area > MIN_ROOM_AREA_CM2) {
+      if (polygonArea(polygon) > MIN_ROOM_AREA_CM2) {
+        // the room's area is its floor surface, bounded by the walls' interior
+        // faces — detection and containment stay on the axis polygon
+        const area = Math.max(0, polygonArea(interiorPolygon(plan, facePointIds)))
         rooms.push({ pointIds: facePointIds, polygon, areaCm2: area, centroid: polygonCentroid(polygon) })
       }
     }
