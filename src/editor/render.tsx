@@ -7,13 +7,16 @@ import { roomAt } from '../model/rooms'
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
 
+// Theme-aware paints: the values live in styles.css (light under :root, dark
+// under [data-theme='dark']). The PNG export pins the light values in its own
+// <style> block, so the standalone SVG resolves them without the document.
 export const COLORS = {
-  wall: '#2f2f2f',
-  wallHover: '#7aa5f8',
-  wallSelected: '#2563eb',
-  snap: '#16a34a',
-  preview: '#2563eb',
-  label: '#374151',
+  wall: 'var(--wall)',
+  wallHover: 'var(--wall-hover)',
+  wallSelected: 'var(--accent)',
+  snap: 'var(--snap)',
+  preview: 'var(--accent)',
+  label: 'var(--label)',
 }
 
 // ISO convention: label text reads from the bottom or the right of the sheet,
@@ -117,7 +120,7 @@ export function OpeningGlyph({
         y={-thickness / 2 - 1}
         width={opening.width}
         height={thickness + 2}
-        fill="#ffffff"
+        fill="var(--sheet)"
       />
       {opening.type === 'door' ? (
         <g transform={doorMirror(opening)}>
@@ -274,7 +277,7 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
           y1={a.y + uy * pad + ux * side * off}
           x2={b.x - ux * pad - uy * side * off}
           y2={b.y - uy * pad + ux * side * off}
-          stroke="#c9cdd4"
+          stroke="var(--rail)"
           strokeWidth={1}
           strokeDasharray="4 4"
           vectorEffect="non-scaling-stroke"
@@ -398,7 +401,7 @@ export function Handle({
       cx={x}
       cy={y}
       r={8}
-      fill="#fff"
+      fill="var(--sheet)"
       stroke={COLORS.wallSelected}
       strokeWidth={2.5}
       style={{ cursor: 'grab' }}

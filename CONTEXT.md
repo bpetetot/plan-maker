@@ -68,6 +68,13 @@ one on each side of its wall. Pure editor feedback: never part of the plan,
 never exported.
 _Avoid_: Guide, track
 
+**Theme**:
+The editor's light or dark appearance, covering both the UI chrome and the
+sheet. Chosen per device — follows the system by default, with a manual
+override — and never part of the plan: exports always render light, as a
+document.
+_Avoid_: Dark mode, appearance, color scheme
+
 **Fit**:
 Framing the view so the whole plan is visible with a margin; on an empty plan
 it returns the view to its default framing. Always reframes, regardless of

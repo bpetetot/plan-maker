@@ -59,4 +59,13 @@ describe('buildExportSvg', () => {
   it('returns null for an empty plan', () => {
     expect(buildExportSvg(buildPlan(() => {}))).toBeNull()
   })
+
+  // Theme (CONTEXT.md): exports always render light, as a document. The scene
+  // paints with CSS variables, so the standalone SVG must pin their light values.
+  it('always renders light, whatever theme the editor is in', () => {
+    const svg = buildExportSvg(squarePlan())!
+    expect(svg).toContain('var(--wall)')
+    expect(svg).toContain('--wall: #2f2f2f')
+    expect(svg).toContain('--sheet: #ffffff')
+  })
 })

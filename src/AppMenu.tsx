@@ -1,6 +1,14 @@
 // Floating burger menu (top-left) with the app-level file actions.
-import { Eraser, FolderOpen, ImageDown, Menu, Save } from 'lucide-react'
+import { Eraser, FolderOpen, ImageDown, Menu, Monitor, Moon, Save, Sun } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import type { ThemePreference } from './theme/theme'
+import { useThemePreference } from './theme/useThemePreference'
+
+const THEME_OPTIONS: { value: ThemePreference; title: string; Icon: typeof Monitor }[] = [
+  { value: 'system', title: 'System theme', Icon: Monitor },
+  { value: 'light', title: 'Light theme', Icon: Sun },
+  { value: 'dark', title: 'Dark theme', Icon: Moon },
+]
 
 export interface AppMenuProps {
   onOpen: () => void
@@ -12,6 +20,7 @@ export interface AppMenuProps {
 
 export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, resetDisabled }: AppMenuProps) {
   const [open, setOpen] = useState(false)
+  const [themePreference, setThemePreference] = useThemePreference()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -58,6 +67,25 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
           <button className="menu-item" role="menuitem" onClick={run(onExportImage)}>
             <ImageDown size={16} aria-hidden /> Export image…
           </button>
+          <div className="menu-sep" />
+          {/* picking a theme keeps the menu open — it's a setting, not an action */}
+          <div className="menu-row">
+            <span>Theme</span>
+            <div className="menu-row-group" role="group" aria-label="Theme">
+              {THEME_OPTIONS.map(({ value, title, Icon }) => (
+                <button
+                  key={value}
+                  className={themePreference === value ? 'floating-btn icon active' : 'floating-btn icon'}
+                  title={title}
+                  aria-label={title}
+                  aria-pressed={themePreference === value}
+                  onClick={() => setThemePreference(value)}
+                >
+                  <Icon size={16} aria-hidden />
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="menu-sep" />
           <button
             className="menu-item danger-item"

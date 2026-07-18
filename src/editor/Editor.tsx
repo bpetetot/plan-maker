@@ -470,7 +470,7 @@ export default function Editor() {
       <svg
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-        style={{ width: '100%', height: '100%', background: '#fff', display: 'block', cursor }}
+        style={{ width: '100%', height: '100%', background: 'var(--sheet)', display: 'block', cursor }}
         onPointerDown={onSvgPointerDown}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
@@ -575,7 +575,7 @@ export default function Editor() {
             y={Math.min(marquee.a.y, marquee.b.y)}
             width={Math.abs(marquee.b.x - marquee.a.x)}
             height={Math.abs(marquee.b.y - marquee.a.y)}
-            fill="rgba(37, 99, 235, 0.08)"
+            fill="var(--marquee-fill)"
             stroke={COLORS.wallSelected}
             strokeWidth={1.5}
             strokeDasharray="6 4"

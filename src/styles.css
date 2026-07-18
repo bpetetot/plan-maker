@@ -1,3 +1,74 @@
+/* Theme palette. Light is the reference; dark overrides under [data-theme].
+   The resolved theme is always stamped on <html> by JS (inline script in
+   index.html, then src/theme) — no prefers-color-scheme media query here. */
+:root {
+  color-scheme: light;
+
+  /* canvas */
+  --sheet: #ffffff;
+  --wall: #2f2f2f;
+  --wall-hover: #7aa5f8;
+  --accent: #2563eb;
+  --accent-contrast: #fff;
+  --snap: #16a34a;
+  --label: #374151;
+  --dim-text: #8a8a8a;
+  --room-area-text: #6b7280;
+  --rail: #c9cdd4;
+  --marquee-fill: rgba(37, 99, 235, 0.08);
+
+  /* chrome */
+  --text: #222;
+  --text-muted: #777;
+  --text-faint: #999;
+  --surface: #fff;
+  --surface-hover: #f3f4f6;
+  --border: #e2e2e2;
+  --separator: #e5e7eb;
+  --input-border: #ddd;
+  --key-hint-active: #cfdcff;
+  --danger-text: #b91c1c;
+  --danger-surface: #fee2e2;
+  --flip-surface: #eef2ff;
+  --flip-text: #3730a3;
+  --hint-surface: rgba(255, 255, 255, 0.9);
+  --banner-surface: #1f2937;
+  --banner-text: #f9fafb;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --sheet: #1e1e1e;
+  --wall: #d4d4d4;
+  --wall-hover: #7aa5f8;
+  --accent: #60a5fa;
+  --accent-contrast: #0f172a;
+  --snap: #4ade80;
+  --label: #d1d5db;
+  --dim-text: #9ca3af;
+  --room-area-text: #9ca3af;
+  --rail: #4b5563;
+  --marquee-fill: rgba(96, 165, 250, 0.12);
+
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-faint: #6b7280;
+  --surface: #262626;
+  --surface-hover: #3a3a3a;
+  --border: #3f3f3f;
+  --separator: #3f3f3f;
+  --input-border: #52525b;
+  --key-hint-active: #1e3a8a;
+  --danger-text: #f87171;
+  --danger-surface: #450a0a;
+  --flip-surface: #312e81;
+  --flip-text: #c7d2fe;
+  --hint-surface: rgba(30, 30, 30, 0.85);
+  --banner-surface: #374151;
+  --banner-text: #f9fafb;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,11 +84,13 @@ body {
     -apple-system,
     sans-serif;
   font-size: 14px;
-  color: #222;
+  color: var(--text);
+  background: var(--sheet);
 }
 button {
   font: inherit;
   cursor: pointer;
+  color: inherit;
 }
 button:disabled {
   cursor: default;
@@ -28,40 +101,40 @@ svg text.dim {
   font:
     11px system-ui,
     sans-serif;
-  fill: #8a8a8a;
+  fill: var(--dim-text);
   paint-order: stroke;
-  stroke: #fff;
+  stroke: var(--sheet);
   /* thick enough to fully mask a rail passing through the text, spaces included */
   stroke-width: 6px;
   user-select: none;
 }
 svg text.dim-live {
-  fill: #2563eb;
+  fill: var(--accent);
   font-weight: 600;
 }
 svg text.room-name {
   font:
     600 15px system-ui,
     sans-serif;
-  fill: #374151;
+  fill: var(--label);
   user-select: none;
 }
 svg text.room-name.selected {
-  fill: #2563eb;
+  fill: var(--accent);
 }
 svg text.room-area {
   font:
     12px system-ui,
     sans-serif;
-  fill: #6b7280;
+  fill: var(--room-area-text);
   user-select: none;
 }
 
 .floating {
   display: flex;
   gap: 2px;
-  background: #fff;
-  border: 1px solid #e2e2e2;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 4px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
@@ -84,11 +157,11 @@ svg text.room-area {
   padding: 0;
 }
 .floating-btn.active {
-  background: #2563eb;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 .floating-btn.active .key-hint {
-  color: #cfdcff;
+  color: var(--key-hint-active);
 }
 /* dropdown panel; composes with .floating for the shared chrome */
 .menu {
@@ -110,18 +183,30 @@ svg text.room-area {
   text-align: left;
 }
 .menu-item:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 .menu-item.danger-item {
-  color: #b91c1c;
+  color: var(--danger-text);
 }
 .menu-item.danger-item:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--danger-surface);
 }
 .menu-sep {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--separator);
   margin: 4px 6px;
+}
+/* non-interactive menu row hosting a group of small controls (theme picker) */
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+}
+.menu-row-group {
+  display: flex;
+  gap: 2px;
 }
 /* bare shortcut digit in the corner of a mode button (Excalidraw-style) */
 .key-hint {
@@ -129,13 +214,13 @@ svg text.room-area {
   bottom: 2px;
   right: 4px;
   font-size: 9px;
-  color: #999;
+  color: var(--text-faint);
 }
 .hint {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--hint-surface);
   border-radius: 6px;
   padding: 4px 10px;
-  color: #777;
+  color: var(--text-muted);
   font-size: 12.5px;
   pointer-events: none;
   white-space: nowrap;
@@ -144,8 +229,8 @@ svg text.room-area {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
-  border: 1px solid #e2e2e2;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -154,17 +239,19 @@ svg text.room-area {
 }
 .popover input {
   font: inherit;
-  border: 1px solid #ddd;
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 4px 8px;
   width: 140px;
+  background: transparent;
+  color: inherit;
 }
 .flip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #eef2ff;
-  color: #3730a3;
+  background: var(--flip-surface);
+  color: var(--flip-text);
   border: none;
   border-radius: 6px;
   padding: 4px 10px;
@@ -173,8 +260,8 @@ svg text.room-area {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--danger-surface);
+  color: var(--danger-text);
   border: none;
   border-radius: 6px;
   padding: 4px 10px;
@@ -188,15 +275,18 @@ svg text.room-area {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #1f2937;
-  color: #f9fafb;
+  background: var(--banner-surface);
+  color: var(--banner-text);
   border-radius: 8px;
   padding: 10px 16px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
   z-index: 100;
 }
+/* deliberately fixed colors (not themed): error red and action blue read the
+   same on both themes */
 .banner.error {
   background: #b91c1c;
+  color: #f9fafb;
 }
 .banner button {
   display: inline-flex;
@@ -207,6 +297,7 @@ svg text.room-area {
 }
 .banner-action {
   background: #2563eb !important;
+  color: #fff;
   border-radius: 6px;
   padding: 4px 10px;
 }

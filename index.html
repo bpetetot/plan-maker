@@ -6,6 +6,21 @@
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" type="image/png" href="/pwa-192.png" />
     <title>Plan Maker</title>
+    <script>
+      // Anti-flash: stamp the resolved theme before first paint.
+      // Mirrors src/theme/theme.ts (storage key, resolution, bar colors) — keep in sync.
+      ;(function () {
+        var pref = null
+        try {
+          pref = localStorage.getItem('plan-maker:theme')
+        } catch (e) {}
+        var dark =
+          pref === 'dark' || (pref !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', dark ? '#1e1e1e' : '#2563eb')
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
