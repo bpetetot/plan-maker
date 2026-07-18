@@ -224,12 +224,12 @@ export function RoomOverlay({
   rooms,
   labels,
   onLabelPointerDown,
-  selectedLabelId,
+  selectedLabelIds,
 }: {
   rooms: Room[]
   labels: RoomLabel[]
   onLabelPointerDown?: (label: RoomLabel, e: React.PointerEvent) => void
-  selectedLabelId?: string | null
+  selectedLabelIds?: ReadonlySet<string>
 }) {
   const labeledRooms = new Set<Room>()
   const entries: { key: string; x: number; y: number; name?: string; area?: number; label?: RoomLabel }[] = []
@@ -268,7 +268,7 @@ export function RoomOverlay({
             <text
               textAnchor="middle"
               className={
-                entry.label && selectedLabelId === entry.label.id ? 'room-name selected' : 'room-name'
+                entry.label && selectedLabelIds?.has(entry.label.id) ? 'room-name selected' : 'room-name'
               }
             >
               {entry.name}

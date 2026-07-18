@@ -3,6 +3,7 @@
 // contextual popover on the selection, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
+import type { Vec } from '../model/geometry'
 import { nearestWall, projectOnWall, wallLength, wallPoints } from '../model/geometry'
 import { formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
@@ -10,9 +11,6 @@ import {
   addRoomLabel,
   addWall,
   clampOpeningOffset,
-  deleteOpening,
-  deleteRoomLabel,
-  deleteWall,
   ensurePoint,
   movePoint,
   moveOpening,
@@ -20,14 +18,23 @@ import {
   placeOpening,
   renameRoomLabel,
   setOpeningWidth,
-  setPoints,
   toggleHingeSide,
   toggleSwing,
 } from '../model/operations'
 import { detectRooms, roomAt } from '../model/rooms'
+import type { ElementRef } from '../model/selection'
+import {
+  deleteElements,
+  elementsInRect,
+  isSelected,
+  refKey,
+  selectionBounds,
+  toggleRef,
+  translateElements,
+} from '../model/selection'
 import type { Snap } from '../model/snap'
 import { snapPoint } from '../model/snap'
-import type { Opening, Plan, Point } from '../model/types'
+import type { Opening, Plan } from '../model/types'
 import { defaultOpeningWidth, OPENING_WIDTHS, WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import {
@@ -45,13 +52,27 @@ import {
 import { useSpaceHeld, useView } from './useView'
 
 type Mode = 'select' | 'wall' | 'door' | 'window'
-type Sel = { type: 'wall' | 'opening' | 'label'; id: string } | null
 type Drag =
   | { kind: 'pan'; x: number; y: number }
   | { kind: 'point'; id: string }
-  | { kind: 'wall'; id: string; start: { x: number; y: number }; orig: [Point, Point] }
+  | {
+      kind: 'group'
+      refs: ElementRef[]
+      start: Vec
+      orig: Plan
+      // set when the drag started on an element of a multi-selection: a
+      // movement below the click threshold collapses the selection to it
+      clickRef?: ElementRef
+      moved?: boolean
+    }
   | { kind: 'opening'; id: string }
   | { kind: 'label'; id: string }
+  // the live rect lives on the drag ref (b is mutated on move) so pointer-up
+  // never reads a stale React state; the marquee state only drives rendering
+  | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
+
+// Below this movement (screen px) a marquee or group drag is a plain click.
+const CLICK_PX = 4
 
 const isTypingTarget = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement
@@ -67,11 +88,14 @@ export default function Editor() {
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [mode, setMode] = useState<Mode>('select')
-  const [sel, setSel] = useState<Sel>(null)
+  const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
   const [chain, setChain] = useState<{ start: string; last: string } | null>(null)
   const [snap, setSnap] = useState<Snap | null>(null)
   const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null)
+  const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
+    null,
+  )
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
   const alt = useRef(false)
@@ -85,16 +109,14 @@ export default function Editor() {
     setChain(null)
     setSnap(null)
     setOpenPreview(null)
-    if (m !== 'select') setSel(null)
+    if (m !== 'select') setSel([])
   }
 
   const deleteSelection = useCallback(
-    (selection: Sel) => {
-      if (!selection) return
-      if (selection.type === 'wall') setPlan((p) => deleteWall(p, selection.id))
-      if (selection.type === 'opening') setPlan((p) => deleteOpening(p, selection.id))
-      if (selection.type === 'label') setPlan((p) => deleteRoomLabel(p, selection.id))
-      setSel(null)
+    (selection: ElementRef[]) => {
+      if (selection.length === 0) return
+      setPlan((p) => deleteElements(p, selection))
+      setSel([])
     },
     [setPlan],
   )
@@ -116,7 +138,7 @@ export default function Editor() {
       }
       if (e.key === 'Escape') {
         if (chain) setChain(null)
-        else if (sel) setSel(null)
+        else if (sel.length > 0) setSel([])
         else switchMode('select')
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         deleteSelection(sel)
@@ -175,10 +197,36 @@ export default function Editor() {
       // actions popover shows right away
       const [next, id] = placeOpening(plan, openPreview.wallId, mode, openPreview.offset)
       setPlan(() => next)
-      setSel(id ? { type: 'opening', id } : null)
+      setSel(id ? [{ type: 'opening', id }] : [])
+    } else if (mode === 'select') {
+      // dragging on empty canvas draws a selection marquee; a click-sized
+      // marquee resolves to "clear the selection" on pointer up
+      drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c }
+      setMarquee({ a: c, b: c })
+      svg.setPointerCapture(e.pointerId)
     } else {
       // clicking empty canvas clears the selection in every non-wall mode
-      setSel(null)
+      setSel([])
+    }
+  }
+
+  // Shared click grammar for walls, openings and labels: Shift+click toggles
+  // membership; clicking an element of a multi-selection drags the whole
+  // group; anything else selects just this element and starts its solo drag.
+  const onElementPointerDown = (ref: ElementRef, e: React.PointerEvent, soloDrag: (c: Vec) => Drag) => {
+    if (e.button !== 0 || space) return
+    if (e.shiftKey) {
+      // don't let the svg handler start a marquee on top of this toggle
+      e.stopPropagation()
+      setSel((s) => toggleRef(s, ref))
+      return
+    }
+    const c = toPlan(e.clientX, e.clientY)
+    if (sel.length > 1 && isSelected(sel, ref)) {
+      startPlanDrag({ kind: 'group', refs: sel, start: c, orig: plan, clickRef: ref })
+    } else {
+      setSel([ref])
+      startPlanDrag(soloDrag(c))
     }
   }
 
@@ -197,16 +245,18 @@ export default function Editor() {
         })
         setPlan((p) => movePoint(p, d.id, s.x, s.y))
         setSnap(s)
-      } else if (d.kind === 'wall') {
-        const dx = Math.round((c.x - d.start.x) / 10) * 10
-        const dy = Math.round((c.y - d.start.y) / 10) * 10
-        const [oa, ob] = d.orig
-        setPlan((p) =>
-          setPoints(p, {
-            [oa.id]: { x: oa.x + dx, y: oa.y + dy },
-            [ob.id]: { x: ob.x + dx, y: ob.y + dy },
-          }),
-        )
+      } else if (d.kind === 'group') {
+        if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
+          d.moved = true
+        }
+        if (d.moved) {
+          const dx = Math.round((c.x - d.start.x) / 10) * 10
+          const dy = Math.round((c.y - d.start.y) / 10) * 10
+          setPlan(() => translateElements(d.orig, d.refs, dx, dy))
+        }
+      } else if (d.kind === 'marquee') {
+        d.b = c
+        setMarquee({ a: d.a, b: c })
       } else if (d.kind === 'opening') {
         const opening = plan.openings[d.id]
         if (opening) {
@@ -233,21 +283,52 @@ export default function Editor() {
   const onSvgPointerUp = () => {
     const d = drag.current
     if (!d) return
+    drag.current = null
+    if (d.kind === 'marquee') {
+      const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm()
+      const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm()
+      if (wPx < CLICK_PX && hPx < CLICK_PX) {
+        setSel(d.additive ? d.prev : [])
+      } else {
+        const captured = elementsInRect(plan, d.a, d.b)
+        setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured)
+      }
+      setMarquee(null)
+      return
+    }
+    // a click (no movement) on an element of a multi-selection collapses the
+    // selection to that element instead of dragging the group
+    if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef])
     if (d.kind === 'point') setSnap(null)
     if (d.kind !== 'pan') endHistoryGroup()
-    drag.current = null
   }
 
-  const selWall = sel?.type === 'wall' ? plan.walls[sel.id] : null
-  const selOpening = sel?.type === 'opening' ? plan.openings[sel.id] : null
-  const selLabel = sel?.type === 'label' ? plan.roomLabels[sel.id] : null
+  const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel])
+  const selectedLabelIds = useMemo(
+    () => new Set(sel.filter((r) => r.type === 'label').map((r) => r.id)),
+    [sel],
+  )
+  const only = sel.length === 1 ? sel[0] : null
+  const selWall = only?.type === 'wall' ? plan.walls[only.id] : null
+  const selOpening = only?.type === 'opening' ? plan.openings[only.id] : null
+  const selLabel = only?.type === 'label' ? plan.roomLabels[only.id] : null
+  const multi = sel.length > 1
 
   // popover anchored to the selection, in wrapper coordinates
   let popover: { left: number; top: number } | null = null
-  if (svgRef.current && wrapRef.current && (selWall || selOpening || selLabel)) {
+  if (svgRef.current && wrapRef.current && (selWall || selOpening || selLabel || multi)) {
     let px = 0
     let py = 0
-    if (selWall) {
+    let anchored = true
+    if (multi) {
+      // anchor below the selection's bounding box
+      const bounds = selectionBounds(plan, sel)
+      anchored = bounds !== null
+      if (bounds) {
+        px = (bounds.minX + bounds.maxX) / 2
+        py = bounds.maxY
+      }
+    } else if (selWall) {
       const [a, b] = wallPoints(plan, selWall)
       px = (a.x + b.x) / 2
       py = (a.y + b.y) / 2
@@ -262,7 +343,7 @@ export default function Editor() {
       py = selLabel.y
     }
     const matrix = svgRef.current.getScreenCTM()
-    if (matrix) {
+    if (matrix && anchored) {
       const sp = new DOMPoint(px, py).matrixTransform(matrix)
       const r = wrapRef.current.getBoundingClientRect()
       popover = { left: sp.x - r.left, top: sp.y - r.top + 24 }
@@ -292,9 +373,8 @@ export default function Editor() {
       : null
 
   const onLabelPointerDown = (label: Plan['roomLabels'][string], e: React.PointerEvent) => {
-    if (e.button !== 0 || space || mode !== 'select') return
-    setSel({ type: 'label', id: label.id })
-    startPlanDrag({ kind: 'label', id: label.id })
+    if (mode !== 'select') return
+    onElementPointerDown({ type: 'label', id: label.id }, e, () => ({ kind: 'label', id: label.id }))
   }
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
@@ -330,7 +410,7 @@ export default function Editor() {
             plan={plan}
             wall={wall}
             color={
-              sel?.type === 'wall' && sel.id === wall.id
+              selKeys.has(refKey({ type: 'wall', id: wall.id }))
                 ? COLORS.wallSelected
                 : hoverWall === wall.id && mode === 'select'
                   ? COLORS.wallHover
@@ -343,14 +423,14 @@ export default function Editor() {
             key={opening.id}
             plan={plan}
             opening={opening}
-            selected={sel?.type === 'opening' && sel.id === opening.id}
+            selected={selKeys.has(refKey({ type: 'opening', id: opening.id }))}
           />
         ))}
         <RoomOverlay
           rooms={rooms}
           labels={Object.values(plan.roomLabels)}
           onLabelPointerDown={onLabelPointerDown}
-          selectedLabelId={sel?.type === 'label' ? sel.id : null}
+          selectedLabelIds={selectedLabelIds}
         />
         {Object.values(plan.walls).map((wall) => (
           <DimLabel key={wall.id} plan={plan} wall={wall} />
@@ -362,12 +442,14 @@ export default function Editor() {
               plan={plan}
               wall={wall}
               cursor="move"
-              onPointerDown={(e) => {
-                if (e.button !== 0 || space) return
-                setSel({ type: 'wall', id: wall.id })
-                const c = toPlan(e.clientX, e.clientY)
-                startPlanDrag({ kind: 'wall', id: wall.id, start: c, orig: [...wallPoints(plan, wall)] })
-              }}
+              onPointerDown={(e) =>
+                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => ({
+                  kind: 'group',
+                  refs: [{ type: 'wall', id: wall.id }],
+                  start: c,
+                  orig: plan,
+                }))
+              }
               onPointerEnter={() => setHoverWall(wall.id)}
               onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
             />
@@ -378,11 +460,12 @@ export default function Editor() {
               key={opening.id}
               plan={plan}
               opening={opening}
-              onPointerDown={(e) => {
-                if (e.button !== 0 || space) return
-                setSel({ type: 'opening', id: opening.id })
-                startPlanDrag({ kind: 'opening', id: opening.id })
-              }}
+              onPointerDown={(e) =>
+                onElementPointerDown({ type: 'opening', id: opening.id }, e, () => ({
+                  kind: 'opening',
+                  id: opening.id,
+                }))
+              }
             />
           ))}
         {selWall &&
@@ -399,6 +482,20 @@ export default function Editor() {
               }}
             />
           ))}
+        {marquee && (
+          <rect
+            x={Math.min(marquee.a.x, marquee.b.x)}
+            y={Math.min(marquee.a.y, marquee.b.y)}
+            width={Math.abs(marquee.b.x - marquee.a.x)}
+            height={Math.abs(marquee.b.y - marquee.a.y)}
+            fill="rgba(37, 99, 235, 0.08)"
+            stroke={COLORS.wallSelected}
+            strokeWidth={1.5}
+            strokeDasharray="6 4"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
         {chain && snap && <RubberWall from={plan.points[chain.last]} to={snap} thickness={WALL_THICKNESS} />}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
         {mode === 'wall' && <SnapMarker snap={snap} />}
@@ -439,7 +536,7 @@ export default function Editor() {
             : 'Click to start a wall chain · Alt disables snapping'
           : mode === 'door' || mode === 'window'
             ? 'Hover a wall, click to place'
-            : 'Click an element to edit it · double-click a room to name it · Space+drag pans · scroll zooms'}
+            : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       {/* zoom controls and undo/redo (bottom-left) */}
@@ -471,8 +568,16 @@ export default function Editor() {
       </div>
 
       {/* contextual popover next to the selection */}
-      {popover && (selWall || selOpening || selLabel) && (
+      {popover && (selWall || selOpening || selLabel || multi) && (
         <div className="popover" style={{ position: 'absolute', left: popover.left, top: popover.top }}>
+          {multi && (
+            <>
+              <span>{sel.length} elements</span>
+              <button className="danger" onClick={() => deleteSelection(sel)}>
+                Delete
+              </button>
+            </>
+          )}
           {selWall && (
             <>
               <span>Wall · {formatLength(wallLength(plan, selWall))}</span>
@@ -525,7 +630,7 @@ export default function Editor() {
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setPlan((p) => renameRoomLabel(p, selLabel.id, e.target.value))}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === 'Escape') setSel(null)
+                  if (e.key === 'Enter' || e.key === 'Escape') setSel([])
                 }}
               />
               <button className="danger" onClick={() => deleteSelection(sel)}>

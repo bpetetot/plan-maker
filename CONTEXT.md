@@ -49,3 +49,10 @@ _Avoid_: Measurement, cote
 **Room area**:
 The surface of a detected room in square meters, computed from its wall loop.
 _Avoid_: Surface, square footage
+
+**Selection**:
+The set of elements — walls, openings, room labels — the user is currently
+acting on in the editor. Group actions (delete, move) apply to every element in
+it. Openings have no position of their own: they follow their wall and never
+move on their own in a group move. Never part of the plan.
+_Avoid_: Highlight, marked elements
