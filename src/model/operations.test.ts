@@ -94,7 +94,7 @@ describe('deleteWall', () => {
     const wall = Object.values(plan.walls).find((w) => {
       return plan.points[w.startPointId].y === 0 && plan.points[w.endPointId].y === 0
     })!
-    plan = placeOpening(plan, wall.id, 'door', 200)
+    plan = placeOpening(plan, wall.id, 'door', 200)[0]
     expect(Object.keys(plan.openings)).toHaveLength(1)
 
     const next = deleteWall(plan, wall.id)
@@ -106,10 +106,11 @@ describe('deleteWall', () => {
 })
 
 describe('openings', () => {
-  it('places a door with defaults at a clamped integer offset', () => {
+  it('places a door with defaults at a clamped integer offset, returning its id', () => {
     const base = rectPlan()
-    const plan = placeOpening(base, Object.keys(base.walls)[0], 'door', 200.4)
-    const door = Object.values(plan.openings)[0]
+    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'door', 200.4)
+    expect(id).not.toBeNull()
+    const door = plan.openings[id!]
     expect(door).toMatchObject({ type: 'door', offset: 200, width: DOOR_WIDTH })
     if (door.type === 'door') {
       expect(door.hingeSide).toBe('start')
@@ -132,46 +133,48 @@ describe('openings', () => {
       b.wall(p1, p2)
     })
     const wallId = Object.keys(plan.walls)[0]
-    expect(placeOpening(plan, wallId, 'door', 40)).toBe(plan)
+    const [next, id] = placeOpening(plan, wallId, 'door', 40)
+    expect(next).toBe(plan)
+    expect(id).toBeNull()
   })
 
   it('moves an opening along its wall, clamped', () => {
     let plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    plan = placeOpening(plan, wallId, 'window', 200)
-    const id = Object.keys(plan.openings)[0]
-    expect(moveOpening(plan, id, 390).openings[id].offset).toBe(335)
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'window', 200)
+    expect(moveOpening(plan, id!, 390).openings[id!].offset).toBe(335)
   })
 
   it('changes width, re-clamping the offset', () => {
     let plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    plan = placeOpening(plan, wallId, 'door', 55)
-    const id = Object.keys(plan.openings)[0]
-    const next = setOpeningWidth(plan, id, 160)
-    expect(next.openings[id].width).toBe(160)
-    expect(next.openings[id].offset).toBe(85)
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'door', 55)
+    const next = setOpeningWidth(plan, id!, 160)
+    expect(next.openings[id!].width).toBe(160)
+    expect(next.openings[id!].offset).toBe(85)
   })
 
   it('toggles door hinge side and swing', () => {
     let plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    plan = placeOpening(plan, wallId, 'door', 200)
-    const id = Object.keys(plan.openings)[0]
-    let next = toggleHingeSide(plan, id)
-    let door = next.openings[id]
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'door', 200)
+    let next = toggleHingeSide(plan, id!)
+    let door = next.openings[id!]
     expect(door.type === 'door' && door.hingeSide).toBe('end')
-    next = toggleSwing(next, id)
-    door = next.openings[id]
+    next = toggleSwing(next, id!)
+    door = next.openings[id!]
     expect(door.type === 'door' && door.swing).toBe('out')
   })
 
   it('deletes an opening', () => {
     let plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    plan = placeOpening(plan, wallId, 'door', 200)
-    const id = Object.keys(plan.openings)[0]
-    expect(Object.keys(deleteOpening(plan, id).openings)).toHaveLength(0)
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'door', 200)
+    expect(Object.keys(deleteOpening(plan, id!).openings)).toHaveLength(0)
   })
 })
 

@@ -61,3 +61,12 @@ export const defaultOpeningWidth = (type: Opening['type']): Cm =>
 export function emptyPlan(): Plan {
   return { points: {}, walls: {}, openings: {}, roomLabels: {} }
 }
+
+export function isPlanEmpty(plan: Plan): boolean {
+  return (
+    Object.keys(plan.points).length === 0 &&
+    Object.keys(plan.walls).length === 0 &&
+    Object.keys(plan.openings).length === 0 &&
+    Object.keys(plan.roomLabels).length === 0
+  )
+}

@@ -1,5 +1,5 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05
-// prototype: full-bleed canvas, floating pill toolbar, click-to-click walls,
+// prototype: full-bleed canvas, floating toolbar, click-to-click walls,
 // contextual popover on the selection, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
@@ -58,7 +58,7 @@ const isTypingTarget = (e: KeyboardEvent) => {
   return t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable
 }
 
-export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNode }) {
+export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const { view, toPlan, pxPerCm, zoomCenter, panByPx, fitPlan } = useView(svgRef)
@@ -120,10 +120,10 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
         else switchMode('select')
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         deleteSelection(sel)
-      } else if (e.key === 'v') switchMode('select')
-      else if (e.key === 'w') switchMode('wall')
-      else if (e.key === 'd') switchMode('door')
-      else if (e.key === 'n') switchMode('window')
+      } else if (e.key === '1') switchMode('select')
+      else if (e.key === '2') switchMode('wall')
+      else if (e.key === '3') switchMode('door')
+      else if (e.key === '4') switchMode('window')
     }
     const up = (e: KeyboardEvent) => {
       alt.current = e.altKey
@@ -171,8 +171,13 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
       setPlan(() => next)
       setChain(chain ? { ...chain, last: pointId } : { start: pointId, last: pointId })
     } else if ((mode === 'door' || mode === 'window') && openPreview) {
-      setPlan((p) => placeOpening(p, openPreview.wallId, mode, openPreview.offset))
-    } else if (mode === 'select') {
+      // keep the placement tool active, but select the new opening so its
+      // actions popover shows right away
+      const [next, id] = placeOpening(plan, openPreview.wallId, mode, openPreview.offset)
+      setPlan(() => next)
+      setSel(id ? { type: 'opening', id } : null)
+    } else {
+      // clicking empty canvas clears the selection in every non-wall mode
       setSel(null)
     }
   }
@@ -402,20 +407,20 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
 
       {/* floating toolbar (spec §4) */}
       <div
-        className="pill"
+        className="floating"
         style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}
       >
         {(
           [
-            ['select', 'Select', 'V'],
-            ['wall', 'Wall', 'W'],
-            ['door', 'Door', 'D'],
-            ['window', 'Window', 'N'],
+            ['select', 'Select', '1'],
+            ['wall', 'Wall', '2'],
+            ['door', 'Door', '3'],
+            ['window', 'Window', '4'],
           ] as const
         ).map(([m, label, key]) => (
           <button
             key={m}
-            className={mode === m ? 'pill-btn active' : 'pill-btn'}
+            className={mode === m ? 'floating-btn active' : 'floating-btn'}
             onClick={() => switchMode(m)}
           >
             {label} <span className="kbd">{key}</span>
@@ -437,28 +442,32 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
             : 'Click an element to edit it · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
-      {/* undo/redo + app actions */}
-      <div className="pill" style={{ position: 'absolute', top: 16, right: 16 }}>
-        <button className="pill-btn" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => undo()}>
-          ↺
-        </button>
-        <button className="pill-btn" title="Redo (Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => redo()}>
-          ↻
-        </button>
-        {toolbarExtra}
-      </div>
-
-      {/* zoom controls */}
-      <div className="pill" style={{ position: 'absolute', right: 16, bottom: 16 }}>
-        <button className="pill-btn" onClick={() => zoomCenter(1 / 1.25)}>
-          +
-        </button>
-        <button className="pill-btn" onClick={() => zoomCenter(1.25)}>
-          −
-        </button>
-        <button className="pill-btn" onClick={() => fitPlan(plan)}>
-          Fit
-        </button>
+      {/* zoom controls and undo/redo (bottom-left) */}
+      <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
+        <div className="floating">
+          <button className="floating-btn" title="Zoom out" onClick={() => zoomCenter(1.25)}>
+            −
+          </button>
+          <button className="floating-btn" title="Fit to plan" onClick={() => fitPlan(plan)}>
+            {Math.round(pxPerCm() * 100)}%
+          </button>
+          <button className="floating-btn" title="Zoom in" onClick={() => zoomCenter(1 / 1.25)}>
+            +
+          </button>
+        </div>
+        <div className="floating">
+          <button className="floating-btn" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => undo()}>
+            ↺
+          </button>
+          <button
+            className="floating-btn"
+            title="Redo (Ctrl+Shift+Z)"
+            disabled={!canRedo}
+            onClick={() => redo()}
+          >
+            ↻
+          </button>
+        </div>
       </div>
 
       {/* contextual popover next to the selection */}

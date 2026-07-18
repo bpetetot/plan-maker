@@ -82,18 +82,25 @@ export function clampOpeningOffset(plan: Plan, wall: Wall, offset: number, width
   return Math.round(Math.max(margin, Math.min(length - margin, offset)))
 }
 
-export function placeOpening(plan: Plan, wallId: string, type: 'door' | 'window', offset: number): Plan {
+// Returns the new plan and the placed opening's id (null when placement is
+// refused), so callers can select the opening they just placed.
+export function placeOpening(
+  plan: Plan,
+  wallId: string,
+  type: 'door' | 'window',
+  offset: number,
+): [Plan, string | null] {
   const wall = plan.walls[wallId]
-  if (!wall) return plan
+  if (!wall) return [plan, null]
   const width = defaultOpeningWidth(type)
   const clamped = clampOpeningOffset(plan, wall, offset, width)
-  if (clamped === null) return plan
+  if (clamped === null) return [plan, null]
   const id = newId()
   const opening: Opening =
     type === 'door'
       ? { id, wallId, type, offset: clamped, width, hingeSide: 'start', swing: 'in' }
       : { id, wallId, type, offset: clamped, width }
-  return { ...plan, openings: { ...plan.openings, [id]: opening } }
+  return [{ ...plan, openings: { ...plan.openings, [id]: opening } }, id]
 }
 
 export function moveOpening(plan: Plan, id: string, offset: number): Plan {

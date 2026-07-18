@@ -59,6 +59,16 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     setView({ x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin })
   }
 
+  // The screen scale (pxPerCm) also depends on the SVG's on-screen size, which
+  // React doesn't track: nudge the state on mount and on window resize so
+  // consumers displaying the zoom percentage re-render with a fresh value.
+  useEffect(() => {
+    const refresh = () => setView((v) => ({ ...v }))
+    refresh()
+    window.addEventListener('resize', refresh)
+    return () => window.removeEventListener('resize', refresh)
+  }, [])
+
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return

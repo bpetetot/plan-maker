@@ -4,7 +4,7 @@ import { formatArea, formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
 import type { Room } from '../model/rooms'
 import { roomAt } from '../model/rooms'
-import type { Opening, Plan, RoomLabel, Wall } from '../model/types'
+import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
 
 export const COLORS = {
@@ -73,6 +73,19 @@ export function WallHit({
   )
 }
 
+// Door geometry in the door's local frame (center of the wall gap, wall along
+// x) — single source shared by the visible glyph and the invisible hit target.
+const doorMirror = (door: Door) =>
+  `scale(${door.hingeSide === 'end' ? -1 : 1},${door.swing === 'out' ? -1 : 1})`
+const doorLeaf = (door: Door) => ({
+  x1: -door.width / 2,
+  y1: 0,
+  x2: -door.width / 2,
+  y2: -door.width,
+})
+const doorArc = (door: Door) =>
+  `M ${door.width / 2} 0 A ${door.width} ${door.width} 0 0 0 ${-door.width / 2} ${-door.width}`
+
 export function OpeningGlyph({
   plan,
   opening,
@@ -105,15 +118,9 @@ export function OpeningGlyph({
         fill="#ffffff"
       />
       {opening.type === 'door' ? (
-        <g transform={`scale(${opening.hingeSide === 'end' ? -1 : 1},${opening.swing === 'out' ? -1 : 1})`}>
-          <line x1={-halfWidth} y1={0} x2={-halfWidth} y2={-opening.width} stroke={stroke} strokeWidth={3} />
-          <path
-            d={`M ${halfWidth} 0 A ${opening.width} ${opening.width} 0 0 0 ${-halfWidth} ${-opening.width}`}
-            fill="none"
-            stroke={stroke}
-            strokeWidth={1.5}
-            strokeDasharray="4 4"
-          />
+        <g transform={doorMirror(opening)}>
+          <line {...doorLeaf(opening)} stroke={stroke} strokeWidth={3} />
+          <path d={doorArc(opening)} fill="none" stroke={stroke} strokeWidth={1.5} strokeDasharray="4 4" />
         </g>
       ) : (
         <>
@@ -140,6 +147,10 @@ export function OpeningGlyph({
     </g>
   )
 }
+
+// Grabbable stroke width for the door leaf/arc hit shapes, in screen px
+// (non-scaling-stroke keeps it constant at every zoom level).
+const DOOR_HIT_STROKE = 12
 
 // Invisible fat hit target for an opening (its full span on the wall).
 // Render AFTER wall hit targets so clicking the opening's span wins (spec §4).
@@ -169,6 +180,24 @@ export function OpeningHit({
         height={wall.thickness * 3.2}
         fill="transparent"
       />
+      {/* the door leaf and swing arc are grabbable too */}
+      {opening.type === 'door' && (
+        <g transform={doorMirror(opening)}>
+          <line
+            {...doorLeaf(opening)}
+            stroke="transparent"
+            strokeWidth={DOOR_HIT_STROKE}
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d={doorArc(opening)}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={DOOR_HIT_STROKE}
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
+      )}
     </g>
   )
 }

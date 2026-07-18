@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import AppMenu from './AppMenu'
 import Editor from './editor/Editor'
 import ReloadPrompt from './pwa/ReloadPrompt'
+import { emptyPlan, isPlanEmpty } from './model/types'
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave'
 import { loadPlan } from './persistence/storage'
 import { replacePlan, usePlanStore } from './store/planStore'
@@ -44,7 +46,14 @@ export default function App() {
     }
   }, [])
 
+  const planIsEmpty = usePlanStore((s) => isPlanEmpty(s.plan))
+
   if (boot === 'loading') return null
+
+  const resetPlan = () => {
+    if (!window.confirm('Reset the plan? It will be lost.')) return
+    replacePlan(emptyPlan())
+  }
 
   const exportPng = async () => {
     try {
@@ -61,24 +70,13 @@ export default function App() {
 
   return (
     <>
-      <Editor
-        toolbarExtra={
-          <>
-            <button className="pill-btn" title="Export as PNG image" onClick={exportPng}>
-              PNG
-            </button>
-            <button
-              className="pill-btn"
-              title="Export as JSON file"
-              onClick={() => exportPlanJson(usePlanStore.getState().plan)}
-            >
-              Export
-            </button>
-            <button className="pill-btn" title="Import a JSON file" onClick={() => importPlanJson(setNotice)}>
-              Import
-            </button>
-          </>
-        }
+      <Editor />
+      <AppMenu
+        onOpen={() => importPlanJson(setNotice)}
+        onSaveAs={() => exportPlanJson(usePlanStore.getState().plan)}
+        onExportImage={exportPng}
+        onReset={resetPlan}
+        resetDisabled={planIsEmpty}
       />
       {readOnly && (
         <div className="banner">The plan is already open in another tab — changes here are not saved.</div>
