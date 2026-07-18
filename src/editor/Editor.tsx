@@ -107,7 +107,7 @@ const isTypingTarget = (e: KeyboardEvent) => {
 export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const { view, toPlan, pxPerCm, zoomCenter, panByPx, fitPlan } = useView(svgRef)
+  const { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
@@ -638,7 +638,7 @@ export default function Editor() {
             <ZoomOut size={16} aria-hidden />
           </button>
           <button className="floating-btn" title="Fit to plan" onClick={() => fitPlan(plan)}>
-            {Math.round(pxPerCm() * 100)}%
+            {Math.round(zoomScale * 100)}%
           </button>
           <button
             className="floating-btn icon"

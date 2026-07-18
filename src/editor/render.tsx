@@ -16,10 +16,12 @@ export const COLORS = {
   label: '#374151',
 }
 
-const labelAngle = (dx: number, dy: number) => {
+// ISO convention: label text reads from the bottom or the right of the sheet,
+// so vertical text is -90 (bottom-to-top), never +90.
+export const labelAngle = (dx: number, dy: number) => {
   let angle = (Math.atan2(dy, dx) * 180) / Math.PI
-  if (angle > 90) angle -= 180
-  else if (angle <= -90) angle += 180
+  if (angle >= 90) angle -= 180
+  else if (angle < -90) angle += 180
   return angle
 }
 
@@ -209,7 +211,8 @@ const dimLineOffset = (wall: Wall) => wall.thickness + 8
 
 // Automatic dimension on every wall, always visible (spec §4). Sits at
 // wall.dimPlacement when set (ratio along the axis, side across it), else at
-// the midpoint on the upper side. With onPointerDown it becomes a drag handle
+// the midpoint, above the text's reading line (upper side for horizontal
+// walls, left side for vertical ones). With onPointerDown it becomes a drag handle
 // (select mode); it is never part of the selection.
 export function DimLabel({
   plan,

@@ -59,15 +59,28 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     setView({ x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin })
   }
 
-  // The screen scale (pxPerCm) also depends on the SVG's on-screen size, which
-  // React doesn't track: nudge the state on mount and on window resize so
-  // consumers displaying the zoom percentage re-render with a fresh value.
+  // On-screen size of the SVG, tracked as state so the zoom percentage can be
+  // derived from `view` + `size` during render. Reading getScreenCTM() at
+  // render time instead would return the *committed* viewBox — one render
+  // behind the state — making the displayed percentage lag every zoom.
+  const [size, setSize] = useState({ w: 0, h: 0 })
   useEffect(() => {
-    const refresh = () => setView((v) => ({ ...v }))
-    refresh()
-    window.addEventListener('resize', refresh)
-    return () => window.removeEventListener('resize', refresh)
+    const svg = svgRef.current
+    if (!svg) return
+    const measure = () => {
+      const r = svg.getBoundingClientRect()
+      setSize((s) => (s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height }))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+    // svgRef is stable; the ref is filled by the time effects run
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Same rule as preserveAspectRatio="xMidYMid meet": uniform scale, min of
+  // the two ratios. This is the render-safe counterpart of pxPerCm().
+  const zoomScale = size.w > 0 ? Math.min(size.w / view.w, size.h / view.h) : 1
 
   useEffect(() => {
     const svg = svgRef.current
@@ -82,7 +95,7 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, toPlan, pxPerCm, zoomCenter, panByPx, fitPlan }
+  return { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan }
 }
 
 export function useSpaceHeld() {

@@ -46,7 +46,9 @@ _Avoid_: Room name, tag
 **Dimension**:
 The displayed length of a wall, measured along its axis between its two points.
 The value is computed from the plan, never stored. Its placement — where along
-the wall it sits and on which side — belongs to the plan, like any edit.
+the wall it sits and on which side — belongs to the plan, like any edit. Its
+text always reads from the bottom or the right of the sheet (ISO convention) —
+the reading direction never depends on which side of the wall it sits.
 _Avoid_: Measurement, cote
 
 **Room area**:
