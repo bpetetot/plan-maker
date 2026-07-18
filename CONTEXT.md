@@ -55,6 +55,12 @@ _Avoid_: Measurement, cote
 The surface of a detected room in square meters, computed from its wall loop.
 _Avoid_: Surface, square footage
 
+**Tool**:
+The editor's active instrument, which determines what clicking the sheet does.
+Exactly one tool is active at a time: Select — the default —, Wall, Door, or
+Window. Pure editor state: never part of the plan.
+_Avoid_: Mode
+
 **Selection**:
 The set of elements — walls, openings, room labels — the user is currently
 acting on in the editor. Group actions (delete, move) apply to every element in

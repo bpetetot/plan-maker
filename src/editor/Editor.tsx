@@ -66,7 +66,7 @@ import {
 } from './render'
 import { useSpaceHeld, useView } from './useView'
 
-type Mode = 'select' | 'wall' | 'door' | 'window'
+type Tool = 'select' | 'wall' | 'door' | 'window'
 type Drag =
   | { kind: 'pan'; x: number; y: number }
   | { kind: 'point'; id: string }
@@ -113,12 +113,12 @@ export default function Editor() {
   const planEpoch = usePlanStore((s) => s.planEpoch)
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
-  const [mode, setMode] = useState<Mode>('select')
+  const [tool, setTool] = useState<Tool>('select')
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
   // A wall chain being drawn. The first click is held as a pending snap —
   // nothing is committed to the plan until the first wall commit, so aborting
-  // the chain (Esc, mode switch, double-click) never mutates the plan.
+  // the chain (Esc, tool switch, double-click) never mutates the plan.
   const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null)
   const [snap, setSnap] = useState<Snap | null>(null)
   const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null)
@@ -143,12 +143,12 @@ export default function Editor() {
 
   const tolerance = () => 14 / pxPerCm()
 
-  const switchMode = (m: Mode) => {
-    setMode(m)
+  const switchTool = (next: Tool) => {
+    setTool(next)
     setChain(null)
     setSnap(null)
     setOpenPreview(null)
-    if (m !== 'select') setSel([])
+    if (next !== 'select') setSel([])
   }
 
   const deleteSelection = useCallback(
@@ -178,13 +178,13 @@ export default function Editor() {
       if (e.key === 'Escape') {
         if (chain) setChain(null)
         else if (sel.length > 0) setSel([])
-        else switchMode('select')
+        else switchTool('select')
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         deleteSelection(sel)
-      } else if (e.key === '1') switchMode('select')
-      else if (e.key === '2') switchMode('wall')
-      else if (e.key === '3') switchMode('door')
-      else if (e.key === '4') switchMode('window')
+      } else if (e.key === '1') switchTool('select')
+      else if (e.key === '2') switchTool('wall')
+      else if (e.key === '3') switchTool('door')
+      else if (e.key === '4') switchTool('window')
     }
     const up = (e: KeyboardEvent) => {
       alt.current = e.altKey
@@ -216,7 +216,7 @@ export default function Editor() {
     }
     if (e.button !== 0) return
     const c = toPlan(e.clientX, e.clientY)
-    if (mode === 'wall') {
+    if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
       const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current })
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
@@ -237,20 +237,20 @@ export default function Editor() {
       } else {
         setChain({ pending: s })
       }
-    } else if ((mode === 'door' || mode === 'window') && openPreview) {
+    } else if ((tool === 'door' || tool === 'window') && openPreview) {
       // keep the placement tool active, but select the new opening so its
       // actions popover shows right away
-      const [next, id] = placeOpening(plan, openPreview.wallId, mode, openPreview.offset)
+      const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset)
       setPlan(() => next)
       setSel(id ? [{ type: 'opening', id }] : [])
-    } else if (mode === 'select') {
+    } else if (tool === 'select') {
       // dragging on empty canvas draws a selection marquee; a click-sized
       // marquee resolves to "clear the selection" on pointer up
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c }
       setMarquee({ a: c, b: c })
       svg.setPointerCapture(e.pointerId)
     } else {
-      // clicking empty canvas clears the selection in every non-wall mode
+      // clicking empty canvas clears the selection in every non-wall tool
       setSel([])
     }
   }
@@ -329,15 +329,29 @@ export default function Editor() {
       }
       return
     }
-    if (mode === 'wall') {
+    if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current }))
-    } else if (mode === 'door' || mode === 'window') {
+    } else if (tool === 'door' || tool === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
       if (near) {
-        const offset = clampOpeningOffset(plan, near.wall, near.t, defaultOpeningWidth(mode))
+        const offset = clampOpeningOffset(plan, near.wall, near.t, defaultOpeningWidth(tool))
         setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset })
       } else setOpenPreview(null)
+    }
+  }
+
+  // Right-click exits the drawing gesture; the canvas never shows the
+  // native context menu.
+  const onSvgContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (drag.current) return
+    if (chain) {
+      // like Escape's first rung: end the chain, stay in the Wall tool
+      setChain(null)
+      setSnap(null)
+    } else if (tool !== 'select') {
+      switchTool('select')
     }
   }
 
@@ -417,10 +431,10 @@ export default function Editor() {
     }
   }
 
-  const cursor = space ? 'grab' : mode === 'select' ? 'default' : 'crosshair'
+  const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair'
   const ghostOpening: Opening | null =
-    openPreview && (mode === 'door' || mode === 'window')
-      ? mode === 'door'
+    openPreview && (tool === 'door' || tool === 'window')
+      ? tool === 'door'
         ? {
             id: '__ghost',
             wallId: openPreview.wallId,
@@ -440,17 +454,17 @@ export default function Editor() {
       : null
 
   const onLabelPointerDown = (label: Plan['roomLabels'][string], e: React.PointerEvent) => {
-    if (mode !== 'select') return
+    if (tool !== 'select') return
     onElementPointerDown({ type: 'label', id: label.id }, e, () => ({ kind: 'label', id: label.id }))
   }
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
-    if (mode === 'wall') {
+    if (tool === 'wall') {
       setChain(null)
       setSnap(null)
       return
     }
-    if (mode !== 'select') return
+    if (tool !== 'select') return
     const c = toPlan(e.clientX, e.clientY)
     const room = roomAt(rooms, c.x, c.y)
     if (!room) return
@@ -475,6 +489,7 @@ export default function Editor() {
         onPointerDown={onSvgPointerDown}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
+        onContextMenu={onSvgContextMenu}
         onDoubleClick={onCanvasDoubleClick}
       >
         {/* the grid is not displayed (spec §4) — grid snapping stays active */}
@@ -486,7 +501,7 @@ export default function Editor() {
             color={
               selKeys.has(refKey({ type: 'wall', id: wall.id }))
                 ? COLORS.wallSelected
-                : hoverWall === wall.id && mode === 'select'
+                : hoverWall === wall.id && tool === 'select'
                   ? COLORS.wallHover
                   : undefined
             }
@@ -506,7 +521,7 @@ export default function Editor() {
           onLabelPointerDown={onLabelPointerDown}
           selectedLabelIds={selectedLabelIds}
         />
-        {mode === 'select' &&
+        {tool === 'select' &&
           Object.values(plan.walls).map((wall) => (
             <WallHit
               key={wall.id}
@@ -525,7 +540,7 @@ export default function Editor() {
               onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
             />
           ))}
-        {mode === 'select' &&
+        {tool === 'select' &&
           Object.values(plan.openings).map((opening) => (
             <OpeningHit
               key={opening.id}
@@ -547,7 +562,7 @@ export default function Editor() {
             plan={plan}
             wall={wall}
             onPointerDown={
-              mode === 'select'
+              tool === 'select'
                 ? (e) => {
                     if (e.button !== 0 || space) return
                     startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
@@ -592,7 +607,7 @@ export default function Editor() {
           />
         )}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
-        {mode === 'wall' && <SnapMarker snap={snap} />}
+        {tool === 'wall' && <SnapMarker snap={snap} />}
         {drag.current?.kind === 'point' && <SnapMarker snap={snap} />}
       </svg>
 
@@ -611,10 +626,11 @@ export default function Editor() {
         ).map(([m, label, key, Icon]) => (
           <button
             key={m}
-            className={mode === m ? 'floating-btn icon active' : 'floating-btn icon'}
+            className={tool === m ? 'floating-btn icon active' : 'floating-btn icon'}
             title={`${label} (${key})`}
             aria-label={label}
-            onClick={() => switchMode(m)}
+            aria-pressed={tool === m}
+            onClick={() => switchTool(m)}
           >
             <Icon size={16} aria-hidden />
             <span className="key-hint">{key}</span>
@@ -627,11 +643,11 @@ export default function Editor() {
         className="hint"
         style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}
       >
-        {mode === 'wall'
+        {tool === 'wall'
           ? chain
             ? 'Click to add a wall · click the start point to close the room · Esc / double-click to stop'
             : 'Click to start a wall chain · Alt disables snapping'
-          : mode === 'door' || mode === 'window'
+          : tool === 'door' || tool === 'window'
             ? 'Hover a wall, click to place'
             : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>

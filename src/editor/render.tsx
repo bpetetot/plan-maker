@@ -216,7 +216,7 @@ const dimLineOffset = (wall: Wall) => wall.thickness + 8
 // wall.dimPlacement when set (ratio along the axis, side across it), else at
 // the midpoint, above the text's reading line (upper side for horizontal
 // walls, left side for vertical ones). With onPointerDown it becomes a drag handle
-// (select mode); it is never part of the selection.
+// (Select tool); it is never part of the selection.
 export function DimLabel({
   plan,
   wall,

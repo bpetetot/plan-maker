@@ -16,7 +16,7 @@ export interface SnapOptions {
   tolerance: number
   anchor?: Vec
   exclude?: Set<string>
-  walls?: boolean // wall bodies become snap targets (drawing mode)
+  walls?: boolean // wall bodies become snap targets (Wall tool)
   free?: boolean // Alt held: no snapping, just integer rounding
 }
 
