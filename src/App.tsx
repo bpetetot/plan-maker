@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import Editor from './editor/Editor'
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave'
 import { loadPlan } from './persistence/storage'
-import { replacePlan } from './store/planStore'
+import { replacePlan, usePlanStore } from './store/planStore'
+import { transferFileName } from './transfer/json'
+import { renderPlanPng } from './transfer/png'
+import { downloadBlob, exportPlanJson, importPlanJson } from './transfer/transferActions'
 
 type BootState = 'loading' | 'ready'
 
 export default function App() {
   const [boot, setBoot] = useState<BootState>('loading')
   const [readOnly, setReadOnly] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let stopAutosave: (() => void) | undefined
@@ -24,7 +27,7 @@ export default function App() {
         stopAutosave = startAutosave({
           onError: (error) => {
             const quota = error instanceof DOMException && error.name === 'QuotaExceededError'
-            setSaveError(quota ? 'Storage is full — the plan can no longer be saved.' : 'Saving the plan failed.')
+            setNotice(quota ? 'Storage is full — the plan can no longer be saved.' : 'Saving the plan failed.')
           },
         })
       } else {
@@ -40,16 +43,47 @@ export default function App() {
 
   if (boot === 'loading') return null
 
+  const exportPng = async () => {
+    try {
+      const blob = await renderPlanPng(usePlanStore.getState().plan)
+      if (!blob) {
+        setNotice('Nothing to export yet — draw some walls first.')
+        return
+      }
+      downloadBlob(blob, transferFileName('png'))
+    } catch {
+      setNotice('PNG export failed.')
+    }
+  }
+
   return (
     <>
-      <Editor />
+      <Editor
+        toolbarExtra={
+          <>
+            <button className="pill-btn" title="Export as PNG image" onClick={exportPng}>
+              PNG
+            </button>
+            <button
+              className="pill-btn"
+              title="Export as JSON file"
+              onClick={() => exportPlanJson(usePlanStore.getState().plan)}
+            >
+              Export
+            </button>
+            <button className="pill-btn" title="Import a JSON file" onClick={() => importPlanJson(setNotice)}>
+              Import
+            </button>
+          </>
+        }
+      />
       {readOnly && (
         <div className="banner">The plan is already open in another tab — changes here are not saved.</div>
       )}
-      {saveError && (
+      {notice && (
         <div className="banner error">
-          {saveError}
-          <button onClick={() => setSaveError(null)}>✕</button>
+          {notice}
+          <button onClick={() => setNotice(null)}>✕</button>
         </div>
       )}
     </>
