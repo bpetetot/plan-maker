@@ -17,7 +17,9 @@ _Avoid_: Vertex, node, corner
 
 **Wall**:
 A straight edge between two points, with a thickness. The only thing the user
-draws to shape the plan.
+draws to shape the plan. Walls only meet at Points: drawing a wall onto or
+across another wall splits the existing wall at the junction — no wall ever
+crosses or overlaps another away from a shared Point.
 _Avoid_: Segment, edge, line
 
 **Opening**:
@@ -43,7 +45,8 @@ _Avoid_: Room name, tag
 
 **Dimension**:
 The displayed length of a wall, measured along its axis between its two points.
-Computed from the plan, never stored.
+The value is computed from the plan, never stored. Its placement — where along
+the wall it sits and on which side — belongs to the plan, like any edit.
 _Avoid_: Measurement, cote
 
 **Room area**:
@@ -56,3 +59,9 @@ acting on in the editor. Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. Never part of the plan.
 _Avoid_: Highlight, marked elements
+
+**Rail**:
+The pair of guide lines a Dimension slides along while it is being dragged —
+one on each side of its wall. Pure editor feedback: never part of the plan,
+never exported.
+_Avoid_: Guide, track
