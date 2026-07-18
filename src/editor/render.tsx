@@ -202,17 +202,81 @@ export function OpeningHit({
   )
 }
 
-// Automatic dimension on every wall, always visible (spec §4).
-export function DimLabel({ plan, wall }: { plan: Plan; wall: Wall }) {
+// Distance from the wall centerline to the line the dimension text is
+// vertically centered on — the same line the rails materialise (4px gap from
+// the wall face + half the 11px text height).
+const dimLineOffset = (wall: Wall) => wall.thickness + 8
+
+// Automatic dimension on every wall, always visible (spec §4). Sits at
+// wall.dimPlacement when set (ratio along the axis, side across it), else at
+// the midpoint on the upper side. With onPointerDown it becomes a drag handle
+// (select mode); it is never part of the selection.
+export function DimLabel({
+  plan,
+  wall,
+  onPointerDown,
+}: {
+  plan: Plan
+  wall: Wall
+  onPointerDown?: (e: React.PointerEvent) => void
+}) {
   const [a, b] = wallPoints(plan, wall)
   const length = wallLength(plan, wall)
   if (length < 20) return null
-  const angle = labelAngle(b.x - a.x, b.y - a.y)
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const raw = (Math.atan2(dy, dx) * 180) / Math.PI
+  const angle = labelAngle(dx, dy)
+  // labelAngle keeps the text readable; when it flips the frame, local +y
+  // points along -n (n = left normal of start→end), so map the stored side
+  // back into the rotated frame. Default: local -y, the pre-placement look.
+  const flipped = angle !== raw
+  const t = wall.dimPlacement?.t ?? 0.5
+  const localSign = wall.dimPlacement ? wall.dimPlacement.side * (flipped ? -1 : 1) : -1
+  const y = localSign * dimLineOffset(wall)
   return (
-    <g transform={`translate(${(a.x + b.x) / 2},${(a.y + b.y) / 2}) rotate(${angle})`} pointerEvents="none">
-      <text y={-wall.thickness - 4} textAnchor="middle" className="dim">
+    <g
+      transform={`translate(${a.x + dx * t},${a.y + dy * t}) rotate(${angle})`}
+      pointerEvents={onPointerDown ? 'auto' : 'none'}
+      style={onPointerDown ? { cursor: 'move' } : undefined}
+      onPointerDown={onPointerDown}
+    >
+      {onPointerDown && <rect x={-30} y={y - 8} width={60} height={16} fill="transparent" />}
+      <text y={y} textAnchor="middle" dominantBaseline="central" className="dim">
         {formatLength(length)}
       </text>
+    </g>
+  )
+}
+
+// Rails: the two lines the dimension text is centered on while dragged, shown
+// on the dragged wall only, from drag threshold to pointer release. They span
+// the label's actual travel — one wall thickness of padding at each end, the
+// same bound setDimPlacement enforces. Editor feedback — deliberately absent
+// from PlanScene (never printed).
+export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
+  const [a, b] = wallPoints(plan, wall)
+  const length = wallLength(plan, wall)
+  const pad = wall.thickness
+  if (length <= 2 * pad) return null
+  const ux = (b.x - a.x) / length
+  const uy = (b.y - a.y) / length
+  const off = dimLineOffset(wall)
+  return (
+    <g pointerEvents="none">
+      {[1, -1].map((side) => (
+        <line
+          key={side}
+          x1={a.x + ux * pad - uy * side * off}
+          y1={a.y + uy * pad + ux * side * off}
+          x2={b.x - ux * pad - uy * side * off}
+          y2={b.y - uy * pad + ux * side * off}
+          stroke="#c9cdd4"
+          strokeWidth={1}
+          strokeDasharray="4 4"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
     </g>
   )
 }
@@ -305,6 +369,9 @@ export function SnapMarker({ snap }: { snap: Snap | null }) {
       )}
       {snap.kind === 'point' ? (
         <circle cx={snap.x} cy={snap.y} r={10} fill="none" stroke={COLORS.snap} strokeWidth={2.5} />
+      ) : snap.kind === 'wall' ? (
+        // hollow marker: the click will join (and split) this wall
+        <circle cx={snap.x} cy={snap.y} r={6.5} fill="none" stroke={COLORS.snap} strokeWidth={2.5} />
       ) : (
         <circle cx={snap.x} cy={snap.y} r={3.5} fill={COLORS.snap} />
       )}

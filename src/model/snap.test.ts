@@ -40,3 +40,36 @@ describe('snapPoint', () => {
     expect(s).toMatchObject({ x: 203, y: 118, kind: 'free' })
   })
 })
+
+describe('snapPoint on wall bodies', () => {
+  it('snaps to the nearest wall body when the walls option is set', () => {
+    const s = snapPoint(plan, 200, 6, { tolerance: 15, walls: true })
+    expect(s).toMatchObject({ x: 200, y: 0, kind: 'wall' })
+    expect(s.wallId).toBe(Object.keys(plan.walls)[0])
+  })
+
+  it('is not a snap target without the walls option', () => {
+    const s = snapPoint(plan, 200, 6, { tolerance: 15 })
+    expect(s.kind).toBe('grid')
+  })
+
+  it('loses to a nearby existing point', () => {
+    const s = snapPoint(plan, 8, 5, { tolerance: 15, walls: true })
+    expect(s.kind).toBe('point')
+  })
+
+  it('beats the 45° axis from the anchor', () => {
+    const s = snapPoint(plan, 200, 6, { tolerance: 15, walls: true, anchor: { x: 0, y: 0 } })
+    expect(s.kind).toBe('wall')
+  })
+
+  it('rounds the projection on a diagonal wall to integer centimeters', () => {
+    const diagonal = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(300, 300)
+      b.wall(p1, p2)
+    })
+    const s = snapPoint(diagonal, 150, 160, { tolerance: 15, walls: true })
+    expect(s).toMatchObject({ x: 155, y: 155, kind: 'wall' })
+  })
+})

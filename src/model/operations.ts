@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { wallLength } from './geometry'
+import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry'
 import type { Snap } from './snap'
 import type { Opening, Plan, Wall } from './types'
 import { defaultOpeningWidth, WALL_THICKNESS } from './types'
@@ -37,6 +37,140 @@ export function setPoints(plan: Plan, updates: Record<string, { x: number; y: nu
   return { ...plan, points }
 }
 
+// Splits a wall in two at an existing point (ADR 0002). The start-side half
+// keeps the wall's id, so its openings keep their wallId and offset. Each
+// opening goes to the half containing its center; one straddling the cut, or
+// no longer fitting its half, is deleted. Both halves drop their dimPlacement.
+export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
+  const wall = plan.walls[wallId]
+  const point = plan.points[pointId]
+  if (!wall || !point) return plan
+  if (pointId === wall.startPointId || pointId === wall.endPointId) return plan
+
+  const startHalf: Wall = {
+    id: wall.id,
+    startPointId: wall.startPointId,
+    endPointId: pointId,
+    thickness: wall.thickness,
+  }
+  const endHalf: Wall = {
+    id: newId(),
+    startPointId: pointId,
+    endPointId: wall.endPointId,
+    thickness: wall.thickness,
+  }
+  const walls = { ...plan.walls, [startHalf.id]: startHalf, [endHalf.id]: endHalf }
+  const next = { ...plan, walls }
+
+  const start = plan.points[wall.startPointId]
+  const cut = distance(start.x, start.y, point.x, point.y)
+  const openings: Record<string, Opening> = {}
+  for (const opening of Object.values(plan.openings)) {
+    if (opening.wallId !== wallId) {
+      openings[opening.id] = opening
+      continue
+    }
+    if (opening.offset - opening.width / 2 < cut && opening.offset + opening.width / 2 > cut) continue
+    const host = opening.offset < cut ? startHalf : endHalf
+    const offset = Math.round(opening.offset < cut ? opening.offset : opening.offset - cut)
+    // Kept only where it already sits: an opening the clamp would shift no
+    // longer fits its half and is deleted, never silently moved.
+    const clamped = clampOpeningOffset(next, host, offset, opening.width)
+    if (clamped !== offset) continue
+    openings[opening.id] = { ...opening, wallId: host.id, offset }
+  }
+  return { ...next, openings }
+}
+
+// Two model positions closer than this are treated as the same junction, and
+// a point this close to a wall's line sits on it. Well under the 10 cm wall
+// thickness, and above the ~0.7 cm drift that integer rounding can introduce.
+const JUNCTION_TOLERANCE = 1 // cm
+
+function findPointNear(plan: Plan, x: number, y: number): string | null {
+  let best: string | null = null
+  let bestDistance = JUNCTION_TOLERANCE
+  for (const point of Object.values(plan.points)) {
+    const d = distance(point.x, point.y, x, y)
+    if (d <= bestDistance) {
+      bestDistance = d
+      best = point.id
+    }
+  }
+  return best
+}
+
+// Resolves a drawing click to a point id, splitting the host wall when the
+// snap targets a wall body. The host is looked up at resolution time (not
+// trusted from the snap) because an earlier split may have replaced it.
+export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
+  if (snap.pointId) return [plan, snap.pointId]
+  const x = Math.round(snap.x)
+  const y = Math.round(snap.y)
+  if (snap.kind === 'wall') {
+    const host = nearestWall(plan, x, y, JUNCTION_TOLERANCE + 1)
+    const existing = findPointNear(plan, x, y)
+    // A reused point still splits the host (no-op when it is one of its
+    // ends): the contact must be a junction, not a dangling overlap.
+    if (existing) return [host ? splitWall(plan, host.wall.id, existing) : plan, existing]
+    const [next, id] = ensurePoint(plan, snap)
+    return [host ? splitWall(next, host.wall.id, id) : next, id]
+  }
+  return ensurePoint(plan, snap)
+}
+
+// Commits one drawn wall with planar insertion (ADR 0002): ends snapped onto
+// a wall body split it (T junction), and a crossed wall is split at the
+// intersection along with the new wall itself (X junction). Returns the
+// resolved end point id so the drawing chain can continue from it.
+export function commitWall(plan: Plan, start: Snap, end: Snap): [Plan, string] {
+  let next = plan
+  let startId: string
+  let endId: string
+  ;[next, startId] = commitPoint(next, start)
+  ;[next, endId] = commitPoint(next, end)
+  if (startId === endId) return [plan, startId]
+
+  const a = next.points[startId]
+  const b = next.points[endId]
+  const length = distance(a.x, a.y, b.x, b.y)
+  const along = (x: number, y: number) => ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / length
+
+  // Cut the new wall at every junction it creates. Walls are snapshotted
+  // here: two straight walls cross at most once, so the halves a split
+  // produces never need re-examination.
+  const cuts = new Map<string, number>() // pointId → distance along a→b
+
+  // existing points lying on the new wall's interior (reversed T junction)
+  for (const point of Object.values(next.points)) {
+    if (point.id === startId || point.id === endId) continue
+    const t = along(point.x, point.y)
+    if (t < JUNCTION_TOLERANCE || t > length - JUNCTION_TOLERANCE) continue
+    const off = Math.abs((b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)) / length
+    if (off <= JUNCTION_TOLERANCE) cuts.set(point.id, t)
+  }
+
+  for (const wall of Object.values(next.walls)) {
+    const [c, d] = wallPoints(next, wall)
+    const crossing = segmentIntersection(a, b, c, d)
+    if (!crossing) continue
+    const x = Math.round(crossing.x)
+    const y = Math.round(crossing.y)
+    let pointId = findPointNear(next, x, y)
+    if (!pointId) {
+      pointId = newId()
+      next = { ...next, points: { ...next.points, [pointId]: { id: pointId, x, y } } }
+    }
+    next = splitWall(next, wall.id, pointId)
+    if (pointId !== startId && pointId !== endId) cuts.set(pointId, along(x, y))
+  }
+
+  const ordered = [...cuts.entries()].sort(([, t1], [, t2]) => t1 - t2).map(([id]) => id)
+  const stops = [startId, ...ordered, endId]
+  for (let i = 0; i < stops.length - 1; i++) next = addWall(next, stops[i], stops[i + 1])
+  return [next, endId]
+}
+
 // Deleting a wall deletes its openings (spec §2) and any point no longer used by a wall.
 export function deleteWall(plan: Plan, id: string): Plan {
   const wall = plan.walls[id]
@@ -60,6 +194,22 @@ export function deleteWall(plan: Plan, id: string): Plan {
   }
 
   return { ...plan, points, walls, openings }
+}
+
+// The label's travel keeps one wall thickness of padding at each end, so the
+// text never crowds a corner; a wall too short for that pins it to the middle.
+// The bound applies on write only — a stored placement that falls outside it
+// after the wall is shortened renders as stored. Ratio rounded to 3 decimals:
+// sub-centimeter on any wall a dimension shows on, without dragging float
+// noise into the persisted plan.
+export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 | -1): Plan {
+  const wall = plan.walls[wallId]
+  if (!wall) return plan
+  const length = wallLength(plan, wall)
+  const pad = length > 0 ? Math.min(0.5, wall.thickness / length) : 0.5
+  const clamped = Math.max(pad, Math.min(1 - pad, t))
+  const dimPlacement = { t: Math.round(clamped * 1000) / 1000, side }
+  return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } }
 }
 
 export function deleteOpening(plan: Plan, id: string): Plan {

@@ -31,7 +31,8 @@ svg text.dim {
   fill: #8a8a8a;
   paint-order: stroke;
   stroke: #fff;
-  stroke-width: 3px;
+  /* thick enough to fully mask a rail passing through the text, spaces included */
+  stroke-width: 6px;
   user-select: none;
 }
 svg text.dim-live {

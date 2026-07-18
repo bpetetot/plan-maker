@@ -3,6 +3,8 @@ import {
   addRoomLabel,
   addWall,
   clampOpeningOffset,
+  commitPoint,
+  commitWall,
   deleteOpening,
   deleteRoomLabel,
   deleteWall,
@@ -12,8 +14,10 @@ import {
   moveOpening,
   placeOpening,
   renameRoomLabel,
+  setDimPlacement,
   setOpeningWidth,
   setPoints,
+  splitWall,
   toggleHingeSide,
   toggleSwing,
 } from './operations'
@@ -40,6 +44,227 @@ describe('ensurePoint', () => {
     const plan = rectPlan()
     const [next, id] = ensurePoint(plan, { x: 10.4, y: 19.6, kind: 'free' })
     expect(next.points[id]).toMatchObject({ x: 10, y: 20 })
+  })
+})
+
+describe('splitWall', () => {
+  it('splits a wall into two halves sharing the split point', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const mid = b.point(150, 0)
+      b.wall(p1, p2)
+      void mid
+    })
+    const [p1, p2, mid] = Object.keys(plan.points)
+    const wallId = Object.keys(plan.walls)[0]
+    const next = splitWall(plan, wallId, mid)
+    expect(Object.keys(next.walls)).toHaveLength(2)
+    // the start-side half keeps the original wall id and thickness
+    expect(next.walls[wallId]).toMatchObject({ startPointId: p1, endPointId: mid, thickness: 10 })
+    const other = Object.values(next.walls).find((w) => w.id !== wallId)!
+    expect(other).toMatchObject({ startPointId: mid, endPointId: p2, thickness: 10 })
+  })
+
+  it('is a no-op when the point is one of the wall ends', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    const endId = plan.walls[wallId].endPointId
+    expect(splitWall(plan, wallId, endId)).toBe(plan)
+  })
+
+  it('reassigns each opening to the half containing its center', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const mid = b.point(200, 0)
+      const wall = b.wall(p1, p2)
+      b.opening(wall, 'door', 60) // center on the start side
+      b.opening(wall, 'window', 320) // center on the end side
+      void mid
+    })
+    const mid = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const [doorId, windowId] = Object.keys(plan.openings)
+    const next = splitWall(plan, wallId, mid)
+    // start-side opening untouched
+    expect(next.openings[doorId]).toMatchObject({ wallId, offset: 60 })
+    // end-side opening rebased on the new half: 320 − 200 = 120
+    const endHalf = Object.values(next.walls).find((w) => w.id !== wallId)!
+    expect(next.openings[windowId]).toMatchObject({ wallId: endHalf.id, offset: 120 })
+  })
+
+  it('deletes an opening straddling the cut', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const cut = b.point(210, 0)
+      const wall = b.wall(p1, p2)
+      b.opening(wall, 'door', 200) // interval 155..245 contains the cut
+      void cut
+    })
+    const cut = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const next = splitWall(plan, wallId, cut)
+    expect(Object.keys(next.openings)).toHaveLength(0)
+  })
+
+  it('deletes an opening whose half is too short to host it', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const cut = b.point(96, 0)
+      const wall = b.wall(p1, p2)
+      b.opening(wall, 'door', 50) // interval 5..95, clear of the cut, but a 96 cm half cannot host 90+2×5
+      void cut
+    })
+    const cut = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const next = splitWall(plan, wallId, cut)
+    expect(Object.keys(next.openings)).toHaveLength(0)
+  })
+
+  it('deletes an opening the cut would force to shift, instead of moving it', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const cut = b.point(100, 0)
+      const wall = b.wall(p1, p2)
+      // interval 7..97: clear of the cut, but inside the 5 cm end margin of
+      // the 100 cm start half — clamping would silently move it to 50
+      b.opening(wall, 'door', 52)
+      void cut
+    })
+    const cut = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const next = splitWall(plan, wallId, cut)
+    expect(Object.keys(next.openings)).toHaveLength(0)
+  })
+
+  it('keeps an opening that exactly fits its half at its stored offset', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const cut = b.point(100, 0)
+      const wall = b.wall(p1, p2)
+      b.opening(wall, 'door', 50) // interval 5..95 with margins: exact fit of the 100 cm half
+      void cut
+    })
+    const cut = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const doorId = Object.keys(plan.openings)[0]
+    const next = splitWall(plan, wallId, cut)
+    expect(next.openings[doorId]).toMatchObject({ wallId, offset: 50 })
+  })
+
+  it('drops the dimension placement on both halves', () => {
+    let plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const mid = b.point(200, 0)
+      b.wall(p1, p2)
+      void mid
+    })
+    const mid = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    plan = setDimPlacement(plan, wallId, 0.3, -1)
+    const next = splitWall(plan, wallId, mid)
+    for (const wall of Object.values(next.walls)) expect(wall.dimPlacement).toBeUndefined()
+  })
+})
+
+describe('commitPoint', () => {
+  it('splits the host wall when the point lands on its body', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    const [next, id] = commitPoint(plan, { x: 150, y: 0, kind: 'wall', wallId })
+    expect(next.points[id]).toMatchObject({ x: 150, y: 0 })
+    expect(Object.keys(next.walls)).toHaveLength(2)
+    const touching = Object.values(next.walls).filter((w) => w.startPointId === id || w.endPointId === id)
+    expect(touching).toHaveLength(2)
+  })
+
+  it('reuses a nearby existing point instead of splitting at a duplicate', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    const endId = plan.walls[wallId].endPointId
+    const [next, id] = commitPoint(plan, { x: 400, y: 0, kind: 'wall', wallId })
+    expect(id).toBe(endId)
+    expect(next.walls).toEqual(plan.walls)
+  })
+
+  it('still splits the host when reusing a point that is not one of its ends', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      // a stray point a hair off the wall's body, from another wall
+      const stray = b.point(200, 1)
+      const top = b.point(200, 300)
+      b.wall(p1, p2)
+      b.wall(stray, top)
+    })
+    const strayId = Object.keys(plan.points)[2]
+    const wallId = Object.keys(plan.walls)[0]
+    const [next, id] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId })
+    expect(id).toBe(strayId)
+    // the host was split at the reused point: T junction, not a dangling contact
+    expect(Object.keys(next.walls)).toHaveLength(3)
+    const touching = Object.values(next.walls).filter((w) => w.startPointId === id || w.endPointId === id)
+    expect(touching).toHaveLength(3)
+  })
+})
+
+describe('commitWall', () => {
+  it('splits the host wall when an end lands on its body (T junction)', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    const [next, endId] = commitWall(
+      plan,
+      { x: 200, y: 300, kind: 'grid' },
+      { x: 200, y: 0, kind: 'wall', wallId },
+    )
+    expect(Object.keys(next.walls)).toHaveLength(3)
+    expect(Object.keys(next.points)).toHaveLength(4)
+    const junction = next.points[endId]
+    expect(junction).toMatchObject({ x: 200, y: 0 })
+    // the junction point is shared by all three walls
+    const touching = Object.values(next.walls).filter(
+      (w) => w.startPointId === endId || w.endPointId === endId,
+    )
+    expect(touching).toHaveLength(3)
+  })
+
+  it('splits both walls at a crossing (X junction), including the new wall', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(200, -100)
+      const p2 = b.point(200, 100)
+      b.wall(p1, p2)
+    })
+    const [next] = commitWall(plan, { x: 0, y: 0, kind: 'grid' }, { x: 400, y: 0, kind: 'grid' })
+    expect(Object.keys(next.walls)).toHaveLength(4)
+    expect(Object.keys(next.points)).toHaveLength(5)
+    const junction = Object.values(next.points).find((p) => p.x === 200 && p.y === 0)!
+    expect(junction).toBeDefined()
+    const touching = Object.values(next.walls).filter(
+      (w) => w.startPointId === junction.id || w.endPointId === junction.id,
+    )
+    expect(touching).toHaveLength(4)
+  })
+
+  it('splits the new wall at an existing point lying on its path', () => {
+    const plan = buildPlan((b) => {
+      const foot = b.point(200, 0)
+      const top = b.point(200, 300)
+      b.wall(foot, top)
+    })
+    const footId = Object.keys(plan.points)[0]
+    const [next] = commitWall(plan, { x: 0, y: 0, kind: 'grid' }, { x: 400, y: 0, kind: 'grid' })
+    expect(Object.keys(next.walls)).toHaveLength(3)
+    expect(Object.keys(next.points)).toHaveLength(4)
+    const touching = Object.values(next.walls).filter(
+      (w) => w.startPointId === footId || w.endPointId === footId,
+    )
+    expect(touching).toHaveLength(3)
   })
 })
 
@@ -175,6 +400,46 @@ describe('openings', () => {
     let id: string | null
     ;[plan, id] = placeOpening(plan, wallId, 'door', 200)
     expect(Object.keys(deleteOpening(plan, id!).openings)).toHaveLength(0)
+  })
+})
+
+describe('setDimPlacement', () => {
+  it('stores the placement on the wall, rounded to 3 decimals', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    expect(setDimPlacement(plan, wallId, 0.75, -1).walls[wallId].dimPlacement).toEqual({
+      t: 0.75,
+      side: -1,
+    })
+    expect(setDimPlacement(plan, wallId, 1 / 3, 1).walls[wallId].dimPlacement).toEqual({
+      t: 0.333,
+      side: 1,
+    })
+  })
+
+  it('keeps one wall thickness of padding at each end of the travel', () => {
+    // 400cm wall, thickness 10 → t clamped to [0.025, 0.975]
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    expect(setDimPlacement(plan, wallId, 1.4, 1).walls[wallId].dimPlacement).toEqual({
+      t: 0.975,
+      side: 1,
+    })
+    expect(setDimPlacement(plan, wallId, -0.2, 1).walls[wallId].dimPlacement).toEqual({
+      t: 0.025,
+      side: 1,
+    })
+  })
+
+  it('pins the placement to the middle of a wall too short for the padding', () => {
+    const plan = buildPlan((b) => b.wall(b.point(0, 0), b.point(15, 0)))
+    const wallId = Object.keys(plan.walls)[0]
+    expect(setDimPlacement(plan, wallId, 0.9, 1).walls[wallId].dimPlacement).toEqual({ t: 0.5, side: 1 })
+  })
+
+  it('is a no-op for an unknown wall', () => {
+    const plan = rectPlan()
+    expect(setDimPlacement(plan, 'missing', 0.5, 1)).toBe(plan)
   })
 })
 

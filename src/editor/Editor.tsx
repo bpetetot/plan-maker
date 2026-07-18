@@ -4,19 +4,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
-import { nearestWall, projectOnWall, wallLength, wallPoints } from '../model/geometry'
+import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry'
 import { formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
 import {
   addRoomLabel,
-  addWall,
   clampOpeningOffset,
-  ensurePoint,
+  commitPoint,
+  commitWall,
   movePoint,
   moveOpening,
   moveRoomLabel,
   placeOpening,
   renameRoomLabel,
+  setDimPlacement,
   setOpeningWidth,
   toggleHingeSide,
   toggleSwing,
@@ -40,6 +41,7 @@ import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '..
 import {
   COLORS,
   DimLabel,
+  DimRails,
   Handle,
   OpeningGlyph,
   OpeningHit,
@@ -67,12 +69,22 @@ type Drag =
     }
   | { kind: 'opening'; id: string }
   | { kind: 'label'; id: string }
+  // dragging a wall's dimension label; a movement below the click threshold
+  // resolves to "select the wall" on pointer up
+  | { kind: 'dim'; id: string; start: Vec; moved?: boolean }
   // the live rect lives on the drag ref (b is mutated on move) so pointer-up
   // never reads a stale React state; the marquee state only drives rendering
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
 
 // Below this movement (screen px) a marquee or group drag is a plain click.
 const CLICK_PX = 4
+
+const pointSnap = (p: Plan, id: string): Snap => ({
+  x: p.points[id].x,
+  y: p.points[id].y,
+  kind: 'point',
+  pointId: id,
+})
 
 const isTypingTarget = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement
@@ -90,12 +102,17 @@ export default function Editor() {
   const [mode, setMode] = useState<Mode>('select')
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
-  const [chain, setChain] = useState<{ start: string; last: string } | null>(null)
+  // A wall chain being drawn. The first click is held as a pending snap —
+  // nothing is committed to the plan until the first wall commit, so aborting
+  // the chain (Esc, mode switch, double-click) never mutates the plan.
+  const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null)
   const [snap, setSnap] = useState<Snap | null>(null)
   const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null)
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
     null,
   )
+  // wall whose dimension is being dragged past the click threshold — drives the rails
+  const [railWallId, setRailWallId] = useState<string | null>(null)
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
   const alt = useRef(false)
@@ -178,20 +195,26 @@ export default function Editor() {
     if (e.button !== 0) return
     const c = toPlan(e.clientX, e.clientY)
     if (mode === 'wall') {
-      const anchor = chain ? plan.points[chain.last] : undefined
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, free: alt.current })
-      if (chain && s.pointId === chain.start && chain.last !== chain.start) {
+      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current })
+      if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
         // clicking the chain's start point closes the room
-        setPlan((p) => addWall(p, chain.last, chain.start))
+        setPlan((p) => commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start))[0])
         setChain(null)
         setSnap(null)
         return
       }
-      const [withPoint, pointId] = ensurePoint(plan, s)
-      let next = withPoint
-      if (chain && chain.last !== pointId) next = addWall(next, chain.last, pointId)
-      setPlan(() => next)
-      setChain(chain ? { ...chain, last: pointId } : { start: pointId, last: pointId })
+      if (chain) {
+        // one setPlan per drawn wall: resolving the (possibly pending) start
+        // and committing the wall land in a single history entry (ADR 0002)
+        const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last)
+        const [withStart, startId] = commitPoint(plan, startSnap)
+        const [next, pointId] = commitWall(withStart, pointSnap(withStart, startId), s)
+        setPlan(() => next)
+        setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId })
+      } else {
+        setChain({ pending: s })
+      }
     } else if ((mode === 'door' || mode === 'window') && openPreview) {
       // keep the placement tool active, but select the new opening so its
       // actions popover shows right away
@@ -265,12 +288,27 @@ export default function Editor() {
         }
       } else if (d.kind === 'label') {
         setPlan((p) => moveRoomLabel(p, d.id, c.x, c.y))
+      } else if (d.kind === 'dim') {
+        const wall = plan.walls[d.id]
+        if (wall) {
+          if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
+            d.moved = true
+            setRailWallId(d.id)
+          }
+          if (d.moved) {
+            const length = wallLength(plan, wall)
+            const { t } = projectOnWall(plan, wall, c.x, c.y)
+            setPlan((p) =>
+              setDimPlacement(p, d.id, length < 1 ? 0.5 : t / length, wallSide(plan, wall, c.x, c.y)),
+            )
+          }
+        }
       }
       return
     }
     if (mode === 'wall') {
-      const anchor = chain ? plan.points[chain.last] : undefined
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, free: alt.current }))
+      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current }))
     } else if (mode === 'door' || mode === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
       if (near) {
@@ -299,6 +337,12 @@ export default function Editor() {
     // a click (no movement) on an element of a multi-selection collapses the
     // selection to that element instead of dragging the group
     if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef])
+    // a click on a dimension label selects its wall; a drag never touches the
+    // selection — the label is a handle, not an element
+    if (d.kind === 'dim') {
+      if (!d.moved) setSel([{ type: 'wall', id: d.id }])
+      setRailWallId(null)
+    }
     if (d.kind === 'point') setSnap(null)
     if (d.kind !== 'pan') endHistoryGroup()
   }
@@ -432,9 +476,6 @@ export default function Editor() {
           onLabelPointerDown={onLabelPointerDown}
           selectedLabelIds={selectedLabelIds}
         />
-        {Object.values(plan.walls).map((wall) => (
-          <DimLabel key={wall.id} plan={plan} wall={wall} />
-        ))}
         {mode === 'select' &&
           Object.values(plan.walls).map((wall) => (
             <WallHit
@@ -468,6 +509,23 @@ export default function Editor() {
               }
             />
           ))}
+        {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
+        {/* after the hit targets so the label wins the hit-test where they overlap */}
+        {Object.values(plan.walls).map((wall) => (
+          <DimLabel
+            key={wall.id}
+            plan={plan}
+            wall={wall}
+            onPointerDown={
+              mode === 'select'
+                ? (e) => {
+                    if (e.button !== 0 || space) return
+                    startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
+                  }
+                : undefined
+            }
+          />
+        ))}
         {selWall &&
           wallPoints(plan, selWall).map((p) => (
             <Handle
@@ -496,7 +554,13 @@ export default function Editor() {
             pointerEvents="none"
           />
         )}
-        {chain && snap && <RubberWall from={plan.points[chain.last]} to={snap} thickness={WALL_THICKNESS} />}
+        {chain && snap && (
+          <RubberWall
+            from={'pending' in chain ? chain.pending : plan.points[chain.last]}
+            to={snap}
+            thickness={WALL_THICKNESS}
+          />
+        )}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
         {mode === 'wall' && <SnapMarker snap={snap} />}
         {drag.current?.kind === 'point' && <SnapMarker snap={snap} />}

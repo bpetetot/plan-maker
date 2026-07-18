@@ -2,7 +2,7 @@ import type { Opening, Plan } from '../model/types'
 
 // One schema, one migration path (spec §7): the IndexedDB record and the JSON
 // export file share this version and replay the same ordered migrations.
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export interface StoredRecord {
   schemaVersion: number
@@ -12,7 +12,11 @@ export interface StoredRecord {
 
 // Keyed by the version they migrate FROM; applied in order up to SCHEMA_VERSION.
 type Migration = (plan: unknown) => unknown
-export const migrations: Record<number, Migration> = {}
+export const migrations: Record<number, Migration> = {
+  // v2 added the optional Wall.dimPlacement; absent means default rendering,
+  // so v1 plans are already valid v2 plans.
+  1: (plan) => plan,
+}
 
 export function runMigrations(
   fromVersion: number,
@@ -62,6 +66,12 @@ export function validatePlan(value: unknown): Plan | null {
     if (typeof wall.startPointId !== 'string' || typeof wall.endPointId !== 'string') return null
     if (!(wall.startPointId in points) || !(wall.endPointId in points)) return null
     if (!isCm(wall.thickness)) return null
+    if (wall.dimPlacement !== undefined) {
+      const dp = wall.dimPlacement
+      if (!isRecord(dp)) return null
+      if (typeof dp.t !== 'number' || !Number.isFinite(dp.t) || dp.t < 0 || dp.t > 1) return null
+      if (dp.side !== 1 && dp.side !== -1) return null
+    }
   }
   const wallIds = new Set(Object.keys(walls))
   for (const [id, opening] of Object.entries(openings)) {

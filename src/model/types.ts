@@ -8,11 +8,20 @@ export interface Point {
   y: Cm
 }
 
+// Placement of a wall's dimension label. Absent = default rendering (midpoint,
+// upper side). `t` is a ratio of the wall's length — not cm — so the label
+// keeps its relative position when the wall is stretched (see ADR 0001).
+export interface DimPlacement {
+  t: number // 0..1 along the wall from its start point
+  side: 1 | -1 // sign along the wall's left normal (start→end rotated +90°)
+}
+
 export interface Wall {
   id: string
   startPointId: string
   endPointId: string
   thickness: Cm // default 10
+  dimPlacement?: DimPlacement
 }
 
 export interface BaseOpening {

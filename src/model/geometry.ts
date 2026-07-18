@@ -29,6 +29,14 @@ export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t
   return { t, d: distance(a.x + ux * t, a.y + uy * t, x, y) }
 }
 
+// Which side of the wall's axis (x, y) is on: +1 along the left normal of
+// start→end (the axis rotated +90°), -1 opposite. Points on the axis get +1.
+export function wallSide(plan: Plan, wall: Wall, x: number, y: number): 1 | -1 {
+  const [a, b] = wallPoints(plan, wall)
+  const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)
+  return cross >= 0 ? 1 : -1
+}
+
 export function nearestWall(
   plan: Plan,
   x: number,
@@ -45,6 +53,23 @@ export function nearestWall(
     }
   }
   return best
+}
+
+// Proper crossing of two segments: the intersection point when it lies
+// strictly inside both, null otherwise (parallel, collinear, or touching at
+// an endpoint). Endpoint contacts are junction matters, not crossings.
+export function segmentIntersection(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
+  const rx = b.x - a.x
+  const ry = b.y - a.y
+  const sx = d.x - c.x
+  const sy = d.y - c.y
+  const denominator = rx * sy - ry * sx
+  if (Math.abs(denominator) < 1e-9) return null
+  const t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / denominator
+  const u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / denominator
+  const epsilon = 1e-9
+  if (t <= epsilon || t >= 1 - epsilon || u <= epsilon || u >= 1 - epsilon) return null
+  return { x: a.x + t * rx, y: a.y + t * ry }
 }
 
 // Signed area (shoelace); sign depends on winding order.

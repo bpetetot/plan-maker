@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest'
+import { commitWall } from './operations'
 import { detectRooms, roomAt } from './rooms'
 import { buildPlan } from './testHelpers'
+
+describe('detectRooms after planar insertion (ADR 0002)', () => {
+  it('detects both rooms when a divider is drawn between two wall bodies', () => {
+    const square = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      b.wall(p1, p2)
+      b.wall(p2, p3)
+      b.wall(p3, p4)
+      b.wall(p4, p1)
+    })
+    expect(detectRooms(square)).toHaveLength(1)
+    const [bottom, , top] = Object.keys(square.walls)
+    const [plan] = commitWall(
+      square,
+      { x: 200, y: 0, kind: 'wall', wallId: bottom },
+      { x: 200, y: 400, kind: 'wall', wallId: top },
+    )
+    const rooms = detectRooms(plan)
+    expect(rooms).toHaveLength(2)
+    for (const room of rooms) expect(room.areaCm2).toBe(200 * 400)
+  })
+})
 
 describe('detectRooms', () => {
   it('finds no room in an empty plan or an open chain', () => {

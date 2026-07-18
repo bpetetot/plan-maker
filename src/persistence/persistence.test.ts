@@ -55,14 +55,30 @@ describe('validatePlan', () => {
     plan2.openings['o1'] = { id: 'o1', wallId, type: 'door', offset: 100, width: 90, hingeSide: 'left' }
     expect(validatePlan(plan2)).toBeNull()
   })
+
+  it('accepts a wall with a valid dimension placement', () => {
+    const plan = structuredClone(squarePlan())
+    Object.values(plan.walls)[0].dimPlacement = { t: 0.75, side: -1 }
+    expect(validatePlan(plan)).not.toBeNull()
+  })
+
+  it('rejects malformed dimension placements', () => {
+    for (const dimPlacement of [{ t: 1.2, side: 1 }, { t: 0.5, side: 0 }, { t: NaN, side: 1 }, 'mid']) {
+      const plan = structuredClone(squarePlan())
+      // @ts-expect-error deliberately malformed placement
+      Object.values(plan.walls)[0].dimPlacement = dimPlacement
+      expect(validatePlan(plan)).toBeNull()
+    }
+  })
 })
 
 describe('runMigrations', () => {
   it('applies ordered migrations from the record version', () => {
     const table = {
-      0: (plan: unknown) => ({ ...(plan as object), migrated: true }),
+      0: (plan: unknown) => ({ ...(plan as object), first: true }),
+      1: (plan: unknown) => ({ ...(plan as object), second: true }),
     }
-    expect(runMigrations(0, {}, table)).toEqual({ migrated: true })
+    expect(runMigrations(0, {}, table)).toEqual({ first: true, second: true })
     expect(runMigrations(SCHEMA_VERSION, { untouched: 1 }, table)).toEqual({ untouched: 1 })
   })
 
@@ -98,6 +114,12 @@ describe('storage', () => {
     const backup = (await get(BACKUP_KEY)) as StoredRecord
     expect(backup.plan).toEqual(plan)
     expect(backup.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+
+  it('loads a v1 record unchanged (dimension placement is optional)', async () => {
+    const plan = squarePlan()
+    await set(CURRENT_KEY, { schemaVersion: 1, savedAt: 1, plan })
+    expect(await loadPlan()).toEqual(plan)
   })
 
   it('rejects records from a future schema version', async () => {
