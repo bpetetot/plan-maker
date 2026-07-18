@@ -67,3 +67,11 @@ The pair of guide lines a Dimension slides along while it is being dragged —
 one on each side of its wall. Pure editor feedback: never part of the plan,
 never exported.
 _Avoid_: Guide, track
+
+**Fit**:
+Framing the view so the whole plan is visible with a margin; on an empty plan
+it returns the view to its default framing. Always reframes, regardless of
+where the view was. Applied after any replacement of the plan — opening a
+file, restoring at startup, resetting — and on demand. Pure editor behavior:
+never part of the plan.
+_Avoid_: Fit zoom, zoom to fit, center

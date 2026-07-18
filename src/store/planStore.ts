@@ -5,10 +5,13 @@ import { emptyPlan } from '../model/types'
 
 // Spec §5: zundo temporal middleware, immutable snapshots, history limit ~100,
 // in-memory only. Selection and camera live outside this store, so partialize
-// keeps only the plan.
+// keeps only the plan — planEpoch never enters the undo/redo history either.
 
 export interface PlanState {
   plan: Plan
+  // Bumped by replacePlan only — lets the editor Fit the view after any
+  // replacement without reacting to ordinary edits.
+  planEpoch: number
   setPlan: (updater: (plan: Plan) => Plan) => void
 }
 
@@ -20,6 +23,7 @@ export const usePlanStore = create<PlanState>()(
   temporal(
     (set) => ({
       plan: emptyPlan(),
+      planEpoch: 0,
       setPlan: (updater) => set((state) => ({ plan: updater(state.plan) })),
     }),
     {
@@ -36,7 +40,7 @@ export const redo = () => usePlanStore.temporal.getState().redo()
 // Import replaces the plan and resets the undo/redo history (spec §7).
 export function replacePlan(plan: Plan) {
   usePlanStore.temporal.getState().pause()
-  usePlanStore.setState({ plan })
+  usePlanStore.setState((state) => ({ plan, planEpoch: state.planEpoch + 1 }))
   usePlanStore.temporal.getState().resume()
   usePlanStore.temporal.setState({ pastStates: [], futureStates: [] })
 }

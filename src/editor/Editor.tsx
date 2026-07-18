@@ -110,6 +110,7 @@ export default function Editor() {
   const { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
+  const planEpoch = usePlanStore((s) => s.planEpoch)
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [mode, setMode] = useState<Mode>('select')
@@ -129,6 +130,14 @@ export default function Editor() {
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
   const alt = useRef(false)
+
+  // Fit after any replacement of the plan (open, startup restore, reset).
+  // Runs on mount too, which frames the plan restored before the editor mounted.
+  useEffect(() => {
+    fitPlan(usePlanStore.getState().plan)
+    // fitPlan is recreated every render but only reads the svg ref; epoch is the trigger
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [planEpoch])
 
   const rooms = useMemo(() => detectRooms(plan), [plan])
 
