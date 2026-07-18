@@ -37,6 +37,13 @@ function lockedAxisDirection(anchor: Vec, x: number, y: number): Vec | null {
   return { x: Math.cos(snapped), y: Math.sin(snapped) }
 }
 
+// A group move snaps its displacement as a whole — never each element
+// separately — so the group's shape stays intact.
+export function snapDelta(dx: number, dy: number, free?: boolean): { dx: number; dy: number } {
+  if (free) return { dx: Math.round(dx), dy: Math.round(dy) }
+  return { dx: Math.round(dx / GRID) * GRID, dy: Math.round(dy / GRID) * GRID }
+}
+
 // Snap priority (spec §4 + ADR 0002): existing point > wall body (when enabled)
 // > 45° axis from the anchor > 10 cm grid.
 export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions): Snap {

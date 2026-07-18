@@ -62,6 +62,19 @@ it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
+**Snap**:
+The default magnetic guidance of any placement or move in the editor:
+positions are drawn to existing points, walls, 45° axes, or the 10 cm grid. A
+group move snaps its displacement as a whole, never each element separately —
+the group's shape stays intact. Pure editor behavior: never part of the plan.
+_Avoid_: Magnetism, snapping grid, attach
+
+**Free move**:
+Any placement or move with Alt held: snapping is suspended and only the
+integer-centimeter rounding remains (Points have integer coordinates).
+Toggles immediately, both ways, including mid-gesture.
+_Avoid_: Free mode, no-grid mode
+
 **Rail**:
 The pair of guide lines a Dimension slides along while it is being dragged —
 one on each side of its wall. Pure editor feedback: never part of the plan,

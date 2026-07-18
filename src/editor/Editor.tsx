@@ -47,7 +47,7 @@ import {
   translateElements,
 } from '../model/selection'
 import type { Snap } from '../model/snap'
-import { snapPoint } from '../model/snap'
+import { snapDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan } from '../model/types'
 import { defaultOpeningWidth, OPENING_WIDTHS, WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
@@ -295,8 +295,9 @@ export default function Editor() {
           d.moved = true
         }
         if (d.moved) {
-          const dx = Math.round((c.x - d.start.x) / 10) * 10
-          const dy = Math.round((c.y - d.start.y) / 10) * 10
+          // e.altKey rather than the tracked key state: it is correct even
+          // when Alt was already down before the window had focus
+          const { dx, dy } = snapDelta(c.x - d.start.x, c.y - d.start.y, e.altKey)
           setPlan(() => translateElements(d.orig, d.refs, dx, dy))
         }
       } else if (d.kind === 'marquee') {
