@@ -143,3 +143,8 @@ svg text.room-area {
   border: none;
   color: inherit;
 }
+.banner-action {
+  background: #2563eb !important;
+  border-radius: 6px;
+  padding: 4px 10px;
+}

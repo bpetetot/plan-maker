@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Editor from './editor/Editor'
+import ReloadPrompt from './pwa/ReloadPrompt'
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave'
 import { loadPlan } from './persistence/storage'
 import { replacePlan, usePlanStore } from './store/planStore'
@@ -86,6 +87,7 @@ export default function App() {
           <button onClick={() => setNotice(null)}>✕</button>
         </div>
       )}
+      <ReloadPrompt />
     </>
   )
 }
