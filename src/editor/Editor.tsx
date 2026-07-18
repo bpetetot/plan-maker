@@ -1,7 +1,7 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05
 // prototype: full-bleed canvas, floating pill toolbar, click-to-click walls,
 // contextual popover on the selection, dimensions always visible.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { nearestWall, projectOnWall, wallLength, wallPoints } from '../model/geometry'
 import { formatLength } from '../model/format'
@@ -88,13 +88,16 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
     if (m !== 'select') setSel(null)
   }
 
-  const deleteSelection = (selection: Sel) => {
-    if (!selection) return
-    if (selection.type === 'wall') setPlan((p) => deleteWall(p, selection.id))
-    if (selection.type === 'opening') setPlan((p) => deleteOpening(p, selection.id))
-    if (selection.type === 'label') setPlan((p) => deleteRoomLabel(p, selection.id))
-    setSel(null)
-  }
+  const deleteSelection = useCallback(
+    (selection: Sel) => {
+      if (!selection) return
+      if (selection.type === 'wall') setPlan((p) => deleteWall(p, selection.id))
+      if (selection.type === 'opening') setPlan((p) => deleteOpening(p, selection.id))
+      if (selection.type === 'label') setPlan((p) => deleteRoomLabel(p, selection.id))
+      setSel(null)
+    },
+    [setPlan],
+  )
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -131,7 +134,7 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [chain, sel])
+  }, [chain, sel, deleteSelection])
 
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup()
@@ -399,7 +402,10 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
       </svg>
 
       {/* floating toolbar (spec §4) */}
-      <div className="pill" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
+      <div
+        className="pill"
+        style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}
+      >
         {(
           [
             ['select', 'Select', 'V'],
@@ -408,14 +414,21 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
             ['window', 'Window', 'N'],
           ] as const
         ).map(([m, label, key]) => (
-          <button key={m} className={mode === m ? 'pill-btn active' : 'pill-btn'} onClick={() => switchMode(m)}>
+          <button
+            key={m}
+            className={mode === m ? 'pill-btn active' : 'pill-btn'}
+            onClick={() => switchMode(m)}
+          >
             {label} <span className="kbd">{key}</span>
           </button>
         ))}
       </div>
 
       {/* one-line contextual hint */}
-      <div className="hint" style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}>
+      <div
+        className="hint"
+        style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}
+      >
         {mode === 'wall'
           ? chain
             ? 'Click to add a wall · click the start point to close the room · Esc / double-click to stop'

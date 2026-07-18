@@ -143,7 +143,10 @@ export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {
 export function moveRoomLabel(plan: Plan, id: string, x: number, y: number): Plan {
   const label = plan.roomLabels[id]
   if (!label) return plan
-  return { ...plan, roomLabels: { ...plan.roomLabels, [id]: { ...label, x: Math.round(x), y: Math.round(y) } } }
+  return {
+    ...plan,
+    roomLabels: { ...plan.roomLabels, [id]: { ...label, x: Math.round(x), y: Math.round(y) } },
+  }
 }
 
 export function deleteRoomLabel(plan: Plan, id: string): Plan {

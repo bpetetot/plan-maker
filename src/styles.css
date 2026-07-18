@@ -8,7 +8,10 @@ body,
   margin: 0;
 }
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 14px;
   color: #222;
 }
@@ -22,7 +25,9 @@ button:disabled {
 }
 
 svg text.dim {
-  font: 11px system-ui, sans-serif;
+  font:
+    11px system-ui,
+    sans-serif;
   fill: #8a8a8a;
   paint-order: stroke;
   stroke: #fff;
@@ -34,7 +39,9 @@ svg text.dim-live {
   font-weight: 600;
 }
 svg text.room-name {
-  font: 600 15px system-ui, sans-serif;
+  font:
+    600 15px system-ui,
+    sans-serif;
   fill: #374151;
   user-select: none;
 }
@@ -42,7 +49,9 @@ svg text.room-name.selected {
   fill: #2563eb;
 }
 svg text.room-area {
-  font: 12px system-ui, sans-serif;
+  font:
+    12px system-ui,
+    sans-serif;
   fill: #6b7280;
   user-select: none;
 }

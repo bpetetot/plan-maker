@@ -97,7 +97,13 @@ export function OpeningGlyph({
       pointerEvents="none"
     >
       {/* gap in the wall */}
-      <rect x={-halfWidth} y={-thickness / 2 - 1} width={opening.width} height={thickness + 2} fill="#ffffff" />
+      <rect
+        x={-halfWidth}
+        y={-thickness / 2 - 1}
+        width={opening.width}
+        height={thickness + 2}
+        fill="#ffffff"
+      />
       {opening.type === 'door' ? (
         <g transform={`scale(${opening.hingeSide === 'end' ? -1 : 1},${opening.swing === 'out' ? -1 : 1})`}>
           <line x1={-halfWidth} y1={0} x2={-halfWidth} y2={-opening.width} stroke={stroke} strokeWidth={3} />
@@ -113,8 +119,22 @@ export function OpeningGlyph({
         <>
           <line x1={-halfWidth} y1={-3} x2={halfWidth} y2={-3} stroke={stroke} strokeWidth={2} />
           <line x1={-halfWidth} y1={3} x2={halfWidth} y2={3} stroke={stroke} strokeWidth={2} />
-          <line x1={-halfWidth} y1={-thickness / 2} x2={-halfWidth} y2={thickness / 2} stroke={stroke} strokeWidth={2} />
-          <line x1={halfWidth} y1={-thickness / 2} x2={halfWidth} y2={thickness / 2} stroke={stroke} strokeWidth={2} />
+          <line
+            x1={-halfWidth}
+            y1={-thickness / 2}
+            x2={-halfWidth}
+            y2={thickness / 2}
+            stroke={stroke}
+            strokeWidth={2}
+          />
+          <line
+            x1={halfWidth}
+            y1={-thickness / 2}
+            x2={halfWidth}
+            y2={thickness / 2}
+            stroke={stroke}
+            strokeWidth={2}
+          />
         </>
       )}
     </g>
@@ -210,13 +230,17 @@ export function RoomOverlay({
           key={entry.key}
           transform={`translate(${entry.x},${entry.y})`}
           style={entry.label && onLabelPointerDown ? { cursor: 'move' } : undefined}
-          onPointerDown={entry.label && onLabelPointerDown ? (e) => onLabelPointerDown(entry.label!, e) : undefined}
+          onPointerDown={
+            entry.label && onLabelPointerDown ? (e) => onLabelPointerDown(entry.label!, e) : undefined
+          }
           pointerEvents={entry.label && onLabelPointerDown ? 'auto' : 'none'}
         >
           {entry.name && (
             <text
               textAnchor="middle"
-              className={entry.label && selectedLabelId === entry.label.id ? 'room-name selected' : 'room-name'}
+              className={
+                entry.label && selectedLabelId === entry.label.id ? 'room-name selected' : 'room-name'
+              }
             >
               {entry.name}
             </text>
@@ -226,7 +250,9 @@ export function RoomOverlay({
               {formatArea(entry.area)}
             </text>
           )}
-          {entry.label && onLabelPointerDown && <rect x={-50} y={-16} width={100} height={36} fill="transparent" />}
+          {entry.label && onLabelPointerDown && (
+            <rect x={-50} y={-16} width={100} height={36} fill="transparent" />
+          )}
         </g>
       ))}
     </g>

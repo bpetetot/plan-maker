@@ -68,6 +68,8 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
+    // zoomAt reads refs and functional state only; subscribing once is intended
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return { view, toPlan, pxPerCm, zoomCenter, panByPx, fitPlan }

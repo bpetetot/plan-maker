@@ -28,7 +28,9 @@ export default function App() {
         stopAutosave = startAutosave({
           onError: (error) => {
             const quota = error instanceof DOMException && error.name === 'QuotaExceededError'
-            setNotice(quota ? 'Storage is full — the plan can no longer be saved.' : 'Saving the plan failed.')
+            setNotice(
+              quota ? 'Storage is full — the plan can no longer be saved.' : 'Saving the plan failed.',
+            )
           },
         })
       } else {
