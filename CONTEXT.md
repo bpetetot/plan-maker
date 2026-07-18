@@ -39,8 +39,9 @@ walls, never drawn or stored; they appear as soon as walls close a loop.
 _Avoid_: Zone, area, space
 
 **Room label**:
-A named marker placed inside a room. It names whichever detected room contains
-its position.
+A marker placed inside a room that positions the room's texts — its optional
+name and its area. It applies to whichever detected room contains its
+position. A room without a label shows its area at its centroid.
 _Avoid_: Room name, tag
 
 **Dimension**:
@@ -62,8 +63,9 @@ Window. Pure editor state: never part of the plan.
 _Avoid_: Mode
 
 **Selection**:
-The set of elements — walls, openings, room labels — the user is currently
-acting on in the editor. Group actions (delete, move) apply to every element in
+The set of elements — walls, openings — the user is currently
+acting on in the editor. Room labels are never selected: they are manipulated
+directly (dragged, edited in place). Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. Never part of the plan.
 _Avoid_: Highlight, marked elements

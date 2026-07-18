@@ -114,13 +114,25 @@ svg text.dim-live {
 }
 svg text.room-name {
   font:
-    600 15px system-ui,
+    600 12px system-ui,
     sans-serif;
   fill: var(--label);
   user-select: none;
 }
-svg text.room-name.selected {
-  fill: var(--accent);
+/* Inline room-name editing, drawn in plan coordinates so it matches the
+   rendered text at every zoom level */
+svg foreignObject input.room-name-input {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  text-align: center;
+  font:
+    600 12px system-ui,
+    sans-serif;
+  color: var(--label);
 }
 svg text.room-area {
   font:

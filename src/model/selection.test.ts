@@ -13,7 +13,6 @@ import type { ElementRef } from './selection'
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id })
 const openingRef = (id: string): ElementRef => ({ type: 'opening', id })
-const labelRef = (id: string): ElementRef => ({ type: 'label', id })
 
 describe('toggleRef', () => {
   it('adds a ref that is not in the selection', () => {
@@ -23,8 +22,8 @@ describe('toggleRef', () => {
   })
 
   it('removes a ref already in the selection, matching on type and id', () => {
-    const sel = toggleRef([wallRef('x'), labelRef('x')], wallRef('x'))
-    expect(sel).toEqual([labelRef('x')])
+    const sel = toggleRef([wallRef('x'), openingRef('x')], wallRef('x'))
+    expect(sel).toEqual([openingRef('x')])
   })
 })
 
@@ -76,20 +75,17 @@ describe('elementsInRect', () => {
     expect(isSelected(refs, openingRef(opening.id))).toBe(false)
   })
 
-  it('selects room labels by their position', () => {
+  it('never captures room labels (they are not selectable)', () => {
     const plan = buildPlan((b) => {
       b.label('Kitchen', 50, 50)
-      b.label('Hall', 500, 500)
     })
-    const [kitchen, hall] = Object.values(plan.roomLabels)
     const refs = elementsInRect(plan, { x: 0, y: 0 }, { x: 100, y: 100 })
-    expect(isSelected(refs, labelRef(kitchen.id))).toBe(true)
-    expect(isSelected(refs, labelRef(hall.id))).toBe(false)
+    expect(refs).toEqual([])
   })
 })
 
 describe('deleteElements', () => {
-  it('deletes walls with their openings and orphan points, plus openings and labels', () => {
+  it('deletes walls with their openings and orphan points, plus openings', () => {
     const plan = buildPlan((b) => {
       const a = b.point(0, 0)
       const c = b.point(400, 0)
@@ -98,18 +94,15 @@ describe('deleteElements', () => {
       const w2 = b.wall(c, d)
       b.opening(w1, 'door', 200)
       b.opening(w2, 'window', 150)
-      b.label('Kitchen', 100, 100)
     })
     const [w1, w2] = Object.values(plan.walls)
     const [, onW2] = Object.values(plan.openings)
-    const label = Object.values(plan.roomLabels)[0]
 
-    const next = deleteElements(plan, [wallRef(w1.id), openingRef(onW2.id), labelRef(label.id)])
+    const next = deleteElements(plan, [wallRef(w1.id), openingRef(onW2.id)])
 
     expect(next.walls[w1.id]).toBeUndefined()
     expect(next.walls[w2.id]).toBeDefined()
     expect(Object.keys(next.openings)).toHaveLength(0)
-    expect(Object.keys(next.roomLabels)).toHaveLength(0)
     // a was only used by w1 → gone; c is still used by w2
     expect(next.points[w1.startPointId]).toBeUndefined()
     expect(next.points[w2.startPointId]).toBeDefined()
@@ -158,15 +151,6 @@ describe('translateElements', () => {
     expect(next.points[w2.endPointId]).toMatchObject({ x: 400, y: 300 })
   })
 
-  it('translates selected labels', () => {
-    const plan = buildPlan((b) => {
-      b.label('Kitchen', 100, 100)
-    })
-    const label = Object.values(plan.roomLabels)[0]
-    const next = translateElements(plan, [labelRef(label.id)], 30, 40)
-    expect(next.roomLabels[label.id]).toMatchObject({ x: 130, y: 140 })
-  })
-
   it('leaves a selected opening in place when its wall is not selected', () => {
     const plan = buildPlan((b) => {
       const wall = b.wall(b.point(0, 0), b.point(400, 0))
@@ -183,7 +167,7 @@ describe('translateElements', () => {
     const plan = buildPlan((b) => {
       b.wall(b.point(0, 0), b.point(100, 0))
     })
-    const next = translateElements(plan, [wallRef('gone'), labelRef('gone')], 10, 10)
+    const next = translateElements(plan, [wallRef('gone'), openingRef('gone')], 10, 10)
     expect(next).toBe(plan)
   })
 
@@ -198,21 +182,19 @@ describe('translateElements', () => {
 
 describe('refKey', () => {
   it('distinguishes same id across types', () => {
-    expect(refKey(wallRef('x'))).not.toBe(refKey(labelRef('x')))
+    expect(refKey(wallRef('x'))).not.toBe(refKey(openingRef('x')))
   })
 })
 
 describe('selectionBounds', () => {
-  it('spans wall endpoints, opening centers and label anchors', () => {
+  it('spans wall endpoints and opening centers', () => {
     const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(400, 0))
+      const wall = b.wall(b.point(0, 0), b.point(400, 250))
       b.opening(wall, 'door', 200)
-      b.label('Kitchen', 100, 250)
     })
     const wall = Object.values(plan.walls)[0]
     const opening = Object.values(plan.openings)[0]
-    const label = Object.values(plan.roomLabels)[0]
-    const bounds = selectionBounds(plan, [wallRef(wall.id), openingRef(opening.id), labelRef(label.id)])
+    const bounds = selectionBounds(plan, [wallRef(wall.id), openingRef(opening.id)])
     expect(bounds).toEqual({ minX: 0, minY: 0, maxX: 400, maxY: 250 })
   })
 

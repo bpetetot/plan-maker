@@ -287,73 +287,108 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
   )
 }
 
-// Room area at the room's label when it has one, else at its centroid; labels
-// outside any room still render their name (spec §2: label association is
-// positional).
-export function RoomOverlay({
-  rooms,
-  labels,
-  onLabelPointerDown,
-  selectedLabelIds,
-}: {
-  rooms: Room[]
-  labels: RoomLabel[]
-  onLabelPointerDown?: (label: RoomLabel, e: React.PointerEvent) => void
-  selectedLabelIds?: ReadonlySet<string>
-}) {
+// One text block per room — the optional name above the area — anchored at
+// the room's label when it has one, else at its centroid. Labels outside any
+// room still render their name (spec §2: label association is positional).
+export interface RoomTextBlock {
+  key: string
+  x: number
+  y: number
+  label?: RoomLabel
+  // the detected room this block belongs to; unset for a label outside any
+  // room, or shadowed by an earlier label of the same room
+  room?: Room
+  name?: string
+  area?: number
+}
+
+export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBlock[] {
   const labeledRooms = new Set<Room>()
-  const entries: { key: string; x: number; y: number; name?: string; area?: number; label?: RoomLabel }[] = []
+  const blocks: RoomTextBlock[] = []
   for (const label of labels) {
     const room = roomAt(rooms, label.x, label.y)
     if (room && !labeledRooms.has(room)) {
       labeledRooms.add(room)
-      entries.push({ key: label.id, x: label.x, y: label.y, name: label.name, area: room.areaCm2, label })
+      blocks.push({
+        key: label.id,
+        x: label.x,
+        y: label.y,
+        name: label.name,
+        area: room.areaCm2,
+        label,
+        room,
+      })
     } else {
-      entries.push({ key: label.id, x: label.x, y: label.y, name: label.name, label })
+      blocks.push({ key: label.id, x: label.x, y: label.y, name: label.name, label })
     }
   }
   for (const room of rooms) {
     if (!labeledRooms.has(room)) {
-      entries.push({
+      blocks.push({
         key: `room-${room.pointIds.join(':')}`,
         x: room.centroid.x,
         y: room.centroid.y,
         area: room.areaCm2,
+        room,
       })
     }
   }
+  return blocks
+}
+
+// Room labels are never selected — the block is dragged and double-click-edited
+// directly (CONTEXT.md: Selection). While the block named by editingKey is
+// edited the editor overlays an input on its name line, so the name text hides
+// but the area keeps its two-line offset.
+export function RoomOverlay({
+  rooms,
+  labels,
+  editingKey,
+  onBlockPointerDown,
+  onBlockDoubleClick,
+}: {
+  rooms: Room[]
+  labels: RoomLabel[]
+  editingKey?: string
+  onBlockPointerDown?: (block: RoomTextBlock, e: React.PointerEvent) => void
+  onBlockDoubleClick?: (block: RoomTextBlock, e: React.MouseEvent) => void
+}) {
   return (
     <g>
-      {entries.map((entry) => (
-        <g
-          key={entry.key}
-          transform={`translate(${entry.x},${entry.y})`}
-          style={entry.label && onLabelPointerDown ? { cursor: 'move' } : undefined}
-          onPointerDown={
-            entry.label && onLabelPointerDown ? (e) => onLabelPointerDown(entry.label!, e) : undefined
-          }
-          pointerEvents={entry.label && onLabelPointerDown ? 'auto' : 'none'}
-        >
-          {entry.name && (
-            <text
-              textAnchor="middle"
-              className={
-                entry.label && selectedLabelIds?.has(entry.label.id) ? 'room-name selected' : 'room-name'
-              }
-            >
-              {entry.name}
-            </text>
-          )}
-          {entry.area !== undefined && (
-            <text y={entry.name ? 16 : 5} textAnchor="middle" className="room-area">
-              {formatArea(entry.area)}
-            </text>
-          )}
-          {entry.label && onLabelPointerDown && (
-            <rect x={-50} y={-16} width={100} height={36} fill="transparent" />
-          )}
-        </g>
-      ))}
+      {roomTextBlocks(rooms, labels).map((block) => {
+        const editing = block.key === editingKey
+        const nameLine = Boolean(block.name) || editing
+        // a block that renders nothing (nameless label whose room is gone)
+        // must not linger as an invisible drag target
+        const interactive =
+          Boolean(onBlockPointerDown || onBlockDoubleClick) && (nameLine || block.area !== undefined)
+        return (
+          <g
+            key={block.key}
+            transform={`translate(${block.x},${block.y})`}
+            style={interactive ? { cursor: 'move' } : undefined}
+            onPointerDown={
+              interactive && onBlockPointerDown ? (e) => onBlockPointerDown(block, e) : undefined
+            }
+            onDoubleClick={
+              interactive && onBlockDoubleClick ? (e) => onBlockDoubleClick(block, e) : undefined
+            }
+            pointerEvents={interactive ? 'auto' : 'none'}
+          >
+            {block.name && !editing && (
+              <text textAnchor="middle" className="room-name">
+                {block.name}
+              </text>
+            )}
+            {block.area !== undefined && (
+              <text y={nameLine ? 14 : 5} textAnchor="middle" className="room-area">
+                {formatArea(block.area)}
+              </text>
+            )}
+            {interactive && <rect x={-50} y={-16} width={100} height={36} fill="transparent" />}
+          </g>
+        )
+      })}
     </g>
   )
 }

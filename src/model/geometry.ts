@@ -104,6 +104,42 @@ export function polygonCentroid(polygon: Vec[]): Vec {
   return { x: cx / (6 * area), y: cy / (6 * area) }
 }
 
+function nearestOnSegment(p: Vec, a: Vec, b: Vec): Vec {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lenSq = dx * dx + dy * dy
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq))
+  return { x: a.x + t * dx, y: a.y + t * dy }
+}
+
+// Nearest interior point of `polygon` to `point`: the point itself when it
+// already lies inside, else its projection on the boundary nudged one unit
+// inward — so the result still tests as inside even after integer rounding.
+export function clampToPolygon(point: Vec, polygon: Vec[]): Vec {
+  if (pointInPolygon(point, polygon)) return point
+  let best: { p: Vec; d: number; a: Vec; b: Vec } | null = null
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]
+    const b = polygon[(i + 1) % polygon.length]
+    const p = nearestOnSegment(point, a, b)
+    const d = Math.hypot(p.x - point.x, p.y - point.y)
+    if (!best || d < best.d) best = { p, d, a, b }
+  }
+  if (!best) return point
+  const dx = best.b.x - best.a.x
+  const dy = best.b.y - best.a.y
+  const len = Math.hypot(dx, dy) || 1
+  for (const sign of [1, -1]) {
+    const candidate = { x: best.p.x + (sign * -dy) / len, y: best.p.y + (sign * dx) / len }
+    if (pointInPolygon(candidate, polygon)) return candidate
+  }
+  // vertex case: both edge normals fall outside — step toward the centroid
+  const centroid = polygonCentroid(polygon)
+  const cd = Math.hypot(centroid.x - best.p.x, centroid.y - best.p.y) || 1
+  const inward = { x: best.p.x + (centroid.x - best.p.x) / cd, y: best.p.y + (centroid.y - best.p.y) / cd }
+  return pointInPolygon(inward, polygon) ? inward : best.p
+}
+
 export function pointInPolygon(point: Vec, polygon: Vec[]): boolean {
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {

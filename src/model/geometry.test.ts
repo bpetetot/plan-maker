@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clampToPolygon,
   distance,
   planBBox,
   pointInPolygon,
@@ -146,5 +147,31 @@ describe('planBBox', () => {
   it('returns null for an empty plan', () => {
     const plan = buildPlan(() => {})
     expect(planBBox(plan)).toBeNull()
+  })
+})
+
+describe('clampToPolygon', () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ]
+
+  it('returns an interior point unchanged', () => {
+    expect(clampToPolygon({ x: 50, y: 50 }, square)).toEqual({ x: 50, y: 50 })
+  })
+
+  it('clamps an outside point to the nearest edge, nudged inside', () => {
+    const p = clampToPolygon({ x: 150, y: 50 }, square)
+    expect(p).toEqual({ x: 99, y: 50 })
+    expect(pointInPolygon(p, square)).toBe(true)
+  })
+
+  it('clamps past a corner onto the vertex region, still inside', () => {
+    const p = clampToPolygon({ x: 150, y: -50 }, square)
+    expect(p.x).toBeLessThanOrEqual(100)
+    expect(p.y).toBeGreaterThanOrEqual(0)
+    expect(pointInPolygon(p, square)).toBe(true)
   })
 })

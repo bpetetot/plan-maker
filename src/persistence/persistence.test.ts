@@ -138,8 +138,8 @@ describe('autosave', () => {
     usePlanStore.setState({ plan: emptyPlan() })
     const stop = startAutosave({ debounceMs: 400 })
 
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1))
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Two', 2, 2))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1)[0])
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Two', 2, 2)[0])
     expect(await get(CURRENT_KEY)).toBeUndefined()
 
     await vi.advanceTimersByTimeAsync(500)
@@ -152,7 +152,7 @@ describe('autosave', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     usePlanStore.setState({ plan: emptyPlan() })
     const stop = startAutosave({ debounceMs: 400 })
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1)[0])
     stop()
     await vi.advanceTimersByTimeAsync(0)
     vi.useRealTimers()

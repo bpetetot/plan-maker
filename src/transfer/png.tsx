@@ -50,7 +50,7 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
 const EXPORT_STYLE = `
   svg { --wall: #2f2f2f; --sheet: #ffffff; }
   text.dim { font: 11px system-ui, sans-serif; fill: #8a8a8a; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
-  text.room-name { font: 600 15px system-ui, sans-serif; fill: #374151; }
+  text.room-name { font: 600 12px system-ui, sans-serif; fill: #374151; }
   text.room-area { font: 12px system-ui, sans-serif; fill: #6b7280; }
 `
 

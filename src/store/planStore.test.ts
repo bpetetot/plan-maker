@@ -14,8 +14,8 @@ beforeEach(() => {
 
 describe('planStore undo/redo', () => {
   it('records one history step per setPlan and undoes/redoes it', () => {
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Kitchen', 10, 10))
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Bedroom', 20, 20))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Kitchen', 10, 10)[0])
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Bedroom', 20, 20)[0])
     expect(Object.keys(plan().roomLabels)).toHaveLength(2)
 
     undo()
@@ -27,19 +27,19 @@ describe('planStore undo/redo', () => {
   })
 
   it('does not record a step when an operation is a no-op (same plan reference)', () => {
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Kitchen', 10, 10))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Kitchen', 10, 10)[0])
     const before = temporal().pastStates.length
     usePlanStore.getState().setPlan((p) => p)
     expect(temporal().pastStates.length).toBe(before)
   })
 
   it('groups all changes between beginHistoryGroup and endHistoryGroup into one undo step', () => {
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Start', 0, 0))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Start', 0, 0)[0])
 
     beginHistoryGroup()
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 1', 1, 1))
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 2', 2, 2))
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 3', 3, 3))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 1', 1, 1)[0])
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 2', 2, 2)[0])
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Drag 3', 3, 3)[0])
     endHistoryGroup()
 
     expect(Object.keys(plan().roomLabels)).toHaveLength(4)
@@ -57,7 +57,7 @@ describe('planStore undo/redo', () => {
   })
 
   it('replacePlan swaps the plan and resets history (spec §7: import)', () => {
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Old', 0, 0))
+    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Old', 0, 0)[0])
     const imported = buildPlan((b) => {
       b.point(0, 0)
     })
@@ -69,7 +69,7 @@ describe('planStore undo/redo', () => {
 
   it('caps history at 100 steps', () => {
     for (let i = 0; i < 130; i++) {
-      usePlanStore.getState().setPlan((p) => addRoomLabel(p, `L${i}`, i, i))
+      usePlanStore.getState().setPlan((p) => addRoomLabel(p, `L${i}`, i, i)[0])
     }
     expect(temporal().pastStates.length).toBeLessThanOrEqual(100)
   })

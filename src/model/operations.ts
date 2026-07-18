@@ -285,10 +285,10 @@ export function toggleSwing(plan: Plan, id: string): Plan {
 
 // ---------- room labels ----------
 
-export function addRoomLabel(plan: Plan, name: string, x: number, y: number): Plan {
+export function addRoomLabel(plan: Plan, name: string, x: number, y: number): [Plan, string] {
   const id = newId()
   const label = { id, name, x: Math.round(x), y: Math.round(y) }
-  return { ...plan, roomLabels: { ...plan.roomLabels, [id]: label } }
+  return [{ ...plan, roomLabels: { ...plan.roomLabels, [id]: label } }, id]
 }
 
 export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {

@@ -446,8 +446,8 @@ describe('setDimPlacement', () => {
 describe('room labels', () => {
   it('adds, renames, moves, and deletes a label', () => {
     let plan = buildPlan(() => {})
-    plan = addRoomLabel(plan, 'Kitchen', 100, 100)
-    const id = Object.keys(plan.roomLabels)[0]
+    let id: string
+    ;[plan, id] = addRoomLabel(plan, 'Kitchen', 100, 100)
     expect(plan.roomLabels[id]).toMatchObject({ name: 'Kitchen', x: 100, y: 100 })
     plan = renameRoomLabel(plan, id, 'Living room')
     expect(plan.roomLabels[id].name).toBe('Living room')

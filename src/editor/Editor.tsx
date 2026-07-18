@@ -17,7 +17,14 @@ import {
 } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
-import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry'
+import {
+  clampToPolygon,
+  nearestWall,
+  projectOnWall,
+  wallLength,
+  wallPoints,
+  wallSide,
+} from '../model/geometry'
 import { formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
 import {
@@ -35,6 +42,7 @@ import {
   toggleHingeSide,
   toggleSwing,
 } from '../model/operations'
+import type { Room } from '../model/rooms'
 import { detectRooms, roomAt } from '../model/rooms'
 import type { ElementRef } from '../model/selection'
 import {
@@ -51,6 +59,7 @@ import { snapDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan } from '../model/types'
 import { defaultOpeningWidth, OPENING_WIDTHS, WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
+import type { RoomTextBlock } from './render'
 import {
   COLORS,
   DimLabel,
@@ -59,6 +68,7 @@ import {
   OpeningGlyph,
   OpeningHit,
   RoomOverlay,
+  roomTextBlocks,
   RubberWall,
   SnapMarker,
   WallHit,
@@ -81,7 +91,14 @@ type Drag =
       moved?: boolean
     }
   | { kind: 'opening'; id: string }
-  | { kind: 'label'; id: string }
+  // dragging a room's text block. `room` is the room containing the block at
+  // drag start: the block can never leave it (the drag clamps to its polygon);
+  // null for a label outside any room, which moves freely.
+  | { kind: 'label'; id: string; room: Room | null }
+  // dragging the text block of a room that has no label yet: the nameless
+  // label is only created once the pointer crosses the click threshold, so a
+  // plain click never touches the plan
+  | { kind: 'newLabel'; start: Vec; room: Room; id?: string }
   // dragging a wall's dimension label; a movement below the click threshold
   // resolves to "select the wall" on pointer up
   | { kind: 'dim'; id: string; start: Vec; moved?: boolean }
@@ -127,6 +144,17 @@ export default function Editor() {
   )
   // wall whose dimension is being dragged past the click threshold — drives the rails
   const [railWallId, setRailWallId] = useState<string | null>(null)
+  // Inline room-name editing over a text block (Excalidraw-style). The plan is
+  // only touched on commit — one undo entry — and Escape cancels; labelId is
+  // null while the room has no label yet (one is created on non-empty commit).
+  const [editing, setEditing] = useState<{
+    key: string
+    labelId: string | null
+    x: number
+    y: number
+    initial: string
+  } | null>(null)
+  const editCancelled = useRef(false)
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
   const alt = useRef(false)
@@ -140,6 +168,7 @@ export default function Editor() {
   }, [planEpoch])
 
   const rooms = useMemo(() => detectRooms(plan), [plan])
+  const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan])
 
   const tolerance = () => 14 / pxPerCm()
 
@@ -310,7 +339,17 @@ export default function Editor() {
           setPlan((p) => moveOpening(p, d.id, t))
         }
       } else if (d.kind === 'label') {
-        setPlan((p) => moveRoomLabel(p, d.id, c.x, c.y))
+        const t = d.room ? clampToPolygon(c, d.room.polygon) : c
+        setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y))
+      } else if (d.kind === 'newLabel') {
+        const t = clampToPolygon(c, d.room.polygon)
+        if (d.id) {
+          setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y))
+        } else if (Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
+          const [next, id] = addRoomLabel(plan, '', t.x, t.y)
+          setPlan(() => next)
+          d.id = id
+        }
       } else if (d.kind === 'dim') {
         const wall = plan.walls[d.id]
         if (wall) {
@@ -385,19 +424,14 @@ export default function Editor() {
   }
 
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel])
-  const selectedLabelIds = useMemo(
-    () => new Set(sel.filter((r) => r.type === 'label').map((r) => r.id)),
-    [sel],
-  )
   const only = sel.length === 1 ? sel[0] : null
   const selWall = only?.type === 'wall' ? plan.walls[only.id] : null
   const selOpening = only?.type === 'opening' ? plan.openings[only.id] : null
-  const selLabel = only?.type === 'label' ? plan.roomLabels[only.id] : null
   const multi = sel.length > 1
 
   // popover anchored to the selection, in wrapper coordinates
   let popover: { left: number; top: number } | null = null
-  if (svgRef.current && wrapRef.current && (selWall || selOpening || selLabel || multi)) {
+  if (svgRef.current && wrapRef.current && (selWall || selOpening || multi)) {
     let px = 0
     let py = 0
     let anchored = true
@@ -419,9 +453,6 @@ export default function Editor() {
         px = placement.cx
         py = placement.cy
       }
-    } else if (selLabel) {
-      px = selLabel.x
-      py = selLabel.y
     }
     const matrix = svgRef.current.getScreenCTM()
     if (matrix && anchored) {
@@ -453,9 +484,46 @@ export default function Editor() {
           }
       : null
 
-  const onLabelPointerDown = (label: Plan['roomLabels'][string], e: React.PointerEvent) => {
+  // Room labels are never selected (CONTEXT.md: Selection) — the text block is
+  // dragged and double-click-edited directly.
+  const onBlockPointerDown = (block: RoomTextBlock, e: React.PointerEvent) => {
+    if (tool !== 'select' || e.button !== 0 || space) return
+    if (block.label) startPlanDrag({ kind: 'label', id: block.label.id, room: block.room ?? null })
+    else if (block.room)
+      startPlanDrag({ kind: 'newLabel', start: toPlan(e.clientX, e.clientY), room: block.room })
+  }
+
+  const startEditing = (block: RoomTextBlock) => {
+    setEditing({
+      key: block.key,
+      labelId: block.label?.id ?? null,
+      x: block.x,
+      y: block.y,
+      initial: block.label?.name ?? '',
+    })
+  }
+
+  // Commit path shared by Enter, Escape and clicking away — all end in a blur.
+  // An empty name only clears the label's name: the marker (and the area's
+  // position) survives.
+  const finishEditing = (value: string) => {
+    const ed = editing
+    setEditing(null)
+    if (!ed) return
+    if (editCancelled.current) {
+      editCancelled.current = false
+      return
+    }
+    const name = value.trim()
+    if (name === ed.initial) return
+    if (ed.labelId) setPlan((p) => renameRoomLabel(p, ed.labelId!, name))
+    else if (name) setPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0])
+  }
+
+  const onBlockDoubleClick = (block: RoomTextBlock, e: React.MouseEvent) => {
     if (tool !== 'select') return
-    onElementPointerDown({ type: 'label', id: label.id }, e, () => ({ kind: 'label', id: label.id }))
+    e.stopPropagation()
+    startEditing(block)
   }
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
@@ -467,10 +535,8 @@ export default function Editor() {
     if (tool !== 'select') return
     const c = toPlan(e.clientX, e.clientY)
     const room = roomAt(rooms, c.x, c.y)
-    if (!room) return
-    const hasLabel = Object.values(plan.roomLabels).some((l) => roomAt(rooms, l.x, l.y) === room)
-    if (hasLabel) return
-    setPlan((p) => addRoomLabel(p, 'Room', c.x, c.y))
+    const block = room ? blocks.find((b) => b.room === room) : undefined
+    if (block) startEditing(block)
   }
 
   // shared by every popover variant
@@ -518,8 +584,9 @@ export default function Editor() {
         <RoomOverlay
           rooms={rooms}
           labels={Object.values(plan.roomLabels)}
-          onLabelPointerDown={onLabelPointerDown}
-          selectedLabelIds={selectedLabelIds}
+          editingKey={editing?.key}
+          onBlockPointerDown={onBlockPointerDown}
+          onBlockDoubleClick={onBlockDoubleClick}
         />
         {tool === 'select' &&
           Object.values(plan.walls).map((wall) => (
@@ -609,6 +676,27 @@ export default function Editor() {
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
         {tool === 'wall' && <SnapMarker snap={snap} />}
         {drag.current?.kind === 'point' && <SnapMarker snap={snap} />}
+        {/* inline room-name editing, directly on the sheet (Excalidraw-style);
+            sized to sit on the block's name line, above the area */}
+        {editing && (
+          <foreignObject x={editing.x - 100} y={editing.y - 14} width={200} height={18}>
+            <input
+              className="room-name-input"
+              defaultValue={editing.initial}
+              autoFocus
+              onFocus={(e) => e.target.select()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                else if (e.key === 'Escape') {
+                  editCancelled.current = true
+                  e.currentTarget.blur()
+                }
+              }}
+              onBlur={(e) => finishEditing(e.currentTarget.value)}
+            />
+          </foreignObject>
+        )}
       </svg>
 
       {/* floating toolbar (spec §4) */}
@@ -698,7 +786,7 @@ export default function Editor() {
       </div>
 
       {/* contextual popover next to the selection */}
-      {popover && (selWall || selOpening || selLabel || multi) && (
+      {popover && (selWall || selOpening || multi) && (
         <div className="popover" style={{ position: 'absolute', left: popover.left, top: popover.top }}>
           {multi && (
             <>
@@ -743,20 +831,6 @@ export default function Editor() {
                   </button>
                 </>
               )}
-              {deleteButton}
-            </>
-          )}
-          {selLabel && (
-            <>
-              <input
-                value={selLabel.name}
-                autoFocus
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setPlan((p) => renameRoomLabel(p, selLabel.id, e.target.value))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === 'Escape') setSel([])
-                }}
-              />
               {deleteButton}
             </>
           )}

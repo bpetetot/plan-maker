@@ -1,15 +1,16 @@
 import type { Vec } from './geometry'
 import { wallPoints } from './geometry'
 import { openingPlacement } from './openings'
-import { deleteOpening, deleteRoomLabel, deleteWall, setPoints } from './operations'
+import { deleteOpening, deleteWall, setPoints } from './operations'
 import type { Plan } from './types'
 
-// Multi-selection over plan elements: a selection is a list of refs to walls,
-// openings, and room labels. It lives in the editor (never in the plan) and
-// supports exactly two group operations — delete and translate.
+// Multi-selection over plan elements: a selection is a list of refs to walls
+// and openings. Room labels are never selected — they are manipulated directly
+// in the editor (CONTEXT.md: Selection). It lives in the editor (never in the
+// plan) and supports exactly two group operations — delete and translate.
 
 export interface ElementRef {
-  type: 'wall' | 'opening' | 'label'
+  type: 'wall' | 'opening'
   id: string
 }
 
@@ -27,7 +28,7 @@ export function toggleRef(selection: ElementRef[], ref: ElementRef): ElementRef[
 
 // Marquee capture rule: containment. An element is selected only when it
 // is entirely inside the rectangle (walls by both endpoints, openings by their
-// span on the wall, labels by their position). Wall thickness is ignored.
+// span on the wall). Wall thickness is ignored.
 export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   const minX = Math.min(a.x, b.x)
   const maxX = Math.max(a.x, b.x)
@@ -51,9 +52,6 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
       refs.push({ type: 'opening', id: opening.id })
     }
   }
-  for (const label of Object.values(plan.roomLabels)) {
-    if (inside(label.x, label.y)) refs.push({ type: 'label', id: label.id })
-  }
   return refs
 }
 
@@ -63,8 +61,7 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan
   for (const ref of refs) {
     if (ref.type === 'wall') next = deleteWall(next, ref.id)
-    else if (ref.type === 'opening') next = deleteOpening(next, ref.id)
-    else next = deleteRoomLabel(next, ref.id)
+    else next = deleteOpening(next, ref.id)
   }
   return next
 }
@@ -77,7 +74,7 @@ export interface SelectionBounds {
 }
 
 // Bounding box of the selection's own positions — wall endpoints, opening
-// centers, label anchors. Null when no ref resolves to a live element.
+// centers. Null when no ref resolves to a live element.
 export function selectionBounds(plan: Plan, refs: ElementRef[]): SelectionBounds | null {
   let minX = Infinity
   let minY = Infinity
@@ -93,22 +90,19 @@ export function selectionBounds(plan: Plan, refs: ElementRef[]): SelectionBounds
     if (ref.type === 'wall') {
       const wall = plan.walls[ref.id]
       if (wall) for (const p of wallPoints(plan, wall)) extend(p.x, p.y)
-    } else if (ref.type === 'opening') {
+    } else {
       const opening = plan.openings[ref.id]
       const placement = opening ? openingPlacement(plan, opening) : null
       if (placement) extend(placement.cx, placement.cy)
-    } else {
-      const label = plan.roomLabels[ref.id]
-      if (label) extend(label.x, label.y)
     }
   }
   return minX === Infinity ? null : { minX, minY, maxX, maxY }
 }
 
-// Group move: translate the union of the selected walls' points and the
-// selected labels. Openings follow their wall (their offset is wall-relative)
-// and stay put when their wall is not selected — only elements with a position
-// of their own translate. Unselected walls attached to a moved point stretch.
+// Group move: translate the union of the selected walls' points. Openings
+// follow their wall (their offset is wall-relative) and stay put when their
+// wall is not selected — only elements with a position of their own translate.
+// Unselected walls attached to a moved point stretch.
 export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy: number): Plan {
   if (dx === 0 && dy === 0) return plan
   const updates: Record<string, Vec> = {}
@@ -120,18 +114,5 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
       updates[point.id] = { x: point.x + dx, y: point.y + dy }
     }
   }
-  let next = Object.keys(updates).length > 0 ? setPoints(plan, updates) : plan
-  for (const ref of refs) {
-    if (ref.type !== 'label') continue
-    const label = next.roomLabels[ref.id]
-    if (!label) continue
-    next = {
-      ...next,
-      roomLabels: {
-        ...next.roomLabels,
-        [ref.id]: { ...label, x: Math.round(label.x + dx), y: Math.round(label.y + dy) },
-      },
-    }
-  }
-  return next
+  return Object.keys(updates).length > 0 ? setPoints(plan, updates) : plan
 }
