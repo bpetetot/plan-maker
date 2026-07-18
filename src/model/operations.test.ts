@@ -66,7 +66,7 @@ describe('addWall', () => {
 })
 
 describe('movePoint / setPoints', () => {
-  it('moves a shared corner (all attached walls follow implicitly)', () => {
+  it('moves a shared point (all attached walls follow implicitly)', () => {
     const plan = rectPlan()
     const id = Object.keys(plan.points)[0]
     const next = movePoint(plan, id, 50.4, 60.5)

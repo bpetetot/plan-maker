@@ -1,5 +1,27 @@
 # Plan Maker
 
+A PWA to draw simple 2D floor plans, per `.scratch/plan-maker/spec.md`. Stack:
+React + TypeScript + Vite, plain SVG rendering, zustand + zundo (undo/redo),
+idb-keyval (autosave), vite-plugin-pwa.
+
+## Development
+
+- `npm run dev` — dev server (service worker enabled via `devOptions`)
+- `npm test` / `npm run test:watch` — Vitest
+- `npm run typecheck` — tsc
+- `npm run lint` / `npm run format` — oxlint / oxfmt
+- `npm run build` — typecheck + production build (generates the service worker); `npm run preview` serves it
+- `node scripts/generate-icons.mjs` — regenerates the PWA icons in `public/`
+
+## Structure
+
+- `src/model/` — pure domain: types, geometry, snapping, plan operations, room detection
+- `src/store/` — zustand plan store, zundo history (drag grouping helpers)
+- `src/persistence/` — schema version + migrations + validation, IndexedDB storage, autosave
+- `src/transfer/` — JSON export/import envelope, PNG export
+- `src/editor/` — the SVG editor (variant A UX), shared render pieces, viewBox hook
+- `src/pwa/` — service worker update prompt
+
 ## Conventions
 
 - All code, comments, and documentation should be written in English

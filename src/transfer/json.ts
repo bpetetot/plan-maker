@@ -31,7 +31,8 @@ export function parsePlanFile(text: string): ParseResult {
   try {
     migrated = runMigrations(version, plan)
   } catch {
-    return { ok: false, reason: 'unsupported-version' }
+    // an old version with no registered migration path is unreadable, not "newer"
+    return { ok: false, reason: 'invalid-plan' }
   }
   const validated = validatePlan(migrated)
   if (!validated) return { ok: false, reason: 'invalid-plan' }

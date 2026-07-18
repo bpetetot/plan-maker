@@ -14,6 +14,8 @@ export interface PlanState {
 
 type TrackedState = { plan: Plan }
 
+const HISTORY_LIMIT = 100
+
 export const usePlanStore = create<PlanState>()(
   temporal(
     (set) => ({
@@ -23,7 +25,7 @@ export const usePlanStore = create<PlanState>()(
     {
       partialize: (state): TrackedState => ({ plan: state.plan }),
       equality: (pastState, currentState) => pastState.plan === currentState.plan,
-      limit: 100,
+      limit: HISTORY_LIMIT,
     },
   ),
 )
@@ -56,7 +58,7 @@ export function endHistoryGroup() {
   if (snapshot === null || snapshot === usePlanStore.getState().plan) return
   const { pastStates } = usePlanStore.temporal.getState()
   usePlanStore.temporal.setState({
-    pastStates: [...pastStates.slice(-99), { plan: snapshot }],
+    pastStates: [...pastStates.slice(1 - HISTORY_LIMIT), { plan: snapshot }],
     futureStates: [],
   })
 }

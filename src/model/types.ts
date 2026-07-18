@@ -1,4 +1,4 @@
-// Domain model per spec §2 — shared-vertex planar graph, integer centimeters.
+// Domain model per spec §2 — shared-point planar graph, integer centimeters.
 
 export type Cm = number // integer centimeters
 
@@ -54,6 +54,9 @@ export const GRID: Cm = 10
 export const DOOR_WIDTH: Cm = 90
 export const WINDOW_WIDTH: Cm = 120
 export const OPENING_WIDTHS: Cm[] = [60, 70, 80, 90, 100, 120, 140, 160]
+
+export const defaultOpeningWidth = (type: Opening['type']): Cm =>
+  type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH
 
 export function emptyPlan(): Plan {
   return { points: {}, walls: {}, openings: {}, roomLabels: {} }

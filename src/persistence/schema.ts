@@ -31,7 +31,8 @@ export function runMigrations(
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const isCm = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+// Spec §2: units are integer centimeters.
+const isCm = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value)
 
 function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening {
   if (!isRecord(value)) return false

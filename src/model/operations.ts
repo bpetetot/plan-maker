@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid'
 import { wallLength } from './geometry'
 import type { Snap } from './snap'
 import type { Opening, Plan, Wall } from './types'
-import { DOOR_WIDTH, WALL_THICKNESS, WINDOW_WIDTH } from './types'
+import { defaultOpeningWidth, WALL_THICKNESS } from './types'
 
 // All operations are immutable: they return a new Plan (or the same one when a no-op).
 
@@ -85,7 +85,7 @@ export function clampOpeningOffset(plan: Plan, wall: Wall, offset: number, width
 export function placeOpening(plan: Plan, wallId: string, type: 'door' | 'window', offset: number): Plan {
   const wall = plan.walls[wallId]
   if (!wall) return plan
-  const width = type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH
+  const width = defaultOpeningWidth(type)
   const clamped = clampOpeningOffset(plan, wall, offset, width)
   if (clamped === null) return plan
   const id = newId()

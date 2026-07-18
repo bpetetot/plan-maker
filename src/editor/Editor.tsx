@@ -28,7 +28,7 @@ import { detectRooms, roomAt } from '../model/rooms'
 import type { Snap } from '../model/snap'
 import { snapPoint } from '../model/snap'
 import type { Opening, Plan, Point } from '../model/types'
-import { DOOR_WIDTH, OPENING_WIDTHS, WALL_THICKNESS, WINDOW_WIDTH } from '../model/types'
+import { defaultOpeningWidth, OPENING_WIDTHS, WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import {
   COLORS,
@@ -219,8 +219,7 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
     } else if (mode === 'door' || mode === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
       if (near) {
-        const width = mode === 'door' ? DOOR_WIDTH : WINDOW_WIDTH
-        const offset = clampOpeningOffset(plan, near.wall, near.t, width)
+        const offset = clampOpeningOffset(plan, near.wall, near.t, defaultOpeningWidth(mode))
         setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset })
       } else setOpenPreview(null)
     }
@@ -274,7 +273,7 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
             wallId: openPreview.wallId,
             type: 'door',
             offset: openPreview.offset,
-            width: DOOR_WIDTH,
+            width: defaultOpeningWidth('door'),
             hingeSide: 'start',
             swing: 'in',
           }
@@ -283,7 +282,7 @@ export default function Editor({ toolbarExtra }: { toolbarExtra?: React.ReactNod
             wallId: openPreview.wallId,
             type: 'window',
             offset: openPreview.offset,
-            width: WINDOW_WIDTH,
+            width: defaultOpeningWidth('window'),
           }
       : null
 

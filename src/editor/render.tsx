@@ -310,11 +310,11 @@ export function Handle({
 export function RubberWall({
   from,
   to,
-  thickness = 10,
+  thickness,
 }: {
   from: { x: number; y: number }
   to: { x: number; y: number }
-  thickness?: number
+  thickness: number
 }) {
   const length = Math.hypot(to.x - from.x, to.y - from.y)
   const angle = labelAngle(to.x - from.x, to.y - from.y)
