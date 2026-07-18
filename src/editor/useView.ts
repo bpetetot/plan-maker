@@ -1,45 +1,62 @@
-// PROTOTYPE — wayfinder ticket 05. Shared viewBox zoom/pan hook.
 import { useEffect, useState } from 'react'
-import type { Plan } from './model'
-import { planBBox } from './model'
+import { planBBox } from '../model/geometry'
+import type { Plan } from '../model/types'
 
-export type View = { x: number; y: number; w: number; h: number }
+export interface View {
+  x: number
+  y: number
+  w: number
+  h: number
+}
 
+const DEFAULT_VIEW: View = { x: -80, y: -80, w: 820, h: 620 }
+
+// Zoom/pan via the SVG viewBox (spec §3): scroll zooms toward the cursor,
+// callers pan by screen pixels, Fit frames the plan's bounding box.
 export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
-  const [view, setView] = useState<View>({ x: -80, y: -80, w: 820, h: 620 })
+  const [view, setView] = useState<View>(DEFAULT_VIEW)
 
   const toPlan = (clientX: number, clientY: number) => {
     const svg = svgRef.current
-    const m = svg?.getScreenCTM()
-    if (!svg || !m) return { x: 0, y: 0 }
-    const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse())
+    const matrix = svg?.getScreenCTM()
+    if (!svg || !matrix) return { x: 0, y: 0 }
+    const p = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse())
     return { x: p.x, y: p.y }
   }
 
   // screen pixels per plan cm at the current zoom
   const pxPerCm = () => svgRef.current?.getScreenCTM()?.a ?? 1
 
-  const zoomAt = (clientX: number, clientY: number, f: number) => {
+  const zoomAt = (clientX: number, clientY: number, factor: number) => {
     const c = toPlan(clientX, clientY)
-    setView((v) => ({ x: c.x - (c.x - v.x) * f, y: c.y - (c.y - v.y) * f, w: v.w * f, h: v.h * f }))
+    setView((v) => ({
+      x: c.x - (c.x - v.x) * factor,
+      y: c.y - (c.y - v.y) * factor,
+      w: v.w * factor,
+      h: v.h * factor,
+    }))
   }
 
-  const zoomCenter = (f: number) => {
+  const zoomCenter = (factor: number) => {
     const svg = svgRef.current
     if (!svg) return
     const r = svg.getBoundingClientRect()
-    zoomAt(r.left + r.width / 2, r.top + r.height / 2, f)
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor)
   }
 
   const panByPx = (dxPx: number, dyPx: number) => {
-    const s = pxPerCm()
-    setView((v) => ({ ...v, x: v.x - dxPx / s, y: v.y - dyPx / s }))
+    const scale = pxPerCm()
+    setView((v) => ({ ...v, x: v.x - dxPx / scale, y: v.y - dyPx / scale }))
   }
 
   const fitPlan = (plan: Plan) => {
-    const b = planBBox(plan)
-    const m = 120
-    setView({ x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m })
+    const box = planBBox(plan)
+    if (!box) {
+      setView(DEFAULT_VIEW)
+      return
+    }
+    const margin = 120
+    setView({ x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin })
   }
 
   useEffect(() => {
@@ -51,10 +68,9 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, setView, toPlan, pxPerCm, zoomAt, zoomCenter, panByPx, fitPlan }
+  return { view, toPlan, pxPerCm, zoomCenter, panByPx, fitPlan }
 }
 
 export function useSpaceHeld() {
