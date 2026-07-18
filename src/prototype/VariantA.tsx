@@ -11,6 +11,7 @@ import {
   GridRect,
   Handle,
   OpeningGlyph,
+  OpeningHit,
   RubberWall,
   SnapMarker,
   WallHit,
@@ -231,18 +232,7 @@ export default function VariantA() {
           />
         ))}
         {Object.values(plan.openings).map((o) => (
-          <OpeningGlyph
-            key={o.id}
-            plan={plan}
-            opening={o}
-            selected={sel?.type === 'opening' && sel.id === o.id}
-            interactive={mode === 'select'}
-            onPointerDown={(e) => {
-              if (mode !== 'select' || e.button !== 0 || space) return
-              setSel({ type: 'opening', id: o.id })
-              drag.current = { kind: 'opening', id: o.id }
-            }}
-          />
+          <OpeningGlyph key={o.id} plan={plan} opening={o} selected={sel?.type === 'opening' && sel.id === o.id} />
         ))}
         {Object.values(plan.walls).map((w) => (
           <DimLabel key={w.id} plan={plan} wall={w} />
@@ -262,6 +252,19 @@ export default function VariantA() {
               }}
               onPointerEnter={() => setHoverWall(w.id)}
               onPointerLeave={() => setHoverWall((h) => (h === w.id ? null : h))}
+            />
+          ))}
+        {mode === 'select' &&
+          Object.values(plan.openings).map((o) => (
+            <OpeningHit
+              key={o.id}
+              plan={plan}
+              opening={o}
+              onPointerDown={(e) => {
+                if (e.button !== 0 || space) return
+                setSel({ type: 'opening', id: o.id })
+                drag.current = { kind: 'opening', id: o.id }
+              }}
             />
           ))}
         {selWall && (

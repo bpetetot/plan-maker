@@ -152,6 +152,33 @@ export function OpeningGlyph({
   )
 }
 
+// Invisible fat hit target for an opening (its full width, at the wall).
+// Render AFTER wall hit targets so clicking the opening's span wins over the wall.
+export function OpeningHit({
+  plan,
+  opening,
+  onPointerDown,
+}: {
+  plan: Plan
+  opening: Opening
+  onPointerDown?: (e: React.PointerEvent) => void
+}) {
+  const w = plan.walls[opening.wall]
+  if (!w) return null
+  const [a, b] = wallPts(plan, w)
+  const L = wallLen(plan, w)
+  if (L < 1) return null
+  const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
+  const cx = a.x + ((b.x - a.x) * opening.center) / L
+  const cy = a.y + ((b.y - a.y) * opening.center) / L
+  const hw = opening.width / 2
+  return (
+    <g transform={`translate(${cx},${cy}) rotate(${ang})`} style={{ cursor: 'move' }} onPointerDown={onPointerDown}>
+      <rect x={-hw} y={-WALL_T * 1.6} width={opening.width} height={WALL_T * 3.2} fill="transparent" />
+    </g>
+  )
+}
+
 export function DimLabel({ plan, wall }: { plan: Plan; wall: Wall }) {
   const [a, b] = wallPts(plan, wall)
   const L = wallLen(plan, wall)
