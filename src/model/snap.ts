@@ -1,3 +1,4 @@
+import type { Vec } from './geometry'
 import { distance, nearestWall, wallLength, wallPoints } from './geometry'
 import type { Plan } from './types'
 import { GRID } from './types'
@@ -8,12 +9,12 @@ export interface Snap {
   kind: 'point' | 'wall' | 'axis' | 'grid' | 'free'
   pointId?: string
   wallId?: string
-  axisFrom?: { x: number; y: number }
+  axisFrom?: Vec
 }
 
 export interface SnapOptions {
   tolerance: number
-  anchor?: { x: number; y: number }
+  anchor?: Vec
   exclude?: Set<string>
   walls?: boolean // wall bodies become snap targets (drawing mode)
   free?: boolean // Alt held: no snapping, just integer rounding
@@ -21,6 +22,20 @@ export interface SnapOptions {
 
 const AXIS_STEP = Math.PI / 4
 const AXIS_TOLERANCE = (8 * Math.PI) / 180
+// An axis ∩ wall intersection farther than this many tolerances from the
+// cursor (grazing angle) is not what the eye is aiming at (ADR 0002).
+const AXIS_INTERSECTION_REACH = 2
+
+// Unit direction of the 45° axis the anchor→cursor direction locks to, or
+// null when the cursor is not within the angular tolerance of any axis.
+function lockedAxisDirection(anchor: Vec, x: number, y: number): Vec | null {
+  const length = Math.hypot(x - anchor.x, y - anchor.y)
+  if (length <= 1) return null
+  const angle = Math.atan2(y - anchor.y, x - anchor.x)
+  const snapped = Math.round(angle / AXIS_STEP) * AXIS_STEP
+  if (Math.abs(angle - snapped) >= AXIS_TOLERANCE) return null
+  return { x: Math.cos(snapped), y: Math.sin(snapped) }
+}
 
 // Snap priority (spec §4 + ADR 0002): existing point > wall body (when enabled)
 // > 45° axis from the anchor > 10 cm grid.
@@ -45,33 +60,51 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
       const [a, b] = wallPoints(plan, near.wall)
       const length = wallLength(plan, near.wall)
       if (length >= 1) {
-        // The rounding may drift a fraction of a cm off the wall's line; the
-        // junction stays topological because the wall is split at this point.
-        return {
-          x: Math.round(a.x + ((b.x - a.x) / length) * near.t),
-          y: Math.round(a.y + ((b.y - a.y) / length) * near.t),
-          kind: 'wall',
-          wallId: near.wall.id,
+        // Default position: the cursor's orthogonal projection on the wall.
+        // When the anchor direction locks to a 45° axis, prefer the locked
+        // axis ∩ wall intersection so the junction keeps the drawn wall
+        // straight (ADR 0002). The rounding may drift a fraction of a cm;
+        // the junction stays topological because the wall is split there.
+        let px = a.x + ((b.x - a.x) / length) * near.t
+        let py = a.y + ((b.y - a.y) / length) * near.t
+        let axisFrom: Vec | undefined
+        const direction = options.anchor && lockedAxisDirection(options.anchor, x, y)
+        if (options.anchor && direction) {
+          const wx = b.x - a.x
+          const wy = b.y - a.y
+          const denominator = direction.x * wy - direction.y * wx
+          if (Math.abs(denominator) > 1e-9) {
+            const t = ((a.x - options.anchor.x) * wy - (a.y - options.anchor.y) * wx) / denominator
+            const ix = options.anchor.x + t * direction.x
+            const iy = options.anchor.y + t * direction.y
+            const s = ((ix - a.x) * wx + (iy - a.y) * wy) / (length * length)
+            const within =
+              t > 0 && // the axis is a ray: never jump behind the anchor
+              s >= 0 &&
+              s <= 1 &&
+              distance(ix, iy, x, y) <= options.tolerance * AXIS_INTERSECTION_REACH
+            if (within) {
+              px = ix
+              py = iy
+              axisFrom = { x: options.anchor.x, y: options.anchor.y }
+            }
+          }
         }
+        return { x: Math.round(px), y: Math.round(py), kind: 'wall', wallId: near.wall.id, axisFrom }
       }
     }
   }
 
   if (options.anchor) {
-    const dx = x - options.anchor.x
-    const dy = y - options.anchor.y
-    const length = Math.hypot(dx, dy)
-    if (length > 1) {
-      const angle = Math.atan2(dy, dx)
-      const snapped = Math.round(angle / AXIS_STEP) * AXIS_STEP
-      if (Math.abs(angle - snapped) < AXIS_TOLERANCE) {
-        const stepped = Math.max(GRID, Math.round(length / GRID) * GRID)
-        return {
-          x: Math.round(options.anchor.x + stepped * Math.cos(snapped)),
-          y: Math.round(options.anchor.y + stepped * Math.sin(snapped)),
-          kind: 'axis',
-          axisFrom: { x: options.anchor.x, y: options.anchor.y },
-        }
+    const direction = lockedAxisDirection(options.anchor, x, y)
+    if (direction) {
+      const length = Math.hypot(x - options.anchor.x, y - options.anchor.y)
+      const stepped = Math.max(GRID, Math.round(length / GRID) * GRID)
+      return {
+        x: Math.round(options.anchor.x + stepped * direction.x),
+        y: Math.round(options.anchor.y + stepped * direction.y),
+        kind: 'axis',
+        axisFrom: { x: options.anchor.x, y: options.anchor.y },
       }
     }
   }

@@ -20,9 +20,14 @@ topological.
 ## Consequences
 
 - Snap priority gains a "wall body" target: existing point > wall body > 45°
-  axis > grid. The snapped position is the orthogonal projection onto the
-  segment, rounded to integer cm; rounding may drift off the line by a
-  fraction of a cm, which is harmless because the connection is topological.
+  axis > grid. The snapped position is the orthogonal projection of the
+  cursor onto the wall — except when the direction from the drawing anchor
+  locks to a 45° axis: then the position is the intersection of the locked
+  axis with the wall, so the junction keeps the drawn wall straight. The
+  intersection is used only when it falls within the wall's extent and within
+  twice the snap tolerance of the cursor; otherwise the plain projection
+  applies. Positions are rounded to integer cm; rounding drift is harmless
+  because the connection is topological.
 - Splitting a wall reassigns each opening to the half containing its center;
   the start-side half keeps the original wall id so its openings keep their
   `wallId` and `offset`. An opening straddling the cut, or no longer fitting

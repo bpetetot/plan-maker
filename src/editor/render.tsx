@@ -356,7 +356,9 @@ export function SnapMarker({ snap }: { snap: Snap | null }) {
   if (!snap) return null
   return (
     <g pointerEvents="none">
-      {snap.kind === 'axis' && snap.axisFrom && (
+      {/* the dashed guide shows whenever a locked axis produced the position —
+          including a wall snap corrected to the axis ∩ wall intersection */}
+      {snap.axisFrom && (
         <line
           x1={snap.axisFrom.x}
           y1={snap.axisFrom.y}

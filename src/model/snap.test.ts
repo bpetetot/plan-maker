@@ -63,6 +63,59 @@ describe('snapPoint on wall bodies', () => {
     expect(s.kind).toBe('wall')
   })
 
+  it('lands on the locked axis ∩ wall intersection, keeping the drawn wall straight', () => {
+    const target = buildPlan((b) => {
+      const p1 = b.point(400, -200)
+      const p2 = b.point(400, 200)
+      b.wall(p1, p2)
+    })
+    // cursor drifts 6 cm off the horizontal while reaching the wall: the snap
+    // corrects to the axis ∩ wall point, not the cursor's raw projection
+    const s = snapPoint(target, 395, 6, { tolerance: 15, walls: true, anchor: { x: 0, y: 0 } })
+    expect(s).toMatchObject({ x: 400, y: 0, kind: 'wall' })
+    expect(s.wallId).toBe(Object.keys(target.walls)[0])
+    expect(s.axisFrom).toEqual({ x: 0, y: 0 })
+  })
+
+  it('falls back to the cursor projection when the axis meets the wall beyond its ends', () => {
+    const target = buildPlan((b) => {
+      const p1 = b.point(400, 20)
+      const p2 = b.point(400, 200)
+      b.wall(p1, p2)
+    })
+    // the horizontal axis from the anchor meets the wall at (400, 0), below
+    // the wall's start — no junction possible there
+    const s = snapPoint(target, 395, 40, { tolerance: 15, walls: true, anchor: { x: 0, y: 0 } })
+    expect(s).toMatchObject({ x: 400, y: 40, kind: 'wall' })
+    expect(s.axisFrom).toBeUndefined()
+  })
+
+  it('falls back to the cursor projection when the axis meets the wall at a grazing angle', () => {
+    const target = buildPlan((b) => {
+      const p1 = b.point(0, 100)
+      const p2 = b.point(1000, 276) // ~10° off horizontal
+      b.wall(p1, p2)
+    })
+    // horizontal axis from the anchor meets the near-parallel wall ~68 cm away
+    // from the cursor — far beyond 2× tolerance, not what the eye is aiming at
+    const s = snapPoint(target, 500, 195, { tolerance: 15, walls: true, anchor: { x: 0, y: 200 } })
+    expect(s).toMatchObject({ x: 501, y: 188, kind: 'wall' })
+    expect(s.axisFrom).toBeUndefined()
+  })
+
+  it('never uses an intersection behind the anchor (the axis is a ray, not a line)', () => {
+    const target = buildPlan((b) => {
+      const p1 = b.point(0, -100)
+      const p2 = b.point(0, 100)
+      b.wall(p1, p2)
+    })
+    // anchor sits just in front of the wall, cursor points away from it: the
+    // locked +x axis crosses the wall behind the anchor — not a valid target
+    const s = snapPoint(target, 14, 1, { tolerance: 15, walls: true, anchor: { x: 2, y: 0 } })
+    expect(s).toMatchObject({ x: 0, y: 1, kind: 'wall' })
+    expect(s.axisFrom).toBeUndefined()
+  })
+
   it('rounds the projection on a diagonal wall to integer centimeters', () => {
     const diagonal = buildPlan((b) => {
       const p1 = b.point(0, 0)
