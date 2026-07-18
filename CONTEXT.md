@@ -83,6 +83,14 @@ integer-centimeter rounding remains (Points have integer coordinates).
 Toggles immediately, both ways, including mid-gesture.
 _Avoid_: Free mode, no-grid mode
 
+**Placement dimension**:
+The pair of temporary dimensions flanking an Opening while it is being placed
+or moved — each runs from a wall end to the near edge of the opening, ignoring
+neighbouring openings. They replace the wall's Dimension on its line for the
+duration of the gesture; a side reduced to nothing shows no dimension. Pure
+editor feedback, like the Rail: never part of the plan, never exported.
+_Avoid_: Side measure, clearance, flanking dimension
+
 **Rail**:
 The pair of guide lines a Dimension slides along while it is being dragged —
 one on each side of its wall. Pure editor feedback: never part of the plan,

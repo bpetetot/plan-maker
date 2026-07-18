@@ -212,6 +212,23 @@ export function OpeningHit({
 // the wall face + half the 11px text height).
 const dimLineOffset = (wall: Wall) => wall.thickness + 8
 
+// Frame of a wall's dimension line, shared by everything that draws on it:
+// unit axis, ISO reading angle (and whether it flipped the wall's own frame),
+// and the side the line sits on — the stored placement, else the default look
+// (upper side for horizontal walls, left side for vertical ones), as a sign
+// along the start→end left normal.
+function dimLineFrame(plan: Plan, wall: Wall) {
+  const [a, b] = wallPoints(plan, wall)
+  const length = wallLength(plan, wall)
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const raw = (Math.atan2(dy, dx) * 180) / Math.PI
+  const angle = labelAngle(dx, dy)
+  const flipped = angle !== raw
+  const side = wall.dimPlacement ? wall.dimPlacement.side : flipped ? 1 : -1
+  return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
+}
+
 // Automatic dimension on every wall, always visible (spec §4). Sits at
 // wall.dimPlacement when set (ratio along the axis, side across it), else at
 // the midpoint, above the text's reading line (upper side for horizontal
@@ -226,23 +243,16 @@ export function DimLabel({
   wall: Wall
   onPointerDown?: (e: React.PointerEvent) => void
 }) {
-  const [a, b] = wallPoints(plan, wall)
-  const length = wallLength(plan, wall)
+  const { a, length, ux, uy, angle, flipped, side, off } = dimLineFrame(plan, wall)
   if (length < 20) return null
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const raw = (Math.atan2(dy, dx) * 180) / Math.PI
-  const angle = labelAngle(dx, dy)
   // labelAngle keeps the text readable; when it flips the frame, local +y
-  // points along -n (n = left normal of start→end), so map the stored side
-  // back into the rotated frame. Default: local -y, the pre-placement look.
-  const flipped = angle !== raw
+  // points along -n (n = left normal of start→end), so map the side back
+  // into the rotated frame.
   const t = wall.dimPlacement?.t ?? 0.5
-  const localSign = wall.dimPlacement ? wall.dimPlacement.side * (flipped ? -1 : 1) : -1
-  const y = localSign * dimLineOffset(wall)
+  const y = side * (flipped ? -1 : 1) * off
   return (
     <g
-      transform={`translate(${a.x + dx * t},${a.y + dy * t}) rotate(${angle})`}
+      transform={`translate(${a.x + ux * length * t},${a.y + uy * length * t}) rotate(${angle})`}
       pointerEvents={onPointerDown ? 'auto' : 'none'}
       style={onPointerDown ? { cursor: 'move' } : undefined}
       onPointerDown={onPointerDown}
@@ -283,6 +293,71 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
           vectorEffect="non-scaling-stroke"
         />
       ))}
+    </g>
+  )
+}
+
+// Placement dimensions: the pair of temporary dimensions flanking an opening
+// while it is being placed or moved — each runs from a wall end to the near
+// edge of the opening, ignoring neighbouring openings, on the same line the
+// wall's (temporarily hidden) Dimension sits on. A side whose segment rounds
+// to 0 cm shows nothing; a segment too short for its text keeps the text and
+// drops the line. Editor feedback — deliberately absent from PlanScene.
+export function PlacementDims({ plan, opening }: { plan: Plan; opening: Opening }) {
+  const wall = plan.walls[opening.wallId]
+  const placement = openingPlacement(plan, opening)
+  if (!wall || !placement) return null
+  const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
+  // point on the dimension line at distance t along the wall axis
+  const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
+  const half = opening.width / 2
+  const segments = [
+    { key: 'start', from: 0, to: placement.offset - half },
+    { key: 'end', from: placement.offset + half, to: length },
+  ]
+  return (
+    <g pointerEvents="none">
+      {segments.map(({ key, from, to }) => {
+        const len = to - from
+        if (Math.round(len) < 1) return null
+        const label = formatLength(len)
+        const mid = at((from + to) / 2)
+        // 9px text ≈ 5 units per character; the line breaks around it
+        const gapHalf = label.length * 2.5 + 4
+        const withLine = len / 2 > gapHalf + 4
+        const p1 = at(from)
+        const p2 = at(to)
+        const g1 = at((from + to) / 2 - gapHalf)
+        const g2 = at((from + to) / 2 + gapHalf)
+        return (
+          <g key={key}>
+            {withLine && (
+              <>
+                {/* the dimension line, broken around the text */}
+                <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
+                <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />
+                {/* perpendicular ticks at both ends */}
+                {[p1, p2].map((p, i) => (
+                  <line
+                    key={i}
+                    x1={p.x + uy * 4}
+                    y1={p.y - ux * 4}
+                    x2={p.x - uy * 4}
+                    y2={p.y + ux * 4}
+                    stroke="var(--rail)"
+                    strokeWidth={1}
+                  />
+                ))}
+              </>
+            )}
+            <g transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}>
+              <text textAnchor="middle" dominantBaseline="central" className="dim dim-placement">
+                {label}
+              </text>
+            </g>
+          </g>
+        )
+      })}
     </g>
   )
 }

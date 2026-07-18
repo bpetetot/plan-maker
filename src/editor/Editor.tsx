@@ -67,6 +67,7 @@ import {
   Handle,
   OpeningGlyph,
   OpeningHit,
+  PlacementDims,
   RoomOverlay,
   roomTextBlocks,
   RubberWall,
@@ -90,7 +91,9 @@ type Drag =
       clickRef?: ElementRef
       moved?: boolean
     }
-  | { kind: 'opening'; id: string }
+  // dragging an opening along its wall; below the click threshold it is a
+  // plain click — the placement dimensions only show once it becomes a move
+  | { kind: 'opening'; id: string; start: Vec; moved?: boolean }
   // dragging a room's text block. `room` is the room containing the block at
   // drag start: the block can never leave it (the drag clamps to its polygon);
   // null for a label outside any room, which moves freely.
@@ -144,6 +147,8 @@ export default function Editor() {
   )
   // wall whose dimension is being dragged past the click threshold — drives the rails
   const [railWallId, setRailWallId] = useState<string | null>(null)
+  // opening being solo-dragged — drives its placement dimensions
+  const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null)
   // Inline room-name editing over a text block (Excalidraw-style). The plan is
   // only touched on commit — one undo entry — and Escape cancels; labelId is
   // null while the room has no label yet (one is created on non-empty commit).
@@ -335,6 +340,10 @@ export default function Editor() {
       } else if (d.kind === 'opening') {
         const opening = plan.openings[d.id]
         if (opening) {
+          if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
+            d.moved = true
+            setMovingOpeningId(d.id)
+          }
           const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y)
           setPlan((p) => moveOpening(p, d.id, t))
         }
@@ -420,6 +429,7 @@ export default function Editor() {
       setRailWallId(null)
     }
     if (d.kind === 'point') setSnap(null)
+    if (d.kind === 'opening') setMovingOpeningId(null)
     if (d.kind !== 'pan') endHistoryGroup()
   }
 
@@ -483,6 +493,10 @@ export default function Editor() {
             width: defaultOpeningWidth('window'),
           }
       : null
+
+  // The opening being placed (ghost) or moved: it carries the placement
+  // dimensions and temporarily hides its wall's own dimension.
+  const placementOpening = ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null)
 
   // Room labels are never selected (CONTEXT.md: Selection) — the text block is
   // dragged and double-click-edited directly.
@@ -614,30 +628,36 @@ export default function Editor() {
               plan={plan}
               opening={opening}
               onPointerDown={(e) =>
-                onElementPointerDown({ type: 'opening', id: opening.id }, e, () => ({
+                onElementPointerDown({ type: 'opening', id: opening.id }, e, (c) => ({
                   kind: 'opening',
                   id: opening.id,
+                  start: c,
                 }))
               }
             />
           ))}
         {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
-        {/* after the hit targets so the label wins the hit-test where they overlap */}
-        {Object.values(plan.walls).map((wall) => (
-          <DimLabel
-            key={wall.id}
-            plan={plan}
-            wall={wall}
-            onPointerDown={
-              tool === 'select'
-                ? (e) => {
-                    if (e.button !== 0 || space) return
-                    startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
-                  }
-                : undefined
-            }
-          />
-        ))}
+        {/* after the hit targets so the label wins the hit-test where they overlap;
+            the wall carrying a placement gesture shows the placement dimensions
+            instead of its own */}
+        {Object.values(plan.walls).map((wall) =>
+          wall.id === placementOpening?.wallId ? null : (
+            <DimLabel
+              key={wall.id}
+              plan={plan}
+              wall={wall}
+              onPointerDown={
+                tool === 'select'
+                  ? (e) => {
+                      if (e.button !== 0 || space) return
+                      startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
+                    }
+                  : undefined
+              }
+            />
+          ),
+        )}
+        {placementOpening && <PlacementDims plan={plan} opening={placementOpening} />}
         {selWall &&
           wallPoints(plan, selWall).map((p) => (
             <Handle
