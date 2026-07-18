@@ -7,8 +7,6 @@ import { useSpaceHeld, useView } from './useView'
 import {
   COLORS,
   DimLabel,
-  GridDefs,
-  GridRect,
   Handle,
   OpeningGlyph,
   OpeningHit,
@@ -221,8 +219,7 @@ export default function VariantA() {
           }
         }}
       >
-        <GridDefs />
-        <GridRect view={view} />
+        {/* grid intentionally not displayed for now — grid snapping stays active */}
         {Object.values(plan.walls).map((w) => (
           <WallLine
             key={w.id}
