@@ -9,7 +9,16 @@ export const WINDOW_W = 120
 export type Pt = { id: string; x: number; y: number }
 export type Wall = { id: string; a: string; b: string }
 export type OpeningKind = 'door' | 'window'
-export type Opening = { id: string; wall: string; kind: OpeningKind; center: number; width: number }
+export type Opening = {
+  id: string
+  wall: string
+  kind: OpeningKind
+  center: number
+  width: number
+  // doors only: which end holds the hinge, and which side of the wall it swings to
+  flipHinge?: boolean
+  flipSwing?: boolean
+}
 export type Plan = {
   points: Record<string, Pt>
   walls: Record<string, Wall>
@@ -233,6 +242,11 @@ export function moveOpening(plan: Plan, id: string, t: number): Plan {
   const center = clampOpening(plan, plan.walls[o.wall], t, o.width)
   if (center === null) return plan
   return { ...plan, openings: { ...plan.openings, [id]: { ...o, center } } }
+}
+
+export function toggleOpeningFlip(plan: Plan, id: string, field: 'flipHinge' | 'flipSwing'): Plan {
+  const o = plan.openings[id]
+  return { ...plan, openings: { ...plan.openings, [id]: { ...o, [field]: !o[field] } } }
 }
 
 export function setOpeningWidth(plan: Plan, id: string, width: number): Plan {

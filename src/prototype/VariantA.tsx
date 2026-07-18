@@ -357,6 +357,24 @@ export default function VariantA() {
                   </option>
                 ))}
               </select>
+              {selOpening.kind === 'door' && (
+                <>
+                  <button
+                    className="flip"
+                    title="Swap hinge side (left/right)"
+                    onClick={() => setPlan((p) => M.toggleOpeningFlip(p, selOpening.id, 'flipHinge'))}
+                  >
+                    ⇋ Hinge
+                  </button>
+                  <button
+                    className="flip"
+                    title="Swap swing direction (inside/outside)"
+                    onClick={() => setPlan((p) => M.toggleOpeningFlip(p, selOpening.id, 'flipSwing'))}
+                  >
+                    ⇵ Swing
+                  </button>
+                </>
+              )}
               <button
                 className="danger"
                 onClick={() => {

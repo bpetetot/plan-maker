@@ -82,6 +82,13 @@ svg text.dim-live {
   transform: translateX(-50%);
   white-space: nowrap;
 }
+.flip {
+  background: #eef2ff;
+  color: #3730a3;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+}
 .danger {
   background: #fee2e2;
   color: #b91c1c;

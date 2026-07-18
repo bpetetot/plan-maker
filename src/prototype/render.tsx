@@ -128,7 +128,7 @@ export function OpeningGlyph({
       {/* gap in the wall */}
       <rect x={-hw} y={-WALL_T / 2 - 1} width={opening.width} height={WALL_T + 2} fill="#ffffff" />
       {opening.kind === 'door' ? (
-        <>
+        <g transform={`scale(${opening.flipHinge ? -1 : 1},${opening.flipSwing ? -1 : 1})`}>
           <line x1={-hw} y1={0} x2={-hw} y2={-opening.width} stroke={stroke} strokeWidth={3} />
           <path
             d={`M ${hw} 0 A ${opening.width} ${opening.width} 0 0 0 ${-hw} ${-opening.width}`}
@@ -137,7 +137,7 @@ export function OpeningGlyph({
             strokeWidth={1.5}
             strokeDasharray="4 4"
           />
-        </>
+        </g>
       ) : (
         <>
           <line x1={-hw} y1={-3} x2={hw} y2={-3} stroke={stroke} strokeWidth={2} />
