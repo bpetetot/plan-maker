@@ -1,4 +1,5 @@
 // Floating burger menu (top-left) with the app-level file actions.
+import { Eraser, FolderOpen, ImageDown, Menu, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 export interface AppMenuProps {
@@ -39,22 +40,23 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
       <button
         className="floating-btn"
         title="Menu"
+        aria-label="Menu"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        ☰
+        <Menu size={16} aria-hidden />
       </button>
       {open && (
         <div className="floating menu" role="menu">
           <button className="menu-item" role="menuitem" onClick={run(onOpen)}>
-            Open
+            <FolderOpen size={16} aria-hidden /> Open
           </button>
           <button className="menu-item" role="menuitem" onClick={run(onSaveAs)}>
-            Save as…
+            <Save size={16} aria-hidden /> Save as…
           </button>
           <button className="menu-item" role="menuitem" onClick={run(onExportImage)}>
-            Export image…
+            <ImageDown size={16} aria-hidden /> Export image…
           </button>
           <div className="menu-sep" />
           <button
@@ -63,7 +65,7 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
             disabled={resetDisabled}
             onClick={run(onReset)}
           >
-            Reset
+            <Eraser size={16} aria-hidden /> Reset
           </button>
         </div>
       )}

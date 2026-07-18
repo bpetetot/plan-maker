@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
@@ -31,7 +32,9 @@ export default function ReloadPrompt() {
       <button className="banner-action" onClick={() => updateServiceWorker(true)}>
         Reload
       </button>
-      <button onClick={() => setNeedRefresh(false)}>✕</button>
+      <button title="Dismiss" aria-label="Dismiss" onClick={() => setNeedRefresh(false)}>
+        <X size={16} aria-hidden />
+      </button>
     </div>
   )
 }

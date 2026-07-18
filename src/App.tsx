@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import AppMenu from './AppMenu'
 import Editor from './editor/Editor'
@@ -84,7 +85,9 @@ export default function App() {
       {notice && (
         <div className="banner error">
           {notice}
-          <button onClick={() => setNotice(null)}>✕</button>
+          <button title="Dismiss" aria-label="Dismiss" onClick={() => setNotice(null)}>
+            <X size={16} aria-hidden />
+          </button>
         </div>
       )}
       <ReloadPrompt />

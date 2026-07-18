@@ -2,6 +2,19 @@
 // prototype: full-bleed canvas, floating toolbar, click-to-click walls,
 // contextual popover on the selection, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  BrickWall,
+  DoorOpen,
+  FlipHorizontal2,
+  FlipVertical2,
+  Grid2x2,
+  MousePointer2,
+  Redo2,
+  Trash2,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
 import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry'
@@ -436,6 +449,13 @@ export default function Editor() {
     setPlan((p) => addRoomLabel(p, 'Room', c.x, c.y))
   }
 
+  // shared by every popover variant
+  const deleteButton = (
+    <button className="danger" title="Delete" aria-label="Delete" onClick={() => deleteSelection(sel)}>
+      <Trash2 size={16} aria-hidden />
+    </button>
+  )
+
   return (
     <div ref={wrapRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <svg
@@ -573,18 +593,21 @@ export default function Editor() {
       >
         {(
           [
-            ['select', 'Select', '1'],
-            ['wall', 'Wall', '2'],
-            ['door', 'Door', '3'],
-            ['window', 'Window', '4'],
+            ['select', 'Select', '1', MousePointer2],
+            ['wall', 'Wall', '2', BrickWall],
+            ['door', 'Door', '3', DoorOpen],
+            ['window', 'Window', '4', Grid2x2],
           ] as const
-        ).map(([m, label, key]) => (
+        ).map(([m, label, key, Icon]) => (
           <button
             key={m}
             className={mode === m ? 'floating-btn active' : 'floating-btn'}
+            title={`${label} (${key})`}
+            aria-label={label}
             onClick={() => switchMode(m)}
           >
-            {label} <span className="kbd">{key}</span>
+            <Icon size={16} aria-hidden />
+            <span className="kbd">{key}</span>
           </button>
         ))}
       </div>
@@ -606,27 +629,44 @@ export default function Editor() {
       {/* zoom controls and undo/redo (bottom-left) */}
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
         <div className="floating">
-          <button className="floating-btn" title="Zoom out" onClick={() => zoomCenter(1.25)}>
-            −
+          <button
+            className="floating-btn"
+            title="Zoom out"
+            aria-label="Zoom out"
+            onClick={() => zoomCenter(1.25)}
+          >
+            <ZoomOut size={16} aria-hidden />
           </button>
           <button className="floating-btn" title="Fit to plan" onClick={() => fitPlan(plan)}>
             {Math.round(pxPerCm() * 100)}%
           </button>
-          <button className="floating-btn" title="Zoom in" onClick={() => zoomCenter(1 / 1.25)}>
-            +
+          <button
+            className="floating-btn"
+            title="Zoom in"
+            aria-label="Zoom in"
+            onClick={() => zoomCenter(1 / 1.25)}
+          >
+            <ZoomIn size={16} aria-hidden />
           </button>
         </div>
         <div className="floating">
-          <button className="floating-btn" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={() => undo()}>
-            ↺
+          <button
+            className="floating-btn"
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+            disabled={!canUndo}
+            onClick={() => undo()}
+          >
+            <Undo2 size={16} aria-hidden />
           </button>
           <button
             className="floating-btn"
             title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
             disabled={!canRedo}
             onClick={() => redo()}
           >
-            ↻
+            <Redo2 size={16} aria-hidden />
           </button>
         </div>
       </div>
@@ -637,17 +677,13 @@ export default function Editor() {
           {multi && (
             <>
               <span>{sel.length} elements</span>
-              <button className="danger" onClick={() => deleteSelection(sel)}>
-                Delete
-              </button>
+              {deleteButton}
             </>
           )}
           {selWall && (
             <>
               <span>Wall · {formatLength(wallLength(plan, selWall))}</span>
-              <button className="danger" onClick={() => deleteSelection(sel)}>
-                Delete
-              </button>
+              {deleteButton}
             </>
           )}
           {selOpening && (
@@ -670,20 +706,18 @@ export default function Editor() {
                     title="Swap hinge side (left/right)"
                     onClick={() => setPlan((p) => toggleHingeSide(p, selOpening.id))}
                   >
-                    ⇋ Hinge
+                    <FlipHorizontal2 size={16} aria-hidden /> Hinge
                   </button>
                   <button
                     className="flip"
                     title="Swap swing direction (inside/outside)"
                     onClick={() => setPlan((p) => toggleSwing(p, selOpening.id))}
                   >
-                    ⇵ Swing
+                    <FlipVertical2 size={16} aria-hidden /> Swing
                   </button>
                 </>
               )}
-              <button className="danger" onClick={() => deleteSelection(sel)}>
-                Delete
-              </button>
+              {deleteButton}
             </>
           )}
           {selLabel && (
@@ -697,9 +731,7 @@ export default function Editor() {
                   if (e.key === 'Enter' || e.key === 'Escape') setSel([])
                 }}
               />
-              <button className="danger" onClick={() => deleteSelection(sel)}>
-                Delete
-              </button>
+              {deleteButton}
             </>
           )}
         </div>

@@ -26,6 +26,9 @@ idb-keyval (autosave), vite-plugin-pwa.
 
 - All code, comments, and documentation should be written in English
 - Add comments to the code only when necessary and when they add value
+- UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
+  Unicode glyphs (exception: the zoom-percentage button, which is a text
+  indicator)
 
 ## Agent skills
 
