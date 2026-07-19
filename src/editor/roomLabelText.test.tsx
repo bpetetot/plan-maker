@@ -121,7 +121,7 @@ describe('dragging the area text', () => {
     fireEvent.pointerUp(svg)
     expect(labels()).toHaveLength(0)
     expect(undoDepth()).toBe(0)
-    expect(document.querySelector('.popover')).toBeNull()
+    expect(document.querySelector('.panel')).toBeNull()
   })
 
   it('the block cannot leave its room: a drag past a wall clamps to the boundary', () => {

@@ -92,6 +92,13 @@ it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
+**Selection panel**:
+The fixed floating card on the editor's left showing the current Selection's
+parameters and actions — per-element measures, opening options, delete.
+Hidden when the Selection is empty. Its values are derived on render from the
+same silhouette readings as the Dimensions, never stored.
+_Avoid_: Popover, inspector, properties dialog
+
 **Snap**:
 The default magnetic guidance of any placement or move in the editor:
 positions are drawn to existing points, walls, 45° axes, or the 10 cm grid. A

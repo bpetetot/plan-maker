@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  deleteElements,
-  elementsInRect,
-  isSelected,
-  refKey,
-  selectionBounds,
-  toggleRef,
-  translateElements,
-} from './selection'
+import { deleteElements, elementsInRect, isSelected, refKey, toggleRef, translateElements } from './selection'
 import { buildPlan } from './testHelpers'
 import type { ElementRef } from './selection'
 
@@ -183,24 +175,5 @@ describe('translateElements', () => {
 describe('refKey', () => {
   it('distinguishes same id across types', () => {
     expect(refKey(wallRef('x'))).not.toBe(refKey(openingRef('x')))
-  })
-})
-
-describe('selectionBounds', () => {
-  it('spans wall endpoints and opening centers', () => {
-    const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(400, 250))
-      b.opening(wall, 'door', 200)
-    })
-    const wall = Object.values(plan.walls)[0]
-    const opening = Object.values(plan.openings)[0]
-    const bounds = selectionBounds(plan, [wallRef(wall.id), openingRef(opening.id)])
-    expect(bounds).toEqual({ minX: 0, minY: 0, maxX: 400, maxY: 250 })
-  })
-
-  it('returns null when no ref resolves to a live element', () => {
-    const plan = buildPlan(() => {})
-    expect(selectionBounds(plan, [])).toBeNull()
-    expect(selectionBounds(plan, [wallRef('gone')])).toBeNull()
   })
 })

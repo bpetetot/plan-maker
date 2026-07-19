@@ -1,20 +1,8 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05
 // prototype: full-bleed canvas, floating toolbar, click-to-click walls,
-// contextual popover on the selection, dimensions always visible.
+// selection panel on the left, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  BrickWall,
-  DoorClosed,
-  FlipHorizontal2,
-  FlipVertical2,
-  Grid2x2,
-  MousePointer2,
-  Redo2,
-  Trash2,
-  Undo2,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react'
+import { BrickWall, DoorClosed, Grid2x2, MousePointer2, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
 import {
@@ -25,8 +13,6 @@ import {
   wallPoints,
   wallSide,
 } from '../model/geometry'
-import { formatLength } from '../model/format'
-import { openingPlacement } from '../model/openings'
 import {
   addRoomLabel,
   clampOpeningOffset,
@@ -38,9 +24,6 @@ import {
   placeOpening,
   renameRoomLabel,
   setDimPlacement,
-  setOpeningWidth,
-  toggleHingeSide,
-  toggleSwing,
 } from '../model/operations'
 import type { Room } from '../model/rooms'
 import { detectRooms, roomAt } from '../model/rooms'
@@ -50,16 +33,16 @@ import {
   elementsInRect,
   isSelected,
   refKey,
-  selectionBounds,
   toggleRef,
   translateElements,
 } from '../model/selection'
 import type { Snap } from '../model/snap'
 import { snapDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan } from '../model/types'
-import { defaultOpeningWidth, OPENING_WIDTHS, WALL_THICKNESS } from '../model/types'
+import { defaultOpeningWidth, WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import type { RoomTextBlock } from './render'
+import { SelectionPanel } from './SelectionPanel'
 import {
   COLORS,
   DimLabel,
@@ -127,7 +110,6 @@ const isTypingTarget = (e: KeyboardEvent) => {
 
 export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
   const { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
@@ -274,7 +256,7 @@ export default function Editor() {
       }
     } else if ((tool === 'door' || tool === 'window') && openPreview) {
       // keep the placement tool active, but select the new opening so its
-      // actions popover shows right away
+      // panel shows right away
       const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset)
       setPlan(() => next)
       setSel(id ? [{ type: 'opening', id }] : [])
@@ -437,41 +419,6 @@ export default function Editor() {
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel])
   const only = sel.length === 1 ? sel[0] : null
   const selWall = only?.type === 'wall' ? plan.walls[only.id] : null
-  const selOpening = only?.type === 'opening' ? plan.openings[only.id] : null
-  const multi = sel.length > 1
-
-  // popover anchored to the selection, in wrapper coordinates
-  let popover: { left: number; top: number } | null = null
-  if (svgRef.current && wrapRef.current && (selWall || selOpening || multi)) {
-    let px = 0
-    let py = 0
-    let anchored = true
-    if (multi) {
-      // anchor below the selection's bounding box
-      const bounds = selectionBounds(plan, sel)
-      anchored = bounds !== null
-      if (bounds) {
-        px = (bounds.minX + bounds.maxX) / 2
-        py = bounds.maxY
-      }
-    } else if (selWall) {
-      const [a, b] = wallPoints(plan, selWall)
-      px = (a.x + b.x) / 2
-      py = (a.y + b.y) / 2
-    } else if (selOpening) {
-      const placement = openingPlacement(plan, selOpening)
-      if (placement) {
-        px = placement.cx
-        py = placement.cy
-      }
-    }
-    const matrix = svgRef.current.getScreenCTM()
-    if (matrix && anchored) {
-      const sp = new DOMPoint(px, py).matrixTransform(matrix)
-      const r = wrapRef.current.getBoundingClientRect()
-      popover = { left: sp.x - r.left, top: sp.y - r.top + 24 }
-    }
-  }
 
   const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair'
   const ghostOpening: Opening | null =
@@ -554,15 +501,8 @@ export default function Editor() {
     if (block) startEditing(block)
   }
 
-  // shared by every popover variant
-  const deleteButton = (
-    <button className="danger" title="Delete" aria-label="Delete" onClick={() => deleteSelection(sel)}>
-      <Trash2 size={16} aria-hidden />
-    </button>
-  )
-
   return (
-    <div ref={wrapRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <svg
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -807,58 +747,14 @@ export default function Editor() {
         </div>
       </div>
 
-      {/* contextual popover next to the selection */}
-      {popover && (selWall || selOpening || multi) && (
-        <div className="popover" style={{ position: 'absolute', left: popover.left, top: popover.top }}>
-          {multi && (
-            <>
-              <span>{sel.length} elements</span>
-              {deleteButton}
-            </>
-          )}
-          {selWall && (
-            <>
-              {/* the drawn length is the hors-tout extent: axis + thickness */}
-              <span>Wall · {formatLength(wallLength(plan, selWall) + selWall.thickness)}</span>
-              {deleteButton}
-            </>
-          )}
-          {selOpening && (
-            <>
-              <span>{selOpening.type === 'door' ? 'Door' : 'Window'}</span>
-              <select
-                value={selOpening.width}
-                onChange={(e) => setPlan((p) => setOpeningWidth(p, selOpening.id, Number(e.target.value)))}
-              >
-                {OPENING_WIDTHS.map((w) => (
-                  <option key={w} value={w}>
-                    {w} cm
-                  </option>
-                ))}
-              </select>
-              {selOpening.type === 'door' && (
-                <>
-                  <button
-                    className="flip"
-                    title="Swap hinge side (left/right)"
-                    onClick={() => setPlan((p) => toggleHingeSide(p, selOpening.id))}
-                  >
-                    <FlipHorizontal2 size={16} aria-hidden /> Hinge
-                  </button>
-                  <button
-                    className="flip"
-                    title="Swap swing direction (inside/outside)"
-                    onClick={() => setPlan((p) => toggleSwing(p, selOpening.id))}
-                  >
-                    <FlipVertical2 size={16} aria-hidden /> Swing
-                  </button>
-                </>
-              )}
-              {deleteButton}
-            </>
-          )}
-        </div>
-      )}
+      {/* selection panel, fixed floating card on the left (selection-panel spec) */}
+      <SelectionPanel
+        plan={plan}
+        rooms={rooms}
+        sel={sel}
+        setPlan={setPlan}
+        onDelete={() => deleteSelection(sel)}
+      />
     </div>
   )
 }

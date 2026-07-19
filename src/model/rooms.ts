@@ -1,4 +1,4 @@
-import { interiorPolygon } from './faces'
+import { faceLength, faceSpan, interiorPolygon } from './faces'
 import type { Vec } from './geometry'
 import { pointInPolygon, polygonArea, polygonCentroid } from './geometry'
 import type { Plan, Wall } from './types'
@@ -118,4 +118,30 @@ export function interiorSide(rooms: Room[], wall: Wall): 1 | -1 | null {
   }
   if (sides.size !== 1) return null
   return sides.has(1) ? 1 : -1
+}
+
+// Display measures of a wall, derived (never stored) from the same silhouette
+// readings the canvas Dimensions use, so the two can never disagree. Oriented
+// when the wall borders exactly one room: the interior side's tape-measurable
+// span, the exterior side's (the hors-tout extent), and the thickness.
+export type WallMeasures =
+  | { kind: 'oriented'; interior: number; exterior: number; thickness: number }
+  | { kind: 'plain'; length: number; thickness: number }
+
+export function wallMeasures(plan: Plan, rooms: Room[], wall: Wall): WallMeasures {
+  const side = interiorSide(rooms, wall)
+  if (side !== null) {
+    return {
+      kind: 'oriented',
+      interior: faceLength(plan, wall, side),
+      exterior: faceLength(plan, wall, -side as 1 | -1),
+      thickness: wall.thickness,
+    }
+  }
+  // no claimed orientation: the hors-tout extent — the union of the two faces'
+  // axis spans, i.e. the full drawn body between mitered corners and overhangs
+  const s1 = faceSpan(plan, wall, 1)
+  const s2 = faceSpan(plan, wall, -1)
+  const length = Math.max(0, Math.max(s1.to, s2.to) - Math.min(s1.from, s2.from))
+  return { kind: 'plain', length, thickness: wall.thickness }
 }

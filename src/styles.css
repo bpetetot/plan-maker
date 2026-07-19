@@ -240,26 +240,86 @@ svg text.room-area {
   pointer-events: none;
   white-space: nowrap;
 }
-.popover {
+/* Selection panel: floating card below the burger menu (top 16, ~40px tall)
+   with a 16px gap. Height capped above the bottom-left controls zone
+   (bottom 16 + ~42px controls + 16px gap); scrolls internally beyond. */
+.panel {
+  position: absolute;
+  left: 16px;
+  top: 72px;
+  width: 232px;
+  max-height: calc(100vh - 72px - 74px);
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  transform: translateX(-50%);
-  white-space: nowrap;
+  font-size: 13px;
 }
-.popover input {
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.panel-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--flip-surface);
+  color: var(--flip-text);
+}
+.panel-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.panel-section-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.panel-row-label {
+  color: var(--text-muted);
+}
+.panel-row-value {
+  font-variant-numeric: tabular-nums;
+}
+.panel-select {
   font: inherit;
+  width: 100%;
   border: 1px solid var(--input-border);
   border-radius: 6px;
-  padding: 4px 8px;
-  width: 140px;
+  padding: 5px 8px;
   background: transparent;
   color: inherit;
+}
+.panel-flips {
+  display: flex;
+  gap: 6px;
+}
+.panel-flips .flip {
+  flex: 1;
+  justify-content: center;
+  padding: 6px 8px;
+}
+.panel-delete {
+  width: 100%;
+  justify-content: center;
+  padding: 7px 10px;
 }
 .flip {
   display: inline-flex;

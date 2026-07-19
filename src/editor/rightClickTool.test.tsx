@@ -69,10 +69,10 @@ describe('right-click exits the drawing tool', () => {
     fireEvent.click(screen.getByLabelText('Door'))
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
     fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 300, 100) })
-    expect(screen.getByText('Door')).toBeTruthy() // actions popover is up
+    expect(screen.getByText('Door')).toBeTruthy() // selection panel is up
     fireEvent.contextMenu(svg)
     expect(activeTool()).toBe('Select')
-    expect(screen.getByText('Door')).toBeTruthy() // popover survives the exit
+    expect(screen.getByText('Door')).toBeTruthy() // panel survives the exit
   })
 
   it('does not clear the selection in the Select tool', () => {
@@ -83,7 +83,7 @@ describe('right-click exits the drawing tool', () => {
     fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 50, 50) })
     fireEvent.pointerMove(svg, clientAt(svg, 550, 150))
     fireEvent.pointerUp(svg)
-    expect(screen.getByLabelText('Delete')).toBeTruthy() // wall popover is up
+    expect(screen.getByLabelText('Delete')).toBeTruthy() // wall panel is up
     fireEvent.contextMenu(svg)
     expect(screen.getByLabelText('Delete')).toBeTruthy() // selection intact
   })

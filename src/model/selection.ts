@@ -66,39 +66,6 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   return next
 }
 
-export interface SelectionBounds {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-}
-
-// Bounding box of the selection's own positions — wall endpoints, opening
-// centers. Null when no ref resolves to a live element.
-export function selectionBounds(plan: Plan, refs: ElementRef[]): SelectionBounds | null {
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  const extend = (x: number, y: number) => {
-    minX = Math.min(minX, x)
-    minY = Math.min(minY, y)
-    maxX = Math.max(maxX, x)
-    maxY = Math.max(maxY, y)
-  }
-  for (const ref of refs) {
-    if (ref.type === 'wall') {
-      const wall = plan.walls[ref.id]
-      if (wall) for (const p of wallPoints(plan, wall)) extend(p.x, p.y)
-    } else {
-      const opening = plan.openings[ref.id]
-      const placement = opening ? openingPlacement(plan, opening) : null
-      if (placement) extend(placement.cx, placement.cy)
-    }
-  }
-  return minX === Infinity ? null : { minX, minY, maxX, maxY }
-}
-
 // Group move: translate the union of the selected walls' points. Openings
 // follow their wall (their offset is wall-relative) and stay put when their
 // wall is not selected — only elements with a position of their own translate.

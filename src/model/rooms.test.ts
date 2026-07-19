@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { commitWall } from './operations'
-import { detectRooms, interiorSide, roomAt } from './rooms'
-import { buildPlan } from './testHelpers'
+import { detectRooms, interiorSide, roomAt, wallMeasures } from './rooms'
+import { buildPlan, squareRoomPlan } from './testHelpers'
 
 describe('detectRooms after planar insertion (ADR 0002)', () => {
   it('detects both rooms when a divider is drawn between two wall bodies', () => {
@@ -240,6 +240,86 @@ describe('interiorSide', () => {
     const rooms = detectRooms(plan)
     const stub = Object.values(plan.walls)[5]
     expect(interiorSide(rooms, stub)).toBeNull()
+  })
+})
+
+describe('wallMeasures', () => {
+  it('gives interior, exterior and thickness for a wall bordering exactly one room', () => {
+    // 4×4 m axis square, 10 cm walls: interior faces 3,90 m, exterior 4,10 m
+    const plan = squareRoomPlan()
+    const rooms = detectRooms(plan)
+    for (const wall of Object.values(plan.walls)) {
+      expect(wallMeasures(plan, rooms, wall)).toEqual({
+        kind: 'oriented',
+        interior: 390,
+        exterior: 410,
+        thickness: 10,
+      })
+    }
+  })
+
+  it('gives the hors-tout length of a standalone wall', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0))
+    })
+    const wall = Object.values(plan.walls)[0]
+    // free ends overhang the Points by half the thickness: 400 + 2×5
+    expect(wallMeasures(plan, detectRooms(plan), wall)).toEqual({
+      kind: 'plain',
+      length: 410,
+      thickness: 10,
+    })
+  })
+
+  it('gives the hors-tout length of a party wall between two rooms', () => {
+    // 600×300 rectangle split by a vertical divider at x=250
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m1 = b.point(250, 0)
+      const c = b.point(600, 0)
+      const d = b.point(600, 300)
+      const m2 = b.point(250, 300)
+      const e = b.point(0, 300)
+      b.wall(a, m1)
+      b.wall(m1, c)
+      b.wall(c, d)
+      b.wall(d, m2)
+      b.wall(m2, e)
+      b.wall(e, a)
+      b.wall(m1, m2)
+    })
+    const divider = Object.values(plan.walls)[6]
+    // both faces miter against the horizontal walls' inner faces: y=5 to y=295
+    expect(wallMeasures(plan, detectRooms(plan), divider)).toEqual({
+      kind: 'plain',
+      length: 290,
+      thickness: 10,
+    })
+  })
+
+  it('gives the hors-tout length of a wall jutting into its own room', () => {
+    // 400×300 room with a stub from the bottom wall's midpoint to (200,100)
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m = b.point(200, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      const tip = b.point(200, 100)
+      b.wall(a, m)
+      b.wall(m, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      b.wall(m, tip)
+    })
+    const stub = Object.values(plan.walls)[5]
+    // mitered at the bottom wall's inner face (y=5), overhang at the tip (y=105)
+    expect(wallMeasures(plan, detectRooms(plan), stub)).toEqual({
+      kind: 'plain',
+      length: 100,
+      thickness: 10,
+    })
   })
 })
 
