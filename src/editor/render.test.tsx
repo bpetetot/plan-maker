@@ -91,11 +91,11 @@ describe('DimLabel value', () => {
     // 2 line pieces around the text + 2 perpendicular ticks
     const lines = Array.from(container.querySelectorAll('line'))
     expect(lines).toHaveLength(4)
-    // the silhouette ends sit at x = -5 and 405; the drawn extent stops 1 cm
-    // short of each so the ticks never bite into a bounding wall
+    // the silhouette ends sit at x = -5 and 405; the drawn extent stops half a
+    // stroke short of each, so a tick sits flush against a bounding wall face
     const xs = lines.flatMap((l) => [l.getAttribute('x1'), l.getAttribute('x2')])
-    expect(xs).toContain('-4')
-    expect(xs).toContain('404')
+    expect(xs).toContain('-4.5')
+    expect(xs).toContain('404.5')
   })
 
   it('keeps the extent ticks even when no line piece has room for them', () => {
@@ -112,8 +112,8 @@ describe('DimLabel value', () => {
   })
 
   it('gives up part of the inset rather than fold a short extent onto itself', () => {
-    // a 20 cm wall between two 18 cm walls: measured 9→11 on the inner side,
-    // a 2 cm span. A full 1 cm inset at each end would collapse both ticks
+    // a 20 cm wall between two 19 cm walls: measured 9.5→10.5 on the inner
+    // side, a 1 cm span. A full inset at each end would collapse both ticks
     // onto the midpoint, so the inset drops to a quarter of the span.
     let wallId = ''
     const plan = buildPlan((b) => {
@@ -122,8 +122,8 @@ describe('DimLabel value', () => {
       const wall = b.wall(l, r)
       const left = b.wall(l, b.point(0, 200))
       const right = b.wall(r, b.point(20, 200))
-      left.thickness = 18
-      right.thickness = 18
+      left.thickness = 19
+      right.thickness = 19
       wall.dimPlacement = { t: 0.5, side: 1 }
       wallId = wall.id
     })
@@ -133,7 +133,7 @@ describe('DimLabel value', () => {
       </svg>,
     )
     const xs = Array.from(container.querySelectorAll('line')).map((l) => l.getAttribute('x1'))
-    expect(xs).toEqual(['9.5', '10.5'])
+    expect(xs).toEqual(['9.75', '10.25'])
   })
 })
 

@@ -284,13 +284,16 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
+const EXTENT_STROKE = 1
+
 // A tick sits at the miter corner bounding the measured extent, running
-// parallel to the wall that bounds it — centred on that wall's face, so half
-// its stroke bites into it. The drawn extent therefore stops this much short
-// of the measured one at each end: half a stroke to clear the bite, half
-// again so the clearance reads. In plan units, like the stroke it clears, so
-// the two keep their proportion at every zoom. The value stays exact.
-const EXTENT_INSET = 1
+// parallel to the wall that bounds it. Its stroke being centred on the corner,
+// half of it would bite into that wall, so the drawn extent stops half a
+// stroke short at each end: the tick then sits flush against the wall face —
+// no bite, no gap. Half a stroke and not a chosen distance, so it stays flush
+// whatever EXTENT_STROKE becomes, and in plan units like the stroke itself, so
+// it holds at every zoom. The value stays exact — only the line recedes.
+const EXTENT_INSET = EXTENT_STROKE / 2
 
 // The broken dimension line shared by DimLabel and PlacementDims: a piece on
 // each side of the text gap (only where it has room) and a perpendicular tick
@@ -324,10 +327,10 @@ function ExtentLine({
   return (
     <g pointerEvents="none">
       {gapFrom - start > 2 && (
-        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
+        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={EXTENT_STROKE} />
       )}
       {end - gapTo > 2 && (
-        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />
+        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={EXTENT_STROKE} />
       )}
       {[p1, p2].map((p, i) => (
         <line
@@ -337,7 +340,7 @@ function ExtentLine({
           x2={p.x - uy * 4}
           y2={p.y + ux * 4}
           stroke="var(--rail)"
-          strokeWidth={1}
+          strokeWidth={EXTENT_STROKE}
         />
       ))}
     </g>
