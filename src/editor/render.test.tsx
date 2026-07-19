@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { squareRoomPlan } from '../model/testHelpers'
+import type { ElementRef } from '../model/selection'
+import { buildPlan, squareRoomPlan } from '../model/testHelpers'
 import type { Plan, Wall } from '../model/types'
-import { DimLabel, labelAngle, RubberWall, WallLine } from './render'
+import { COLORS, DimLabel, JunctionPatches, labelAngle, RubberWall, WallLine } from './render'
 
 afterEach(cleanup)
 
@@ -163,6 +164,53 @@ describe('DimLabel on a vertical wall', () => {
       expect(group.getAttribute('transform')).toBe('translate(18,100) rotate(-90)')
       cleanup()
     }
+  })
+})
+
+describe('JunctionPatches', () => {
+  // A T junction: two collinear bar walls split at the stem's Point.
+  function tJunctionPlan(): { plan: Plan; bar1: Wall; bar2: Wall; stem: Wall } {
+    let bar1!: Wall, bar2!: Wall, stem!: Wall
+    const plan = buildPlan((b) => {
+      const left = b.point(0, 0)
+      const mid = b.point(200, 0)
+      const right = b.point(400, 0)
+      const foot = b.point(200, 200)
+      bar1 = b.wall(left, mid)
+      bar2 = b.wall(mid, right)
+      stem = b.wall(mid, foot)
+    })
+    return { plan, bar1, bar2, stem }
+  }
+
+  function renderPatch(plan: Plan, selection?: ElementRef[]) {
+    const { container } = render(
+      <svg>
+        <JunctionPatches plan={plan} selection={selection} />
+      </svg>,
+    )
+    return container.querySelector('polygon')!
+  }
+
+  it('tints the patch when two of its walls are selected', () => {
+    const { plan, bar1, bar2 } = tJunctionPlan()
+    const patch = renderPatch(plan, [
+      { type: 'wall', id: bar1.id },
+      { type: 'wall', id: bar2.id },
+    ])
+    expect(patch.getAttribute('fill')).toBe(COLORS.wallSelected)
+  })
+
+  it('keeps the plain wall color when only one of its walls is selected', () => {
+    const { plan, bar1 } = tJunctionPlan()
+    const patch = renderPatch(plan, [{ type: 'wall', id: bar1.id }])
+    expect(patch.getAttribute('fill')).toBe(COLORS.wall)
+  })
+
+  it('keeps the plain wall color without a selection (PNG export)', () => {
+    const { plan } = tJunctionPlan()
+    const patch = renderPatch(plan)
+    expect(patch.getAttribute('fill')).toBe(COLORS.wall)
   })
 })
 

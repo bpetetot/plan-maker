@@ -129,7 +129,13 @@ export function wallOutline(plan: Plan, wall: Wall): Vec[] {
 // incident face corners ordered angularly around the Point. Fills the central
 // gap wall outlines leave at T and angled crossings; degenerates to zero area
 // at plain corners and collinear continuations.
-export function junctionPatches(plan: Plan): { pointId: string; corners: Vec[] }[] {
+export interface JunctionPatch {
+  pointId: string
+  wallIds: string[]
+  corners: Vec[]
+}
+
+export function junctionPatches(plan: Plan): JunctionPatch[] {
   const byPoint = new Map<string, { wall: Wall; end: 'start' | 'end' }[]>()
   for (const wall of Object.values(plan.walls)) {
     for (const end of ['start', 'end'] as const) {
@@ -139,7 +145,7 @@ export function junctionPatches(plan: Plan): { pointId: string; corners: Vec[] }
       byPoint.set(pointId, list)
     }
   }
-  const patches: { pointId: string; corners: Vec[] }[] = []
+  const patches: JunctionPatch[] = []
   for (const [pointId, ends] of byPoint) {
     if (ends.length < 2) continue
     const p = plan.points[pointId]
@@ -148,7 +154,7 @@ export function junctionPatches(plan: Plan): { pointId: string; corners: Vec[] }
       ([1, -1] as const).map((side) => facePoint(plan, wall, end, side)),
     )
     corners.sort((c1, c2) => Math.atan2(c1.y - p.y, c1.x - p.x) - Math.atan2(c2.y - p.y, c2.x - p.x))
-    patches.push({ pointId, corners })
+    patches.push({ pointId, wallIds: [...new Set(ends.map(({ wall }) => wall.id))], corners })
   }
   return patches
 }

@@ -4,6 +4,7 @@ import { wallLength, wallPoints } from '../model/geometry'
 import { formatArea, formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
 import type { Room } from '../model/rooms'
+import type { ElementRef } from '../model/selection'
 import { interiorSide, roomAt } from '../model/rooms'
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
@@ -41,14 +42,20 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
 }
 
 // Junction patches: the polygons filling the central gaps wall outlines leave
-// at T and angled crossings (CONTEXT.md: Face). Rendered in the plain wall
-// color — a patch belongs to every wall at its Point, so it never takes a
-// single wall's hover or selection tint.
-export function JunctionPatches({ plan }: { plan: Plan }) {
+// at T and angled crossings (CONTEXT.md: Face). A patch belongs to every wall
+// at its Point, so it never takes a single wall's hover tint; it reads as
+// selected — never selectable itself — once the junction is between selected
+// walls: at least two of its walls in the Selection (CONTEXT.md: Selection).
+export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: ElementRef[] }) {
+  const selected = new Set((selection ?? []).filter((r) => r.type === 'wall').map((r) => r.id))
   return (
     <g pointerEvents="none">
-      {junctionPatches(plan).map(({ pointId, corners }) => (
-        <polygon key={pointId} points={corners.map((c) => `${c.x},${c.y}`).join(' ')} fill={COLORS.wall} />
+      {junctionPatches(plan).map(({ pointId, wallIds, corners }) => (
+        <polygon
+          key={pointId}
+          points={corners.map((c) => `${c.x},${c.y}`).join(' ')}
+          fill={wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall}
+        />
       ))}
     </g>
   )

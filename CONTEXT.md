@@ -107,7 +107,10 @@ The set of elements — walls, openings — the user is currently
 acting on in the editor. Room labels are never selected: they are manipulated
 directly (dragged, edited in place). Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
-move on their own in a group move. Never part of the plan.
+move on their own in a group move. A junction reads as selected — never
+selectable itself, never in the set — as soon as it sits between selected
+walls: at least two of the walls meeting at its Point are in the Selection.
+Never part of the plan.
 _Avoid_: Highlight, marked elements
 
 **Tool panel**:

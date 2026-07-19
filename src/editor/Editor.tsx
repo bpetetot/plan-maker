@@ -573,7 +573,7 @@ export default function Editor() {
             }
           />
         ))}
-        <JunctionPatches plan={plan} />
+        <JunctionPatches plan={plan} selection={sel} />
         {Object.values(plan.openings).map((opening) => (
           <OpeningGlyph
             key={opening.id}
