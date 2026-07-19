@@ -284,9 +284,17 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
+// A tick sits at the miter corner bounding the measured extent, running
+// parallel to the wall that bounds it — centred on that wall's face, so half
+// its stroke bites into it. The drawn extent therefore stops this much short
+// of the measured one at each end: half a stroke to clear the bite, half
+// again so the clearance reads. In plan units, like the stroke it clears, so
+// the two keep their proportion at every zoom. The value stays exact.
+const EXTENT_INSET = 1
+
 // The broken dimension line shared by DimLabel and PlacementDims: a piece on
 // each side of the text gap (only where it has room) and a perpendicular tick
-// at each end of the measured extent.
+// at each end of the measured extent, held back by EXTENT_INSET.
 function ExtentLine({
   at,
   ux,
@@ -304,16 +312,21 @@ function ExtentLine({
   gapFrom: number
   gapTo: number
 }) {
-  const p1 = at(from)
-  const p2 = at(to)
-  const g1 = at(Math.max(from, Math.min(gapFrom, to)))
-  const g2 = at(Math.min(to, Math.max(gapTo, from)))
+  // never eat more than a quarter of the span at each end, so a segment too
+  // short to absorb the inset degrades instead of folding onto itself
+  const inset = Math.min(EXTENT_INSET, (to - from) / 4)
+  const start = from + inset
+  const end = to - inset
+  const p1 = at(start)
+  const p2 = at(end)
+  const g1 = at(Math.max(start, Math.min(gapFrom, end)))
+  const g2 = at(Math.min(end, Math.max(gapTo, start)))
   return (
     <g pointerEvents="none">
-      {gapFrom - from > 2 && (
+      {gapFrom - start > 2 && (
         <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
       )}
-      {to - gapTo > 2 && (
+      {end - gapTo > 2 && (
         <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />
       )}
       {[p1, p2].map((p, i) => (
@@ -358,8 +371,8 @@ export function DimLabel({
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
   // 9px text ≈ 5 units per character; the line breaks around it. The ticks
-  // always mark the measured extent — that legibility is the point when a
-  // value refines at a new junction — even when no line piece has room.
+  // are always drawn — that legibility is the point when a value refines at a
+  // new junction — even when no line piece has room.
   const gapHalf = label.length * 2.5 + 4
   return (
     <g>

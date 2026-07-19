@@ -91,10 +91,11 @@ describe('DimLabel value', () => {
     // 2 line pieces around the text + 2 perpendicular ticks
     const lines = Array.from(container.querySelectorAll('line'))
     expect(lines).toHaveLength(4)
-    // the extent runs between the silhouette ends: x = -5 and 405
+    // the silhouette ends sit at x = -5 and 405; the drawn extent stops 1 cm
+    // short of each so the ticks never bite into a bounding wall
     const xs = lines.flatMap((l) => [l.getAttribute('x1'), l.getAttribute('x2')])
-    expect(xs).toContain('-5')
-    expect(xs).toContain('405')
+    expect(xs).toContain('-4')
+    expect(xs).toContain('404')
   })
 
   it('keeps the extent ticks even when no line piece has room for them', () => {
@@ -108,6 +109,31 @@ describe('DimLabel value', () => {
     )
     expect(container.querySelector('text')!.textContent).toBe('35 cm')
     expect(container.querySelectorAll('line')).toHaveLength(2)
+  })
+
+  it('gives up part of the inset rather than fold a short extent onto itself', () => {
+    // a 20 cm wall between two 18 cm walls: measured 9→11 on the inner side,
+    // a 2 cm span. A full 1 cm inset at each end would collapse both ticks
+    // onto the midpoint, so the inset drops to a quarter of the span.
+    let wallId = ''
+    const plan = buildPlan((b) => {
+      const l = b.point(0, 0)
+      const r = b.point(20, 0)
+      const wall = b.wall(l, r)
+      const left = b.wall(l, b.point(0, 200))
+      const right = b.wall(r, b.point(20, 200))
+      left.thickness = 18
+      right.thickness = 18
+      wall.dimPlacement = { t: 0.5, side: 1 }
+      wallId = wall.id
+    })
+    const { container } = render(
+      <svg>
+        <DimLabel plan={plan} wall={plan.walls[wallId]} />
+      </svg>,
+    )
+    const xs = Array.from(container.querySelectorAll('line')).map((l) => l.getAttribute('x1'))
+    expect(xs).toEqual(['9.5', '10.5'])
   })
 })
 
