@@ -26,7 +26,7 @@ import {
   setDimPlacement,
 } from '../model/operations'
 import type { Room } from '../model/rooms'
-import { detectRooms, roomAt } from '../model/rooms'
+import { detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms'
 import type { ElementRef } from '../model/selection'
 import {
   deleteElements,
@@ -65,7 +65,9 @@ import { useSpaceHeld, useView } from './useView'
 
 type Drag =
   | { kind: 'pan'; x: number; y: number }
-  | { kind: 'point'; id: string }
+  // `orig` is the plan at drag start — labels reconcile against it at the
+  // end of the gesture, never on intermediate states
+  | { kind: 'point'; id: string; orig: Plan }
   | {
       kind: 'group'
       refs: ElementRef[]
@@ -80,8 +82,9 @@ type Drag =
   // plain click — the placement dimensions only show once it becomes a move
   | { kind: 'opening'; id: string; start: Vec; moved?: boolean }
   // dragging a room's text block. `room` is the room containing the block at
-  // drag start: the block can never leave it (the drag clamps to its polygon);
-  // null for a label outside any room, which moves freely.
+  // drag start: the block can never leave it (the drag clamps to its polygon).
+  // null is defensive — an orphan label cannot arise from plan operations
+  // (CONTEXT.md: Room label) — and lets such a label move freely.
   | { kind: 'label'; id: string; room: Room | null }
   // dragging the text block of a room that has no label yet: the nameless
   // label is only created once the pointer crosses the click threshold, so a
@@ -428,6 +431,9 @@ export default function Editor() {
     }
     if (d.kind === 'point') setSnap(null)
     if (d.kind === 'opening') setMovingOpeningId(null)
+    // wall geometry changed: labels reconcile once, at the end of the gesture
+    // (CONTEXT.md: Room label), inside the same history group
+    if (d.kind === 'point' || d.kind === 'group') setPlan((p) => reconcileRoomLabels(d.orig, p))
     if (d.kind !== 'pan') endHistoryGroup()
   }
 
@@ -624,7 +630,7 @@ export default function Editor() {
               onPointerDown={(e) => {
                 if (e.button !== 0) return
                 e.stopPropagation()
-                startPlanDrag({ kind: 'point', id: p.id })
+                startPlanDrag({ kind: 'point', id: p.id, orig: plan })
                 svgRef.current!.setPointerCapture(e.pointerId)
               }}
             />

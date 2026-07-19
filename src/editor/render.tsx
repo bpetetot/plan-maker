@@ -446,8 +446,9 @@ export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: O
 }
 
 // One text block per room — the optional name above the area — anchored at
-// the room's label when it has one, else at its centroid. Labels outside any
-// room still render their name (spec §2: label association is positional).
+// the room's label when it has one, else at its centroid. A label outside any
+// room cannot arise from plan operations (CONTEXT.md: Room label), but is
+// defensively rendered as its name alone.
 export interface RoomTextBlock {
   key: string
   x: number

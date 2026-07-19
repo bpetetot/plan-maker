@@ -54,7 +54,17 @@ _Avoid_: Zone, area, space
 **Room label**:
 A marker placed inside a room that positions the room's texts — its optional
 name and its area. It applies to whichever detected room contains its
-position. A room without a label shows its area at its centroid.
+position, and is always inside a detected room — an orphan label never
+exists: it cannot be created or dragged outside a room, and labels that
+would arrive orphaned (e.g. from an imported plan) are dropped. After every
+wall change, each label reconciles against the room that contained it: still
+inside a detected room — untouched; its room still detected but no longer
+containing it — the label jumps to that room's centroid; its room no longer
+detected — the label is deleted. When a move translates every wall of its
+room, the label translates with the room, keeping its position relative to
+the room. A room without a label shows its area at its centroid. When one
+room contains several labels (e.g. after deleting a dividing wall), all are
+kept: the oldest carries the area, the others show only their name.
 _Avoid_: Room name, tag
 
 **Dimension**:

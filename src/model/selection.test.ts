@@ -177,3 +177,101 @@ describe('refKey', () => {
     expect(refKey(wallRef('x'))).not.toBe(refKey(openingRef('x')))
   })
 })
+
+describe('deleteElements — room label cascade', () => {
+  // two 3×3 m rooms side by side sharing a divider, one label in each
+  const twoLabeledRooms = () => {
+    let ids = { leftWalls: [] as string[], divider: '', leftLabel: '', rightLabel: '' }
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m1 = b.point(300, 0)
+      const c = b.point(600, 0)
+      const d = b.point(600, 300)
+      const m2 = b.point(300, 300)
+      const e = b.point(0, 300)
+      const w1 = b.wall(a, m1)
+      b.wall(m1, c)
+      b.wall(c, d)
+      b.wall(d, m2)
+      const w5 = b.wall(m2, e)
+      const w6 = b.wall(e, a)
+      const divider = b.wall(m1, m2)
+      ids = {
+        leftWalls: [w1.id, w5.id, w6.id, divider.id],
+        divider: divider.id,
+        leftLabel: b.label('Kitchen', 150, 150).id,
+        rightLabel: b.label('Living room', 450, 150).id,
+      }
+    })
+    return { plan, ...ids }
+  }
+
+  it('deletes the label of a room whose wall is deleted', () => {
+    const { plan, leftWalls, rightLabel } = twoLabeledRooms()
+    // deleting one boundary wall opens the left loop: its label goes too
+    const next = deleteElements(plan, [wallRef(leftWalls[0])])
+    expect(Object.keys(next.roomLabels)).toEqual([rightLabel])
+  })
+
+  it('keeps both labels when deleting the divider merges the rooms', () => {
+    const { plan, divider, leftLabel, rightLabel } = twoLabeledRooms()
+    const next = deleteElements(plan, [wallRef(divider)])
+    expect(Object.keys(next.roomLabels).sort()).toEqual([leftLabel, rightLabel].sort())
+  })
+
+  it('deletes every label when the whole plan is deleted', () => {
+    const { plan } = twoLabeledRooms()
+    const refs = Object.keys(plan.walls).map(wallRef)
+    expect(deleteElements(plan, refs).roomLabels).toEqual({})
+  })
+})
+
+describe('translateElements — room label rigid move', () => {
+  const labeledSquare = () => {
+    let ids = { walls: [] as string[], label: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      const walls = [b.wall(p1, p2), b.wall(p2, p3), b.wall(p3, p4), b.wall(p4, p1)]
+      ids = { walls: walls.map((w) => w.id), label: b.label('Kitchen', 350, 120).id }
+    })
+    return { plan, ...ids }
+  }
+
+  it('moves the label with the room when every boundary wall is selected', () => {
+    const { plan, walls, label } = labeledSquare()
+    const next = translateElements(plan, walls.map(wallRef), 50, -30)
+    expect(next.roomLabels[label]).toMatchObject({ x: 400, y: 90 })
+  })
+
+  it('leaves the label in place when the room only deforms (partial selection)', () => {
+    const { plan, walls, label } = labeledSquare()
+    const next = translateElements(plan, [wallRef(walls[0])], 50, -30)
+    expect(next.roomLabels[label]).toMatchObject({ x: 350, y: 120 })
+  })
+
+  it('does not move the label of an unselected room', () => {
+    let ids = { leftWalls: [] as string[], rightLabel: '' }
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(300, 0)
+      const d = b.point(300, 300)
+      const e = b.point(0, 300)
+      const f = b.point(500, 0)
+      const g = b.point(800, 0)
+      const h = b.point(800, 300)
+      const i = b.point(500, 300)
+      const left = [b.wall(a, c), b.wall(c, d), b.wall(d, e), b.wall(e, a)]
+      b.wall(f, g)
+      b.wall(g, h)
+      b.wall(h, i)
+      b.wall(i, f)
+      b.label('Kitchen', 150, 150)
+      ids = { leftWalls: left.map((w) => w.id), rightLabel: b.label('Living room', 650, 150).id }
+    })
+    const next = translateElements(plan, ids.leftWalls.map(wallRef), 20, 20)
+    expect(next.roomLabels[ids.rightLabel]).toMatchObject({ x: 650, y: 150 })
+  })
+})

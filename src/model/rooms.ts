@@ -98,6 +98,65 @@ export function roomAt(rooms: Room[], x: number, y: number): Room | null {
   return rooms.find((room) => pointInPolygon({ x, y }, room.polygon)) ?? null
 }
 
+// The walls tracing a room's boundary, one per consecutive pair of loop
+// points; null when a pair has no wall (degenerate plan).
+export function roomWallIds(plan: Plan, room: Room): string[] | null {
+  const byPair = new Map<string, string>()
+  for (const wall of Object.values(plan.walls)) {
+    byPair.set(`${wall.startPointId}|${wall.endPointId}`, wall.id)
+    byPair.set(`${wall.endPointId}|${wall.startPointId}`, wall.id)
+  }
+  const ids: string[] = []
+  for (let i = 0; i < room.pointIds.length; i++) {
+    const id = byPair.get(`${room.pointIds[i]}|${room.pointIds[(i + 1) % room.pointIds.length]}`)
+    if (!id) return null
+    ids.push(id)
+  }
+  return ids
+}
+
+const sameLoop = (a: Room, b: Room) => {
+  if (a.pointIds.length !== b.pointIds.length) return false
+  const ids = new Set(b.pointIds)
+  return a.pointIds.every((id) => ids.has(id))
+}
+
+// Reconciliation after a wall change (CONTEXT.md: Room label) — an orphan
+// label never exists. Each label is checked against the rooms detected in
+// `after`: still inside a room — untouched; its room (the one containing it
+// in `before`, matched by point loop) still detected but no longer
+// containing it — snapped to that room's centroid; its room gone — deleted.
+// Reconciling a plan against itself purges plain orphans (import, restore).
+export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
+  const labels = Object.values(after.roomLabels)
+  if (labels.length === 0) return after
+  const roomsAfter = detectRooms(after)
+  let roomsBefore: Room[] | null = null
+  let changed = false
+  const next: Plan['roomLabels'] = {}
+  for (const label of labels) {
+    if (roomAt(roomsAfter, label.x, label.y)) {
+      next[label.id] = label
+      continue
+    }
+    changed = true
+    roomsBefore ??= before === after ? roomsAfter : detectRooms(before)
+    // the label may have been moved by the gesture itself (rigid group move):
+    // its room is found from its pre-change position
+    const pos = before.roomLabels[label.id] ?? label
+    const homeRoom = roomAt(roomsBefore, pos.x, pos.y)
+    const target = homeRoom && roomsAfter.find((room) => sameLoop(room, homeRoom))
+    if (target) {
+      next[label.id] = { ...label, x: Math.round(target.centroid.x), y: Math.round(target.centroid.y) }
+    }
+  }
+  return changed ? { ...after, roomLabels: next } : after
+}
+
+// Load-path guard: reconciling a plan against itself keeps contained labels
+// and drops orphans (an orphan label never exists — CONTEXT.md: Room label).
+export const dropOrphanRoomLabels = (plan: Plan): Plan => reconcileRoomLabels(plan, plan)
+
 // The side of the wall facing a detected room, when exactly one of its two
 // sides does — the wall then "borders exactly one room" and that side is its
 // interior. Null otherwise: standalone wall (no side faces a room), party

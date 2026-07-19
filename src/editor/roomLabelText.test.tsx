@@ -143,7 +143,7 @@ describe('dragging the area text', () => {
     expect(labels()[0]).toMatchObject({ name: 'Kitchen', x: 499, y: 300 })
   })
 
-  it('a label outside any room (after wall edits) drags freely', () => {
+  it('a label outside any room (defensive: unreachable via plan operations) drags freely', () => {
     const { container, svg } = setup({ name: 'Kitchen', x: 700, y: 300 })
     const nameBlock = container.querySelector('text.room-name')!.closest('g')!
     fireEvent.pointerDown(nameBlock, { button: 0, ...clientAt(svg, 700, 300) })

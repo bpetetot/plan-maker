@@ -1,3 +1,4 @@
+import { dropOrphanRoomLabels } from '../model/rooms'
 import type { Plan } from '../model/types'
 import { runMigrations, SCHEMA_VERSION, validatePlan } from '../persistence/schema'
 
@@ -36,7 +37,7 @@ export function parsePlanFile(text: string): ParseResult {
   }
   const validated = validatePlan(migrated)
   if (!validated) return { ok: false, reason: 'invalid-plan' }
-  return { ok: true, plan: validated }
+  return { ok: true, plan: dropOrphanRoomLabels(validated) }
 }
 
 export function transferFileName(extension: 'json' | 'png', date: Date = new Date()): string {

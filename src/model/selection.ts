@@ -1,7 +1,9 @@
 import type { Vec } from './geometry'
 import { wallPoints } from './geometry'
 import { openingPlacement } from './openings'
-import { deleteOpening, deleteWall, setPoints } from './operations'
+import { deleteOpening, deleteWall, moveRoomLabel, setPoints } from './operations'
+import type { Room } from './rooms'
+import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms'
 import type { Plan } from './types'
 
 // Multi-selection over plan elements: a selection is a list of refs to walls
@@ -55,21 +57,24 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   return refs
 }
 
-// Group delete. Walls cascade their openings and orphan points (deleteWall);
-// refs to elements already gone are no-ops.
+// Group delete. Walls cascade their openings and orphan points (deleteWall)
+// and room labels left without a room (reconcileRoomLabels); refs to
+// elements already gone are no-ops.
 export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan
   for (const ref of refs) {
     if (ref.type === 'wall') next = deleteWall(next, ref.id)
     else next = deleteOpening(next, ref.id)
   }
-  return next
+  return reconcileRoomLabels(plan, next)
 }
 
 // Group move: translate the union of the selected walls' points. Openings
 // follow their wall (their offset is wall-relative) and stay put when their
 // wall is not selected — only elements with a position of their own translate.
-// Unselected walls attached to a moved point stretch.
+// Unselected walls attached to a moved point stretch. A room whose boundary
+// walls are all selected translates rigidly: its label moves with it,
+// keeping its position relative to the room (CONTEXT.md: Room label).
 export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy: number): Plan {
   if (dx === 0 && dy === 0) return plan
   const updates: Record<string, Vec> = {}
@@ -81,5 +86,21 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
       updates[point.id] = { x: point.x + dx, y: point.y + dy }
     }
   }
-  return Object.keys(updates).length > 0 ? setPoints(plan, updates) : plan
+  if (Object.keys(updates).length === 0) return plan
+  let next = setPoints(plan, updates)
+
+  const labels = Object.values(plan.roomLabels)
+  if (labels.length > 0) {
+    const selected = new Set(refs.filter((r) => r.type === 'wall').map((r) => r.id))
+    const rigid = (room: Room) => {
+      const wallIds = roomWallIds(plan, room)
+      return wallIds !== null && wallIds.every((id) => selected.has(id))
+    }
+    const rooms = detectRooms(plan)
+    for (const label of labels) {
+      const room = roomAt(rooms, label.x, label.y)
+      if (room && rigid(room)) next = moveRoomLabel(next, label.id, label.x + dx, label.y + dy)
+    }
+  }
+  return next
 }

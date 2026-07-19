@@ -1,4 +1,5 @@
 import { get, set } from 'idb-keyval'
+import { dropOrphanRoomLabels } from '../model/rooms'
 import type { Plan } from '../model/types'
 import type { StoredRecord } from './schema'
 import { runMigrations, SCHEMA_VERSION, validatePlan } from './schema'
@@ -11,7 +12,8 @@ function decodeRecord(value: unknown): Plan | null {
   const record = value as Partial<StoredRecord>
   if (typeof record.schemaVersion !== 'number' || record.schemaVersion > SCHEMA_VERSION) return null
   try {
-    return validatePlan(runMigrations(record.schemaVersion, record.plan))
+    const plan = validatePlan(runMigrations(record.schemaVersion, record.plan))
+    return plan && dropOrphanRoomLabels(plan)
   } catch {
     return null
   }

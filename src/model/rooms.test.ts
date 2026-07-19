@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { commitWall } from './operations'
-import { detectRooms, interiorSide, roomAt, wallMeasures } from './rooms'
+import { commitWall, deleteWall, setPoints } from './operations'
+import { detectRooms, interiorSide, reconcileRoomLabels, roomAt, wallMeasures } from './rooms'
 import { buildPlan, squareRoomPlan } from './testHelpers'
 
 describe('detectRooms after planar insertion (ADR 0002)', () => {
@@ -338,5 +338,62 @@ describe('roomAt', () => {
     const rooms = detectRooms(plan)
     expect(roomAt(rooms, 200, 150)).toBe(rooms[0])
     expect(roomAt(rooms, 900, 900)).toBeNull()
+  })
+})
+
+describe('reconcileRoomLabels', () => {
+  // 4×4 m square room; returns the plan plus the ids needed to reshape it
+  const labeledSquare = (labelX: number, labelY: number) => {
+    let ids = { right: ['', ''], wall: '', label: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      const w = b.wall(p1, p2)
+      b.wall(p2, p3)
+      b.wall(p3, p4)
+      b.wall(p4, p1)
+      const label = b.label('Kitchen', labelX, labelY)
+      ids = { right: [p2.id, p3.id], wall: w.id, label: label.id }
+    })
+    return { plan, ...ids }
+  }
+
+  it('leaves a label alone while a room still contains it', () => {
+    const { plan, right } = labeledSquare(200, 200)
+    const after = setPoints(plan, { [right[0]]: { x: 300, y: 0 }, [right[1]]: { x: 300, y: 400 } })
+    expect(reconcileRoomLabels(plan, after)).toBe(after)
+  })
+
+  it('snaps a label to its room centroid when the room deforms away from it', () => {
+    const { plan, right, label } = labeledSquare(350, 200)
+    const after = setPoints(plan, { [right[0]]: { x: 300, y: 0 }, [right[1]]: { x: 300, y: 400 } })
+    const next = reconcileRoomLabels(plan, after)
+    expect(next.roomLabels[label]).toMatchObject({ name: 'Kitchen', x: 150, y: 200 })
+  })
+
+  it('deletes a label whose room is no longer detected', () => {
+    const { plan, wall } = labeledSquare(200, 200)
+    const after = deleteWall(plan, wall)
+    expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({})
+  })
+
+  it('drops orphan labels when reconciling a plan against itself', () => {
+    let insideId = ''
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      b.wall(p1, p2)
+      b.wall(p2, p3)
+      b.wall(p3, p4)
+      b.wall(p4, p1)
+      insideId = b.label('Kitchen', 200, 200).id
+      b.label('Orphan', 900, 900)
+    })
+    const next = reconcileRoomLabels(plan, plan)
+    expect(Object.keys(next.roomLabels)).toEqual([insideId])
   })
 })

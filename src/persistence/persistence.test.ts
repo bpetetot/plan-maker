@@ -161,3 +161,24 @@ describe('autosave', () => {
     expect(record).toBeDefined()
   })
 })
+
+describe('loadPlan — orphan room labels', () => {
+  it('drops labels outside any room and keeps contained ones', async () => {
+    let inside = ''
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      inside = b.label('Kitchen', 200, 150).id
+      b.label('Orphan', 900, 900)
+    })
+    await savePlan(plan)
+    const loaded = await loadPlan()
+    expect(Object.keys(loaded?.roomLabels ?? {})).toEqual([inside])
+  })
+})
