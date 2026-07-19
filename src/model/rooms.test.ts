@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { commitWall } from './operations'
-import { detectRooms, roomAt } from './rooms'
+import { detectRooms, interiorSide, roomAt } from './rooms'
 import { buildPlan } from './testHelpers'
 
 describe('detectRooms after planar insertion (ADR 0002)', () => {
@@ -168,6 +168,78 @@ describe('detectRooms', () => {
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
     expect(rooms[0].areaCm2).toBe(390 * 190 + 190 * 200)
+  })
+})
+
+describe('interiorSide', () => {
+  it('gives the side of a perimeter wall facing its single room', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+    })
+    const rooms = detectRooms(plan)
+    const [bottom, right, top, left] = Object.values(plan.walls)
+    // interior of the room is below the bottom wall in screen coords: side +1
+    // (the same convention faceLength uses)
+    expect(interiorSide(rooms, bottom)).toBe(1)
+    expect(interiorSide(rooms, right)).toBe(1)
+    expect(interiorSide(rooms, top)).toBe(1)
+    expect(interiorSide(rooms, left)).toBe(1)
+  })
+
+  it('returns null for a wall bordering no room', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0))
+    })
+    const wall = Object.values(plan.walls)[0]
+    expect(interiorSide(detectRooms(plan), wall)).toBeNull()
+  })
+
+  it('returns null for a party wall between two rooms', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m1 = b.point(250, 0)
+      const c = b.point(600, 0)
+      const d = b.point(600, 300)
+      const m2 = b.point(250, 300)
+      const e = b.point(0, 300)
+      b.wall(a, m1)
+      b.wall(m1, c)
+      b.wall(c, d)
+      b.wall(d, m2)
+      b.wall(m2, e)
+      b.wall(e, a)
+      b.wall(m1, m2)
+    })
+    const rooms = detectRooms(plan)
+    const divider = Object.values(plan.walls)[6]
+    expect(interiorSide(rooms, divider)).toBeNull()
+  })
+
+  it('returns null for a dangling wall inside a room (both sides face it)', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const m = b.point(200, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      const tip = b.point(200, 100)
+      b.wall(a, m)
+      b.wall(m, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      b.wall(m, tip)
+    })
+    const rooms = detectRooms(plan)
+    const stub = Object.values(plan.walls)[5]
+    expect(interiorSide(rooms, stub)).toBeNull()
   })
 })
 

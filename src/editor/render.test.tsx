@@ -3,7 +3,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { squareRoomPlan } from '../model/testHelpers'
 import type { Plan, Wall } from '../model/types'
-import { DimLabel, labelAngle, WallLine } from './render'
+import { DimLabel, labelAngle, RubberWall, WallLine } from './render'
 
 afterEach(cleanup)
 
@@ -54,15 +54,16 @@ describe('labelAngle', () => {
 })
 
 describe('DimLabel value', () => {
-  // Dimensions measure the face they run along — 3,90 m inside, 4,10 m
-  // outside a 4×4 m axis square, 4,00 m only when the wall is free.
-  it('shows the axis length on a free-standing wall', () => {
+  // A dimension measures the rendered silhouette on the side it sits on —
+  // 3,90 m inside, 4,10 m outside a 4×4 m axis square, and the hors-tout
+  // extent (axis + thickness) on a free-standing wall.
+  it('shows the hors-tout extent on a free-standing wall', () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { text } = renderDim(plan, wall)
-    expect(text.textContent).toBe('4,00 m')
+    expect(text.textContent).toBe('4,10 m')
   })
 
-  it('measures the face on the side it sits on', () => {
+  it('measures the silhouette on the side it sits on', () => {
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
     // default side for a horizontal wall is the upper one — outside the room
@@ -71,6 +72,35 @@ describe('DimLabel value', () => {
     // dragged inside the room (side +1, below in screen coords): interior face
     bottom.dimPlacement = { t: 0.5, side: 1 }
     expect(renderDim(plan, bottom).text.textContent).toBe('3,90 m')
+  })
+
+  it('marks the measured extent: a broken line with a tick at each end', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const { container } = render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} />
+      </svg>,
+    )
+    // 2 line pieces around the text + 2 perpendicular ticks
+    const lines = Array.from(container.querySelectorAll('line'))
+    expect(lines).toHaveLength(4)
+    // the extent runs between the silhouette ends: x = -5 and 405
+    const xs = lines.flatMap((l) => [l.getAttribute('x1'), l.getAttribute('x2')])
+    expect(xs).toContain('-5')
+    expect(xs).toContain('405')
+  })
+
+  it('keeps the extent ticks even when no line piece has room for them', () => {
+    // a 25 cm wall: the text gap swallows the whole line, the ticks stay —
+    // marking the measured extent is the point when a value refines
+    const { plan, wall } = planWith(0, 0, 25, 0)
+    const { container } = render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} />
+      </svg>,
+    )
+    expect(container.querySelector('text')!.textContent).toBe('35 cm')
+    expect(container.querySelectorAll('line')).toHaveLength(2)
   })
 })
 
@@ -84,10 +114,10 @@ describe('WallLine', () => {
     return container.querySelector('polygon')!
   }
 
-  it('draws a free-standing wall as a rectangle capped at its Points', () => {
+  it('draws a free-standing wall as a rectangle overhanging its Points', () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const polygon = renderWall(plan, wall)
-    expect(polygon.getAttribute('points')).toBe('0,5 400,5 400,-5 0,-5')
+    expect(polygon.getAttribute('points')).toBe('-5,5 405,5 405,-5 -5,-5')
   })
 
   it('miters a square-room corner: faces meet where the dimensions measure', () => {
@@ -114,24 +144,45 @@ describe('DimLabel on a vertical wall', () => {
 
   it('defaults to the left side of the wall (above the reading line)', () => {
     const { plan, wall } = planWith(0, 0, 0, 200)
-    const { text } = renderDim(plan, wall)
-    // Local (0, -18) under rotate(-90) lands at global (-18, 0): left of the wall.
-    expect(text.getAttribute('y')).toBe('-18')
+    const { group } = renderDim(plan, wall)
+    // the text group sits on the dimension line, 18 left of the wall axis
+    expect(group.getAttribute('transform')).toBe('translate(-18,100) rotate(-90)')
   })
 
   it('keeps a stored placement on its geometric side', () => {
-    // Geometric right is side -1 when drawn downward, side +1 when drawn upward
-    // (side is a sign along the start→end left normal). Both must land at
-    // local (0, +18) — global (+18, 0) under rotate(-90).
+    // Geometric right is side -1 when drawn downward, side +1 when drawn
+    // upward (side is a sign along the start→end left normal). Both must
+    // land 18 right of the wall axis.
     for (const [y1, y2, side] of [
       [0, 200, -1],
       [200, 0, 1],
     ] as const) {
       const { plan, wall } = planWith(0, y1, 0, y2)
       wall.dimPlacement = { t: 0.5, side }
-      const { text } = renderDim(plan, wall)
-      expect(text.getAttribute('y')).toBe('18')
+      const { group } = renderDim(plan, wall)
+      expect(group.getAttribute('transform')).toBe('translate(18,100) rotate(-90)')
       cleanup()
     }
+  })
+})
+
+describe('RubberWall', () => {
+  function renderRubber(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const { container } = render(
+      <svg>
+        <RubberWall from={from} to={to} thickness={10} />
+      </svg>,
+    )
+    return container
+  }
+
+  it('labels the hors-tout extent: axis length plus the thickness', () => {
+    const container = renderRubber({ x: 0, y: 0 }, { x: 400, y: 0 })
+    expect(container.querySelector('text')!.textContent).toBe('4,10 m')
+  })
+
+  it('previews the future body honestly: square caps', () => {
+    const container = renderRubber({ x: 0, y: 0 }, { x: 400, y: 0 })
+    expect(container.querySelector('line')!.getAttribute('stroke-linecap')).toBe('square')
   })
 })

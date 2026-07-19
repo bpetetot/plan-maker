@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import type { Room } from '../model/rooms'
+import { detectRooms } from '../model/rooms'
 import { squareRoomPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import type { Opening, Plan } from '../model/types'
@@ -34,30 +36,34 @@ function planWith(offset: number, width: number): { plan: Plan; opening: Opening
   return { plan, opening }
 }
 
-function renderDims(plan: Plan, opening: Opening) {
+function renderDims(plan: Plan, opening: Opening, rooms: Room[] = []) {
   const { container } = render(
     <svg>
-      <PlacementDims plan={plan} opening={opening} />
+      <PlacementDims plan={plan} opening={opening} rooms={rooms} />
     </svg>,
   )
   return container
 }
 
 describe('PlacementDims', () => {
-  it('shows one dimension per side, from each wall end to the near edge of the opening', () => {
+  it('shows one dimension per side, from each silhouette end to the near edge of the opening', () => {
+    // free-standing wall: the silhouette overhangs each Point by 5
     const { plan, opening } = planWith(100, 80)
     const container = renderDims(plan, opening)
     const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
-    expect(texts).toEqual(['60 cm', '2,60 m'])
+    expect(texts).toEqual(['65 cm', '2,65 m'])
   })
 
   it('hides the side whose segment is 0 cm, measuring from the effective (clamped) offset', () => {
     // stored offset 0 clamps to half the width: the opening sits flush at the
-    // wall start, so only the far-side placement dimension remains
-    const { plan, opening } = planWith(0, 80)
-    const container = renderDims(plan, opening)
+    // wall start, where the interior face begins — only the far side remains
+    const plan = squareRoomPlan()
+    const bottom = Object.values(plan.walls)[0]
+    const opening: Opening = { id: 'o', wallId: bottom.id, type: 'window', offset: 0, width: 80 }
+    plan.openings.o = opening
+    const container = renderDims(plan, opening, detectRooms(plan))
     const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
-    expect(texts).toEqual(['3,20 m'])
+    expect(texts).toEqual(['3,15 m'])
   })
 
   it('sits on the wall dimension line: default side, at the middle of each segment', () => {
@@ -66,48 +72,77 @@ describe('PlacementDims', () => {
     const groups = Array.from(container.querySelectorAll('g[transform]')).map((g) =>
       g.getAttribute('transform'),
     )
-    // thickness 10 → offset 18 above the wall, like DimLabel's default
-    expect(groups).toEqual(['translate(30,-18) rotate(0)', 'translate(270,-18) rotate(0)'])
+    // thickness 10 → offset 18 above the wall, like DimLabel's default;
+    // segments run from the overhang (-5) to the opening edges (60 / 140)
+    expect(groups).toEqual(['translate(27.5,-18) rotate(0)', 'translate(272.5,-18) rotate(0)'])
   })
 
-  it('follows a custom dimPlacement side', () => {
+  it('follows a custom dimPlacement side when the wall borders no room', () => {
     const { plan, opening } = planWith(100, 80)
     plan.walls.w.dimPlacement = { t: 0.5, side: 1 }
     const container = renderDims(plan, opening)
     const group = container.querySelector('g[transform]')!
-    expect(group.getAttribute('transform')).toBe('translate(30,18) rotate(0)')
+    expect(group.getAttribute('transform')).toBe('translate(27.5,18) rotate(0)')
   })
 
-  it('measures from the face it runs along when the wall ends at junctions', () => {
-    // 4×4 m square room; window (80) centered on the bottom wall. Like any
-    // dimension, each side measures what it runs along: the exterior face
-    // reaches the miter at -5, the interior face starts at +5.
+  it('always sits on the interior side when the wall borders exactly one room', () => {
+    // 4×4 m square room; window (80) centered on the bottom wall. Whatever
+    // side the wall's Dimension sits on, the placement dimensions measure on
+    // the interior side: from the interior face corners at +5/395.
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
     const opening: Opening = { id: 'o', wallId: bottom.id, type: 'window', offset: 200, width: 80 }
     plan.openings.o = opening
-    // default side for a horizontal wall: upper — outside the room
-    let texts = Array.from(renderDims(plan, opening).querySelectorAll('text')).map((t) => t.textContent)
-    expect(texts).toEqual(['1,65 m', '1,65 m'])
-    cleanup()
-    // dragged inside the room: both sides measure to the interior faces
-    bottom.dimPlacement = { t: 0.5, side: 1 }
-    texts = Array.from(renderDims(plan, opening).querySelectorAll('text')).map((t) => t.textContent)
+    const rooms = detectRooms(plan)
+    // default Dimension side for a horizontal wall: upper — outside the room
+    let container = renderDims(plan, opening, rooms)
+    let texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['1,55 m', '1,55 m'])
+    // the dims sit below the wall (interior side): positive y offset
+    expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
+      'translate(82.5,18) rotate(0)',
+    )
+    cleanup()
+    // dragging the Dimension outside changes nothing for placement dims
+    bottom.dimPlacement = { t: 0.5, side: -1 }
+    container = renderDims(plan, opening, rooms)
+    texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['1,55 m', '1,55 m'])
+  })
+
+  it('chains from the near edge of the closest neighbouring opening', () => {
+    // window (80) at 100 with a neighbour (60) at 250: the end-side segment
+    // runs between the two openings' facing edges (140 → 220), the start
+    // side still reaches the silhouette end (-5)
+    const { plan, opening } = planWith(100, 80)
+    plan.openings.n = { id: 'n', wallId: 'w', type: 'window', offset: 250, width: 60 }
+    const container = renderDims(plan, opening)
+    const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['65 cm', '80 cm'])
+  })
+
+  it('hides a side reduced to nothing by an adjacent neighbouring opening', () => {
+    // neighbour flush against the manipulated opening: the gap is 0 cm
+    const { plan, opening } = planWith(100, 80)
+    plan.openings.n = { id: 'n', wallId: 'w', type: 'window', offset: 180, width: 80 }
+    const container = renderDims(plan, opening)
+    const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['65 cm'])
   })
 
   it('draws a broken line with a tick at each end, dropped when the segment is too short', () => {
     // left segment 10 cm: too short for its text — text only, no line
-    const { plan, opening } = planWith(55, 90)
+    const { plan, opening } = planWith(60, 90)
     const container = renderDims(plan, opening)
     const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
-    expect(texts).toEqual(['10 cm', '3,00 m'])
+    expect(texts).toEqual(['20 cm', '3,00 m'])
     // only the right segment draws lines: 2 line pieces + 2 ticks
     expect(container.querySelectorAll('line')).toHaveLength(4)
   })
 })
 
-// A horizontal wall from (100,100) to (500,100) — dimension "4,00 m".
+// A horizontal wall from (100,100) to (500,100) — dimension "4,10 m"
+// (hors-tout: 400 axis + 10 thickness, both ends free).
 const editorPlan = (): Plan => ({
   points: {
     a: { id: 'a', x: 100, y: 100 },
@@ -124,14 +159,15 @@ describe('placement dimensions while placing an opening', () => {
     const { container } = render(<Editor />)
     const svg = container.querySelector('svg')!
     fireEvent.click(screen.getByLabelText('Door'))
-    // ghost door (width 90) centered at wall middle: 155 cm on each side
+    // ghost door (width 90) centered at wall middle: 160 cm on each side,
+    // from the opening edge to the silhouette overhang
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
-    expect(screen.queryByText('4,00 m')).toBeNull()
-    expect(screen.getAllByText('1,55 m')).toHaveLength(2)
+    expect(screen.queryByText('4,10 m')).toBeNull()
+    expect(screen.getAllByText('1,60 m')).toHaveLength(2)
     // leaving the wall restores the wall dimension and drops the placement dimensions
     fireEvent.pointerMove(svg, clientAt(svg, 300, 400))
-    expect(screen.getByText('4,00 m')).toBeTruthy()
-    expect(screen.queryByText('1,55 m')).toBeNull()
+    expect(screen.getByText('4,10 m')).toBeTruthy()
+    expect(screen.queryByText('1,60 m')).toBeNull()
   })
 })
 
@@ -149,13 +185,13 @@ describe('placement dimensions while moving an opening', () => {
     const hit = container.querySelector('rect[width="120"][height="32"]')!
     fireEvent.pointerDown(hit, { button: 0, ...clientAt(svg, 250, 100) })
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
-    // opening centered on the wall: 140 cm on each side
-    expect(screen.getAllByText('1,40 m')).toHaveLength(2)
-    expect(screen.queryByText('4,00 m')).toBeNull()
-    expect(screen.getByText('3,00 m')).toBeTruthy() // the other wall keeps its dimension
+    // opening centered on the wall: 145 cm on each side (to the overhangs)
+    expect(screen.getAllByText('1,45 m')).toHaveLength(2)
+    expect(screen.queryByText('4,10 m')).toBeNull()
+    expect(screen.getByText('3,10 m')).toBeTruthy() // the other wall keeps its dimension
     fireEvent.pointerUp(svg)
-    expect(screen.queryByText('1,40 m')).toBeNull()
-    expect(screen.getByText('4,00 m')).toBeTruthy()
+    expect(screen.queryByText('1,45 m')).toBeNull()
+    expect(screen.getByText('4,10 m')).toBeTruthy()
   })
 
   it('does not show them on a plain click — selecting is not moving', () => {
@@ -166,8 +202,8 @@ describe('placement dimensions while moving an opening', () => {
     const svg = container.querySelector('svg')!
     const hit = container.querySelector('rect[width="120"][height="32"]')!
     fireEvent.pointerDown(hit, { button: 0, ...clientAt(svg, 150, 100) })
-    expect(screen.getByText('4,00 m')).toBeTruthy() // wall dimension never blinks
+    expect(screen.getByText('4,10 m')).toBeTruthy() // wall dimension never blinks
     fireEvent.pointerUp(svg)
-    expect(screen.getByText('4,00 m')).toBeTruthy()
+    expect(screen.getByText('4,10 m')).toBeTruthy()
   })
 })

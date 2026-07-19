@@ -1,10 +1,10 @@
 // Presentational SVG pieces, shared by the editor and the PNG export (WYSIWYG).
-import { faceLength, faceSpan, wallOutline } from '../model/faces'
+import { faceSpan, junctionPatches, wallOutline } from '../model/faces'
 import { wallLength, wallPoints } from '../model/geometry'
 import { formatArea, formatLength } from '../model/format'
 import { openingPlacement } from '../model/openings'
 import type { Room } from '../model/rooms'
-import { roomAt } from '../model/rooms'
+import { interiorSide, roomAt } from '../model/rooms'
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
 
@@ -37,6 +37,20 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
       fill={color ?? COLORS.wall}
       pointerEvents="none"
     />
+  )
+}
+
+// Junction patches: the polygons filling the central gaps wall outlines leave
+// at T and angled crossings (CONTEXT.md: Face). Rendered in the plain wall
+// color — a patch belongs to every wall at its Point, so it never takes a
+// single wall's hover or selection tint.
+export function JunctionPatches({ plan }: { plan: Plan }) {
+  return (
+    <g pointerEvents="none">
+      {junctionPatches(plan).map(({ pointId, corners }) => (
+        <polygon key={pointId} points={corners.map((c) => `${c.x},${c.y}`).join(' ')} fill={COLORS.wall} />
+      ))}
+    </g>
   )
 }
 
@@ -221,15 +235,63 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   const raw = (Math.atan2(dy, dx) * 180) / Math.PI
   const angle = labelAngle(dx, dy)
   const flipped = angle !== raw
-  const side = wall.dimPlacement ? wall.dimPlacement.side : flipped ? 1 : -1
+  const side: 1 | -1 = wall.dimPlacement ? wall.dimPlacement.side : flipped ? 1 : -1
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
-// Automatic dimension on every wall, always visible (spec §4). Sits at
-// wall.dimPlacement when set (ratio along the axis, side across it), else at
-// the midpoint, above the text's reading line (upper side for horizontal
-// walls, left side for vertical ones). With onPointerDown it becomes a drag handle
-// (Select tool); it is never part of the selection.
+// The broken dimension line shared by DimLabel and PlacementDims: a piece on
+// each side of the text gap (only where it has room) and a perpendicular tick
+// at each end of the measured extent.
+function ExtentLine({
+  at,
+  ux,
+  uy,
+  from,
+  to,
+  gapFrom,
+  gapTo,
+}: {
+  at: (t: number) => { x: number; y: number }
+  ux: number
+  uy: number
+  from: number
+  to: number
+  gapFrom: number
+  gapTo: number
+}) {
+  const p1 = at(from)
+  const p2 = at(to)
+  const g1 = at(Math.max(from, Math.min(gapFrom, to)))
+  const g2 = at(Math.min(to, Math.max(gapTo, from)))
+  return (
+    <g pointerEvents="none">
+      {gapFrom - from > 2 && (
+        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
+      )}
+      {to - gapTo > 2 && <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />}
+      {[p1, p2].map((p, i) => (
+        <line
+          key={i}
+          x1={p.x + uy * 4}
+          y1={p.y - ux * 4}
+          x2={p.x - uy * 4}
+          y2={p.y + ux * 4}
+          stroke="var(--rail)"
+          strokeWidth={1}
+        />
+      ))}
+    </g>
+  )
+}
+
+// Automatic dimension on every wall, always visible (spec §4). It measures
+// exactly the wall's rendered silhouette on the side it sits on — the mitered
+// Face corners at junction ends, the body overhang at free ends — drawn as a
+// broken dimension line with perpendicular ticks at the measured extent. The
+// text sits at wall.dimPlacement when set (ratio along the axis, side across
+// it), else at the midpoint, above the reading line (upper side for
+// horizontal walls, left side for vertical ones). With onPointerDown it
+// becomes a drag handle (Select tool); it is never part of the selection.
 export function DimLabel({
   plan,
   wall,
@@ -239,26 +301,43 @@ export function DimLabel({
   wall: Wall
   onPointerDown?: (e: React.PointerEvent) => void
 }) {
-  const { a, length, ux, uy, angle, flipped, side, off } = dimLineFrame(plan, wall)
+  const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
   if (length < 20) return null
-  // a dimension measures what it runs along: the face on the side it sits on
-  const value = faceLength(plan, wall, side)
-  // labelAngle keeps the text readable; when it flips the frame, local +y
-  // points along -n (n = left normal of start→end), so map the side back
-  // into the rotated frame.
-  const t = wall.dimPlacement?.t ?? 0.5
-  const y = side * (flipped ? -1 : 1) * off
+  const span = faceSpan(plan, wall, side)
+  const value = Math.max(0, span.to - span.from)
+  const label = formatLength(value)
+  // point on the dimension line at axis parameter t (cm from the start Point)
+  const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
+  const tText = (wall.dimPlacement?.t ?? 0.5) * length
+  const mid = at(tText)
+  // 11px text ≈ 5.5 units per character; the line breaks around it. The ticks
+  // always mark the measured extent — that legibility is the point when a
+  // value refines at a new junction — even when no line piece has room.
+  const gapHalf = label.length * 2.75 + 4
   return (
-    <g
-      transform={`translate(${a.x + ux * length * t},${a.y + uy * length * t}) rotate(${angle})`}
-      pointerEvents={onPointerDown ? 'auto' : 'none'}
-      style={onPointerDown ? { cursor: 'move' } : undefined}
-      onPointerDown={onPointerDown}
-    >
-      {onPointerDown && <rect x={-30} y={y - 8} width={60} height={16} fill="transparent" />}
-      <text y={y} textAnchor="middle" dominantBaseline="central" className="dim">
-        {formatLength(value)}
-      </text>
+    <g>
+      {value >= 1 && (
+        <ExtentLine
+          at={at}
+          ux={ux}
+          uy={uy}
+          from={span.from}
+          to={span.to}
+          gapFrom={tText - gapHalf}
+          gapTo={tText + gapHalf}
+        />
+      )}
+      <g
+        transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
+        pointerEvents={onPointerDown ? 'auto' : 'none'}
+        style={onPointerDown ? { cursor: 'move' } : undefined}
+        onPointerDown={onPointerDown}
+      >
+        {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
+        <text textAnchor="middle" dominantBaseline="central" className="dim">
+          {label}
+        </text>
+      </g>
     </g>
   )
 }
@@ -296,25 +375,37 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
 }
 
 // Placement dimensions: the pair of temporary dimensions flanking an opening
-// while it is being placed or moved — each runs from a wall end to the near
-// edge of the opening, ignoring neighbouring openings, on the same line the
-// wall's (temporarily hidden) Dimension sits on. A side whose segment rounds
-// to 0 cm shows nothing; a segment too short for its text keeps the text and
-// drops the line. Editor feedback — deliberately absent from PlanScene.
-export function PlacementDims({ plan, opening }: { plan: Plan; opening: Opening }) {
+// while it is being placed or moved. They sit on the interior side whenever
+// the wall borders exactly one room, else on the side the wall's (temporarily
+// hidden) Dimension sits on. Each runs to the near edge of the opening from
+// the silhouette end on that side, or from the near edge of the closest
+// neighbouring opening when one intervenes — every value is tape-measurable.
+// A side whose segment rounds to 0 cm shows nothing; a segment too short for
+// its text keeps the text and drops the line. Editor feedback — deliberately
+// absent from PlanScene.
+export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: Opening; rooms: Room[] }) {
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
-  const { a, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
+  const frame = dimLineFrame(plan, wall)
+  const side = interiorSide(rooms, wall) ?? frame.side
+  const { a, ux, uy, angle, off } = frame
   // point on the dimension line at distance t along the wall axis
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const half = opening.width / 2
-  // like any dimension, each side measures what it runs along: the face on
-  // the side the dims sit on (the Point when the wall end is free)
-  const span = faceSpan(plan, wall, side as 1 | -1)
+  // outer bounds: the silhouette span on the chosen side, cut back to the
+  // near edge of the closest neighbouring opening when one intervenes
+  const span = faceSpan(plan, wall, side)
+  let startBound = span.from
+  let endBound = span.to
+  for (const other of Object.values(plan.openings)) {
+    if (other.wallId !== wall.id || other.id === opening.id) continue
+    if (other.offset <= placement.offset) startBound = Math.max(startBound, other.offset + other.width / 2)
+    else endBound = Math.min(endBound, other.offset - other.width / 2)
+  }
   const segments = [
-    { key: 'start', from: span.from, to: placement.offset - half },
-    { key: 'end', from: placement.offset + half, to: span.to },
+    { key: 'start', from: startBound, to: placement.offset - half },
+    { key: 'end', from: placement.offset + half, to: endBound },
   ]
   return (
     <g pointerEvents="none">
@@ -323,33 +414,22 @@ export function PlacementDims({ plan, opening }: { plan: Plan; opening: Opening 
         if (Math.round(len) < 1) return null
         const label = formatLength(len)
         const mid = at((from + to) / 2)
-        // 9px text ≈ 5 units per character; the line breaks around it
+        // 9px text ≈ 5 units per character; the line breaks around it. A
+        // segment too short for its text keeps the text and drops the line.
         const gapHalf = label.length * 2.5 + 4
         const withLine = len / 2 > gapHalf + 4
-        const p1 = at(from)
-        const p2 = at(to)
-        const g1 = at((from + to) / 2 - gapHalf)
-        const g2 = at((from + to) / 2 + gapHalf)
         return (
           <g key={key}>
             {withLine && (
-              <>
-                {/* the dimension line, broken around the text */}
-                <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
-                <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />
-                {/* perpendicular ticks at both ends */}
-                {[p1, p2].map((p, i) => (
-                  <line
-                    key={i}
-                    x1={p.x + uy * 4}
-                    y1={p.y - ux * 4}
-                    x2={p.x - uy * 4}
-                    y2={p.y + ux * 4}
-                    stroke="var(--rail)"
-                    strokeWidth={1}
-                  />
-                ))}
-              </>
+              <ExtentLine
+                at={at}
+                ux={ux}
+                uy={uy}
+                from={from}
+                to={to}
+                gapFrom={(from + to) / 2 - gapHalf}
+                gapTo={(from + to) / 2 + gapHalf}
+              />
             )}
             <g transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}>
               <text textAnchor="middle" dominantBaseline="central" className="dim dim-placement">
@@ -521,7 +601,10 @@ export function Handle({
   )
 }
 
-// Rubber-band wall while drawing, with a live length label (spec §4).
+// Rubber-band wall while drawing, with a live length label (spec §4). The
+// ghost previews the future body honestly — square caps overhang each end by
+// half the thickness — and the label reads the overall (hors-tout) extent:
+// axis + thickness.
 export function RubberWall({
   from,
   to,
@@ -542,13 +625,13 @@ export function RubberWall({
         y2={to.y}
         stroke={COLORS.preview}
         strokeWidth={thickness}
-        strokeLinecap="round"
+        strokeLinecap="square"
         opacity={0.5}
       />
       {length > 20 && (
         <g transform={`translate(${(from.x + to.x) / 2},${(from.y + to.y) / 2}) rotate(${angle})`}>
           <text y={-thickness - 4} textAnchor="middle" className="dim dim-live">
-            {formatLength(length)}
+            {formatLength(length + thickness)}
           </text>
         </g>
       )}
@@ -564,6 +647,7 @@ export function PlanScene({ plan, rooms }: { plan: Plan; rooms: Room[] }) {
       {Object.values(plan.walls).map((wall) => (
         <WallLine key={wall.id} plan={plan} wall={wall} />
       ))}
+      <JunctionPatches plan={plan} />
       {Object.values(plan.openings).map((opening) => (
         <OpeningGlyph key={opening.id} plan={plan} opening={opening} />
       ))}

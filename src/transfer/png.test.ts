@@ -71,5 +71,7 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('var(--wall)')
     expect(svg).toContain('--wall: #2f2f2f')
     expect(svg).toContain('--sheet: #ffffff')
+    // the dimension extent lines paint with --rail — pinned too
+    expect(svg).toContain('--rail: #c9cdd4')
   })
 })

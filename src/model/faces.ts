@@ -4,9 +4,10 @@ import type { Plan, Wall } from './types'
 
 // A wall's Faces: its two long sides, offset half the thickness from the axis.
 // At a junction a face ends where it meets the face of the angularly adjacent
-// wall (miter); at a free end it stops at the Point. Sides use the same
-// convention as DimPlacement: +1 along the left normal of start→end (the axis
-// rotated +90° in screen coordinates).
+// wall (miter); at a free end the body overhangs the Point by half the
+// thickness (square cap). Sides use the same convention as DimPlacement: +1
+// along the left normal of start→end (the axis rotated +90° in screen
+// coordinates).
 
 const rot90 = (v: Vec): Vec => ({ x: -v.y, y: v.x })
 
@@ -48,9 +49,10 @@ function miter(p1: Vec, d1: Vec, p2: Vec, d2: Vec, corner: Vec, wallA: Wall, wal
   return Math.hypot(hit.x - corner.x, hit.y - corner.y) > limit ? null : hit
 }
 
-// The corner of `wall`'s side-`side` face at the given end: the miter with the
-// angularly adjacent wall's facing face, or the square cap at the Point when
-// the end is free (or the adjacent wall is collinear).
+// The corner of `wall`'s side-`side` face at the given end: the miter with
+// the angularly adjacent wall's facing face; the half-thickness overhang past
+// the Point when the end is free; the square cap at the Point when the
+// adjacent wall is collinear (miter fallback).
 export function facePoint(plan: Plan, wall: Wall, end: 'start' | 'end', side: 1 | -1): Vec {
   const frame = wallFrame(plan, wall)
   if (!frame) {
@@ -84,7 +86,8 @@ export function facePoint(plan: Plan, wall: Wall, end: 'start' | 'end', side: 1 
     const delta = ((raw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) || 2 * Math.PI
     if (!best || delta < best.delta) best = { wall: other, v, delta }
   }
-  if (!best) return cap
+  // free end: the body overhangs the Point by half the thickness
+  if (!best) return { x: cap.x - wDir.x * half, y: cap.y - wDir.y * half }
 
   // the neighbour's face bounding the swept sector: offset toward the sector
   const m = rotSign > 0 ? { x: best.v.y, y: -best.v.x } : rot90(best.v)
@@ -112,7 +115,7 @@ export function faceLength(plan: Plan, wall: Wall, side: 1 | -1): number {
 }
 
 // The drawn contour of a wall: its two faces joined at the corners facePoint
-// resolves — mitered at junctions, square caps at free ends.
+// resolves — mitered at junctions, overhung square caps at free ends.
 export function wallOutline(plan: Plan, wall: Wall): Vec[] {
   return [
     facePoint(plan, wall, 'start', 1),
@@ -120,6 +123,34 @@ export function wallOutline(plan: Plan, wall: Wall): Vec[] {
     facePoint(plan, wall, 'end', -1),
     facePoint(plan, wall, 'start', -1),
   ]
+}
+
+// Junction patches: at each Point shared by several walls, the polygon of all
+// incident face corners ordered angularly around the Point. Fills the central
+// gap wall outlines leave at T and angled crossings; degenerates to zero area
+// at plain corners and collinear continuations.
+export function junctionPatches(plan: Plan): { pointId: string; corners: Vec[] }[] {
+  const byPoint = new Map<string, { wall: Wall; end: 'start' | 'end' }[]>()
+  for (const wall of Object.values(plan.walls)) {
+    for (const end of ['start', 'end'] as const) {
+      const pointId = end === 'start' ? wall.startPointId : wall.endPointId
+      const list = byPoint.get(pointId) ?? []
+      list.push({ wall, end })
+      byPoint.set(pointId, list)
+    }
+  }
+  const patches: { pointId: string; corners: Vec[] }[] = []
+  for (const [pointId, ends] of byPoint) {
+    if (ends.length < 2) continue
+    const p = plan.points[pointId]
+    if (!p) continue
+    const corners = ends.flatMap(({ wall, end }) =>
+      ([1, -1] as const).map((side) => facePoint(plan, wall, end, side)),
+    )
+    corners.sort((c1, c2) => Math.atan2(c1.y - p.y, c1.x - p.x) - Math.atan2(c2.y - p.y, c2.x - p.x))
+    patches.push({ pointId, corners })
+  }
+  return patches
 }
 
 // The floor polygon of a room loop: every edge offset inward by half its

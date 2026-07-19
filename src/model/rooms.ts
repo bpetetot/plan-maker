@@ -1,7 +1,7 @@
 import { interiorPolygon } from './faces'
 import type { Vec } from './geometry'
 import { pointInPolygon, polygonArea, polygonCentroid } from './geometry'
-import type { Plan } from './types'
+import type { Plan, Wall } from './types'
 
 // Rooms are derived, never stored (spec §2): the closed faces of the wall
 // graph, found by walking every directed edge with a "most clockwise turn"
@@ -96,4 +96,26 @@ export function detectRooms(plan: Plan): Room[] {
 
 export function roomAt(rooms: Room[], x: number, y: number): Room | null {
   return rooms.find((room) => pointInPolygon({ x, y }, room.polygon)) ?? null
+}
+
+// The side of the wall facing a detected room, when exactly one of its two
+// sides does — the wall then "borders exactly one room" and that side is its
+// interior. Null otherwise: standalone wall (no side faces a room), party
+// wall between two rooms, or dangling wall inside a room (both sides face
+// the same room). Sides follow the faces convention: room loops are
+// positively oriented in screen coordinates, so a loop traversing the wall
+// start→end has its interior on side +1 (the start→end left normal).
+export function interiorSide(rooms: Room[], wall: Wall): 1 | -1 | null {
+  const sides = new Set<1 | -1>()
+  for (const room of rooms) {
+    const ids = room.pointIds
+    for (let i = 0; i < ids.length; i++) {
+      const u = ids[i]
+      const v = ids[(i + 1) % ids.length]
+      if (u === wall.startPointId && v === wall.endPointId) sides.add(1)
+      else if (u === wall.endPointId && v === wall.startPointId) sides.add(-1)
+    }
+  }
+  if (sides.size !== 1) return null
+  return sides.has(1) ? 1 : -1
 }

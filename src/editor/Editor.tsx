@@ -65,6 +65,7 @@ import {
   DimLabel,
   DimRails,
   Handle,
+  JunctionPatches,
   OpeningGlyph,
   OpeningHit,
   PlacementDims,
@@ -587,6 +588,7 @@ export default function Editor() {
             }
           />
         ))}
+        <JunctionPatches plan={plan} />
         {Object.values(plan.openings).map((opening) => (
           <OpeningGlyph
             key={opening.id}
@@ -657,7 +659,7 @@ export default function Editor() {
             />
           ),
         )}
-        {placementOpening && <PlacementDims plan={plan} opening={placementOpening} />}
+        {placementOpening && <PlacementDims plan={plan} opening={placementOpening} rooms={rooms} />}
         {selWall &&
           wallPoints(plan, selWall).map((p) => (
             <Handle
@@ -816,7 +818,8 @@ export default function Editor() {
           )}
           {selWall && (
             <>
-              <span>Wall · {formatLength(wallLength(plan, selWall))}</span>
+              {/* the drawn length is the hors-tout extent: axis + thickness */}
+              <span>Wall · {formatLength(wallLength(plan, selWall) + selWall.thickness)}</span>
               {deleteButton}
             </>
           )}
