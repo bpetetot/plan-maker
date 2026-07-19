@@ -268,7 +268,9 @@ function ExtentLine({
       {gapFrom - from > 2 && (
         <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={1} />
       )}
-      {to - gapTo > 2 && <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />}
+      {to - gapTo > 2 && (
+        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={1} />
+      )}
       {[p1, p2].map((p, i) => (
         <line
           key={i}

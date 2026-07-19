@@ -17,6 +17,7 @@ import {
   setDimPlacement,
   setOpeningWidth,
   setPoints,
+  setWallThickness,
   splitWall,
   toggleHingeSide,
   toggleSwing,
@@ -251,6 +252,23 @@ describe('commitWall', () => {
     expect(touching).toHaveLength(4)
   })
 
+  it('gives every drawn segment the requested thickness, leaving crossed walls alone', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(200, -100)
+      const p2 = b.point(200, 100)
+      b.wall(p1, p2)
+    })
+    const [next] = commitWall(plan, { x: 0, y: 0, kind: 'grid' }, { x: 400, y: 0, kind: 'grid' }, 20)
+    const drawn = Object.values(next.walls).filter(
+      (w) => next.points[w.startPointId].y === 0 && next.points[w.endPointId].y === 0,
+    )
+    expect(drawn).toHaveLength(2)
+    for (const w of drawn) expect(w.thickness).toBe(20)
+    const crossed = Object.values(next.walls).filter((w) => !drawn.includes(w))
+    expect(crossed).toHaveLength(2)
+    for (const w of crossed) expect(w.thickness).toBe(10)
+  })
+
   it('splits the new wall at an existing point lying on its path', () => {
     const plan = buildPlan((b) => {
       const foot = b.point(200, 0)
@@ -279,6 +297,15 @@ describe('addWall', () => {
     expect(added.thickness).toBe(10)
     expect(added.endPointId).toBe(withPoint[1])
     expect(p1).toBeTruthy()
+  })
+
+  it('adds a wall with the requested thickness', () => {
+    const plan = rectPlan()
+    const [, p2] = Object.keys(plan.points)
+    const [withPoint, p3] = ensurePoint(plan, { x: 400, y: 300, kind: 'free' })
+    const next = addWall(withPoint, p2, p3, 25)
+    const added = Object.values(next.walls).find((w) => w.startPointId === p2)!
+    expect(added.thickness).toBe(25)
   })
 
   it('rejects self-loops and duplicate walls (either direction)', () => {
@@ -343,6 +370,22 @@ describe('openings', () => {
     }
   })
 
+  it('places a door with the given width, hinge side and swing', () => {
+    const base = rectPlan()
+    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'door', 200, {
+      width: 80,
+      hingeSide: 'end',
+      swing: 'out',
+    })
+    expect(plan.openings[id!]).toMatchObject({ width: 80, hingeSide: 'end', swing: 'out' })
+  })
+
+  it('places a window with the given width, clamped to fit', () => {
+    const base = rectPlan()
+    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'window', 390, { width: 60 })
+    expect(plan.openings[id!]).toMatchObject({ type: 'window', width: 60, offset: 365 })
+  })
+
   it('clamps the offset so the opening fits inside the wall', () => {
     const plan = rectPlan()
     const wall = Object.values(plan.walls)[0]
@@ -400,6 +443,19 @@ describe('openings', () => {
     let id: string | null
     ;[plan, id] = placeOpening(plan, wallId, 'door', 200)
     expect(Object.keys(deleteOpening(plan, id!).openings)).toHaveLength(0)
+  })
+})
+
+describe('setWallThickness', () => {
+  it('sets the thickness of a wall', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    expect(setWallThickness(plan, wallId, 20).walls[wallId].thickness).toBe(20)
+  })
+
+  it('is a no-op for an unknown wall', () => {
+    const plan = rectPlan()
+    expect(setWallThickness(plan, 'nope', 20)).toBe(plan)
   })
 })
 

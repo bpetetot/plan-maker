@@ -15,7 +15,12 @@ export function ensurePoint(plan: Plan, snap: Snap): [Plan, string] {
   return [{ ...plan, points: { ...plan.points, [id]: point } }, id]
 }
 
-export function addWall(plan: Plan, startPointId: string, endPointId: string): Plan {
+export function addWall(
+  plan: Plan,
+  startPointId: string,
+  endPointId: string,
+  thickness: number = WALL_THICKNESS,
+): Plan {
   if (startPointId === endPointId) return plan
   for (const wall of Object.values(plan.walls)) {
     const same = wall.startPointId === startPointId && wall.endPointId === endPointId
@@ -23,7 +28,7 @@ export function addWall(plan: Plan, startPointId: string, endPointId: string): P
     if (same || reversed) return plan
   }
   const id = newId()
-  const wall: Wall = { id, startPointId, endPointId, thickness: WALL_THICKNESS }
+  const wall: Wall = { id, startPointId, endPointId, thickness }
   return { ...plan, walls: { ...plan.walls, [id]: wall } }
 }
 
@@ -123,7 +128,12 @@ export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
 // a wall body split it (T junction), and a crossed wall is split at the
 // intersection along with the new wall itself (X junction). Returns the
 // resolved end point id so the drawing chain can continue from it.
-export function commitWall(plan: Plan, start: Snap, end: Snap): [Plan, string] {
+export function commitWall(
+  plan: Plan,
+  start: Snap,
+  end: Snap,
+  thickness: number = WALL_THICKNESS,
+): [Plan, string] {
   let next = plan
   let startId: string
   let endId: string
@@ -167,7 +177,7 @@ export function commitWall(plan: Plan, start: Snap, end: Snap): [Plan, string] {
 
   const ordered = [...cuts.entries()].sort(([, t1], [, t2]) => t1 - t2).map(([id]) => id)
   const stops = [startId, ...ordered, endId]
-  for (let i = 0; i < stops.length - 1; i++) next = addWall(next, stops[i], stops[i + 1])
+  for (let i = 0; i < stops.length - 1; i++) next = addWall(next, stops[i], stops[i + 1], thickness)
   return [next, endId]
 }
 
@@ -212,6 +222,12 @@ export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 |
   return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } }
 }
 
+export function setWallThickness(plan: Plan, id: string, thickness: number): Plan {
+  const wall = plan.walls[id]
+  if (!wall || wall.thickness === thickness) return plan
+  return { ...plan, walls: { ...plan.walls, [id]: { ...wall, thickness } } }
+}
+
 export function deleteOpening(plan: Plan, id: string): Plan {
   if (!plan.openings[id]) return plan
   const openings = { ...plan.openings }
@@ -233,22 +249,33 @@ export function clampOpeningOffset(plan: Plan, wall: Wall, offset: number, width
 }
 
 // Returns the new plan and the placed opening's id (null when placement is
-// refused), so callers can select the opening they just placed.
+// refused), so callers can select the opening they just placed. `init` lets
+// the caller apply its Tool defaults; anything omitted falls back to the
+// built-in values.
 export function placeOpening(
   plan: Plan,
   wallId: string,
   type: 'door' | 'window',
   offset: number,
+  init?: { width?: number; hingeSide?: 'start' | 'end'; swing?: 'in' | 'out' },
 ): [Plan, string | null] {
   const wall = plan.walls[wallId]
   if (!wall) return [plan, null]
-  const width = defaultOpeningWidth(type)
+  const width = init?.width ?? defaultOpeningWidth(type)
   const clamped = clampOpeningOffset(plan, wall, offset, width)
   if (clamped === null) return [plan, null]
   const id = newId()
   const opening: Opening =
     type === 'door'
-      ? { id, wallId, type, offset: clamped, width, hingeSide: 'start', swing: 'in' }
+      ? {
+          id,
+          wallId,
+          type,
+          offset: clamped,
+          width,
+          hingeSide: init?.hingeSide ?? 'start',
+          swing: init?.swing ?? 'in',
+        }
       : { id, wallId, type, offset: clamped, width }
   return [{ ...plan, openings: { ...plan.openings, [id]: opening } }, id]
 }

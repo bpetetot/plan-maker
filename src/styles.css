@@ -307,6 +307,11 @@ svg text.room-area {
   background: transparent;
   color: inherit;
 }
+.panel-select.inline {
+  width: auto;
+  padding: 3px 6px;
+  font-variant-numeric: tabular-nums;
+}
 .panel-flips {
   display: flex;
   gap: 6px;

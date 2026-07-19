@@ -49,7 +49,7 @@ const doorPlan = () =>
     b.opening(wall, 'door', 200)
   })
 
-describe('selection panel on a wall', () => {
+describe('tool panel on a selected wall', () => {
   it('shows Interior, Exterior and Thickness for a wall bordering one room', () => {
     const { svg } = setup()
     // bottom wall of the 4×4 m square only
@@ -58,14 +58,14 @@ describe('selection panel on a wall', () => {
     expect(screen.getByText('Wall')).toBeTruthy()
     expect(rowValue('Interior')).toBe('3,90 m')
     expect(rowValue('Exterior')).toBe('4,10 m')
-    expect(rowValue('Thickness')).toBe('10 cm')
+    expect(screen.getByText('Thickness').nextElementSibling).toHaveProperty('value', '10')
   })
 
   it('shows a single hors-tout Length when no orientation is claimed', () => {
     const { svg } = setup(standalonePlan())
     marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 })
     expect(rowValue('Length')).toBe('4,10 m')
-    expect(rowValue('Thickness')).toBe('10 cm')
+    expect(screen.getByText('Thickness').nextElementSibling).toHaveProperty('value', '10')
     expect(screen.queryByText('Interior')).toBeNull()
     expect(screen.queryByText('Exterior')).toBeNull()
   })
@@ -83,7 +83,7 @@ describe('selection panel on a wall', () => {
   })
 })
 
-describe('selection panel on openings', () => {
+describe('tool panel on selected openings', () => {
   it('shows Width, Hinge/Swing options and Delete for a door', () => {
     const { svg } = setup(doorPlan())
     marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 })
@@ -112,7 +112,76 @@ describe('selection panel on openings', () => {
   })
 })
 
-describe('selection panel visibility', () => {
+describe('tool defaults facet', () => {
+  it('shows the active tool defaults on an empty selection, nothing in Select', () => {
+    setup()
+    expect(panel()).toBeNull()
+    fireEvent.keyDown(window, { key: '2' })
+    expect(panel()).toBeTruthy()
+    expect(screen.getByText('Wall')).toBeTruthy()
+    const thickness = document.querySelector<HTMLSelectElement>('.panel select')!
+    expect(thickness.value).toBe('10')
+    expect(screen.queryByLabelText('Delete')).toBeNull()
+    fireEvent.keyDown(window, { key: '3' })
+    expect(screen.getByText('Door')).toBeTruthy()
+    expect(document.querySelector<HTMLSelectElement>('.panel select')!.value).toBe('90')
+    expect(screen.getByText('Hinge')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '4' })
+    expect(screen.getByText('Window')).toBeTruthy()
+    expect(document.querySelector<HTMLSelectElement>('.panel select')!.value).toBe('120')
+    expect(screen.queryByText('Hinge')).toBeNull()
+    fireEvent.keyDown(window, { key: '1' })
+    expect(panel()).toBeNull()
+  })
+
+  it('draws walls with the preconfigured thickness', () => {
+    const { svg } = setup(emptyPlan())
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.change(document.querySelector('.panel select')!, { target: { value: '20' } })
+    fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 0, 0) })
+    fireEvent.pointerUp(svg)
+    fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 200, 0) })
+    fireEvent.pointerUp(svg)
+    const walls = Object.values(usePlanStore.getState().plan.walls)
+    expect(walls).toHaveLength(1)
+    expect(walls[0].thickness).toBe(20)
+  })
+
+  it('places doors with the preconfigured width, hinge and swing', () => {
+    const { svg } = setup(standalonePlan())
+    fireEvent.keyDown(window, { key: '3' })
+    fireEvent.change(document.querySelector('.panel select')!, { target: { value: '80' } })
+    fireEvent.click(screen.getByText('Hinge'))
+    fireEvent.click(screen.getByText('Swing'))
+    fireEvent.pointerMove(svg, clientAt(svg, 200, 0))
+    fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 200, 0) })
+    fireEvent.pointerUp(svg)
+    const door = Object.values(usePlanStore.getState().plan.openings)[0]
+    expect(door).toMatchObject({ type: 'door', width: 80, hingeSide: 'end', swing: 'out' })
+  })
+
+  it('adopts the width of an edited selected opening as the tool default (sticky)', () => {
+    const { svg } = setup(doorPlan())
+    marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 })
+    fireEvent.change(document.querySelector('.panel select')!, { target: { value: '100' } })
+    fireEvent.keyDown(window, { key: '3' })
+    expect(document.querySelector<HTMLSelectElement>('.panel select')!.value).toBe('100')
+  })
+
+  it('edits a selected wall thickness and makes it the tool default (sticky)', () => {
+    const { svg } = setup(standalonePlan())
+    marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 })
+    fireEvent.change(document.querySelector('.panel select')!, { target: { value: '25' } })
+    const wall = Object.values(usePlanStore.getState().plan.walls)[0]
+    expect(wall.thickness).toBe(25)
+    // hors-tout follows the new thickness
+    expect(rowValue('Length')).toBe('4,25 m')
+    fireEvent.keyDown(window, { key: '2' })
+    expect(document.querySelector<HTMLSelectElement>('.panel select')!.value).toBe('25')
+  })
+})
+
+describe('tool panel visibility', () => {
   it('is hidden on an empty selection and after Escape clears it', () => {
     const { svg } = setup()
     expect(panel()).toBeNull()
@@ -130,7 +199,7 @@ describe('selection panel visibility', () => {
   })
 })
 
-describe('selection panel on a multi-selection', () => {
+describe('tool panel on a multi-selection', () => {
   it('shows the element count and Delete removes everything', () => {
     const { svg } = setup()
     marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 450 })

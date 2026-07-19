@@ -39,10 +39,10 @@ import {
 import type { Snap } from '../model/snap'
 import { snapDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan } from '../model/types'
-import { defaultOpeningWidth, WALL_THICKNESS } from '../model/types'
+import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import type { RoomTextBlock } from './render'
-import { SelectionPanel } from './SelectionPanel'
+import { ToolPanel } from './ToolPanel'
 import {
   COLORS,
   DimLabel,
@@ -59,9 +59,10 @@ import {
   WallHit,
   WallLine,
 } from './render'
+import type { Tool, ToolDefaults } from './tools'
+import { initialToolDefaults } from './tools'
 import { useSpaceHeld, useView } from './useView'
 
-type Tool = 'select' | 'wall' | 'door' | 'window'
 type Drag =
   | { kind: 'pan'; x: number; y: number }
   | { kind: 'point'; id: string }
@@ -117,6 +118,7 @@ export default function Editor() {
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [tool, setTool] = useState<Tool>('select')
+  const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
   // A wall chain being drawn. The first click is held as a pending snap —
@@ -238,7 +240,10 @@ export default function Editor() {
       const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current })
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
         // clicking the chain's start point closes the room
-        setPlan((p) => commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start))[0])
+        setPlan(
+          (p) =>
+            commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start), defaults.wallThickness)[0],
+        )
         setChain(null)
         setSnap(null)
         return
@@ -248,7 +253,12 @@ export default function Editor() {
         // and committing the wall land in a single history entry (ADR 0002)
         const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last)
         const [withStart, startId] = commitPoint(plan, startSnap)
-        const [next, pointId] = commitWall(withStart, pointSnap(withStart, startId), s)
+        const [next, pointId] = commitWall(
+          withStart,
+          pointSnap(withStart, startId),
+          s,
+          defaults.wallThickness,
+        )
         setPlan(() => next)
         setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId })
       } else {
@@ -257,7 +267,11 @@ export default function Editor() {
     } else if ((tool === 'door' || tool === 'window') && openPreview) {
       // keep the placement tool active, but select the new opening so its
       // panel shows right away
-      const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset)
+      const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset, {
+        width: tool === 'door' ? defaults.doorWidth : defaults.windowWidth,
+        hingeSide: defaults.doorHinge,
+        swing: defaults.doorSwing,
+      })
       setPlan(() => next)
       setSel(id ? [{ type: 'opening', id }] : [])
     } else if (tool === 'select') {
@@ -366,7 +380,8 @@ export default function Editor() {
     } else if (tool === 'door' || tool === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
       if (near) {
-        const offset = clampOpeningOffset(plan, near.wall, near.t, defaultOpeningWidth(tool))
+        const width = tool === 'door' ? defaults.doorWidth : defaults.windowWidth
+        const offset = clampOpeningOffset(plan, near.wall, near.t, width)
         setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset })
       } else setOpenPreview(null)
     }
@@ -429,16 +444,16 @@ export default function Editor() {
             wallId: openPreview.wallId,
             type: 'door',
             offset: openPreview.offset,
-            width: defaultOpeningWidth('door'),
-            hingeSide: 'start',
-            swing: 'in',
+            width: defaults.doorWidth,
+            hingeSide: defaults.doorHinge,
+            swing: defaults.doorSwing,
           }
         : {
             id: '__ghost',
             wallId: openPreview.wallId,
             type: 'window',
             offset: openPreview.offset,
-            width: defaultOpeningWidth('window'),
+            width: defaults.windowWidth,
           }
       : null
 
@@ -632,7 +647,7 @@ export default function Editor() {
           <RubberWall
             from={'pending' in chain ? chain.pending : plan.points[chain.last]}
             to={snap}
-            thickness={WALL_THICKNESS}
+            thickness={defaults.wallThickness}
           />
         )}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
@@ -747,11 +762,14 @@ export default function Editor() {
         </div>
       </div>
 
-      {/* selection panel, fixed floating card on the left (selection-panel spec) */}
-      <SelectionPanel
+      {/* tool panel, fixed floating card on the left (CONTEXT.md: Tool panel) */}
+      <ToolPanel
         plan={plan}
         rooms={rooms}
         sel={sel}
+        tool={tool}
+        defaults={defaults}
+        setDefaults={setDefaults}
         setPlan={setPlan}
         onDelete={() => deleteSelection(sel)}
       />

@@ -92,12 +92,24 @@ it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
-**Selection panel**:
-The fixed floating card on the editor's left showing the current Selection's
-parameters and actions — per-element measures, opening options, delete.
-Hidden when the Selection is empty. Its values are derived on render from the
-same silhouette readings as the Dimensions, never stored.
-_Avoid_: Popover, inspector, properties dialog
+**Tool panel**:
+The fixed floating card on the editor's left. When the Selection is non-empty
+it shows the Selection's parameters and actions — per-element measures,
+opening options, delete; otherwise it shows the active Tool's Tool defaults,
+so the next element is configured before it is placed. Hidden only when the
+Selection is empty and the Select tool is active. Selection values are
+derived on render from the same silhouette readings as the Dimensions, never
+stored.
+_Avoid_: Selection panel, popover, inspector, properties dialog
+
+**Tool defaults**:
+The per-tool parameters every newly placed element inherits — wall
+thickness, opening width, door hinge side and swing. Editing a placed
+element's measure (width, thickness) updates the matching tool default (last
+used wins); hinge and swing corrections stay local to their door. Pure
+per-session editor state: never part of the plan, reset to the built-in
+values on load.
+_Avoid_: Tool options, tool settings, presets
 
 **Snap**:
 The default magnetic guidance of any placement or move in the editor:
