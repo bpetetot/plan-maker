@@ -357,10 +357,10 @@ export function DimLabel({
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
-  // 11px text ≈ 5.5 units per character; the line breaks around it. The ticks
+  // 9px text ≈ 5 units per character; the line breaks around it. The ticks
   // always mark the measured extent — that legibility is the point when a
   // value refines at a new junction — even when no line piece has room.
-  const gapHalf = label.length * 2.75 + 4
+  const gapHalf = label.length * 2.5 + 4
   return (
     <g>
       {value >= 1 && (
@@ -479,7 +479,7 @@ export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: O
               />
             )}
             <g transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}>
-              <text textAnchor="middle" dominantBaseline="central" className="dim dim-placement">
+              <text textAnchor="middle" dominantBaseline="central" className="dim">
                 {label}
               </text>
             </g>

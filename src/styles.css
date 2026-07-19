@@ -103,7 +103,7 @@ button:disabled {
 
 svg text.dim {
   font:
-    11px system-ui,
+    9px system-ui,
     sans-serif;
   fill: var(--dim-text);
   paint-order: stroke;
@@ -115,9 +115,6 @@ svg text.dim {
 svg text.dim-live {
   fill: var(--accent);
   font-weight: 600;
-}
-svg text.dim-placement {
-  font-size: 9px;
 }
 svg text.room-name {
   font:
