@@ -191,3 +191,11 @@ where the view was. Applied after any replacement of the plan — opening a
 file, restoring at startup, resetting — and on demand. Pure editor behavior:
 never part of the plan.
 _Avoid_: Fit zoom, zoom to fit, center
+
+**Zoom**:
+How far the view is zoomed in or out, expressed relative to the default
+framing: 100% means the view frames the same area an empty plan opens with,
+whatever the screen size, so resizing the window leaves it unchanged. Never a
+paper scale or a physical size. Pure editor state: never part of the plan,
+never exported.
+_Avoid_: Zoom level, scale, magnification

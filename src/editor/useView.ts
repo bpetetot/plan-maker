@@ -94,6 +94,12 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
   const visibleView = visibleRect(view, size.w, size.h)
   const zoomScale = size.w > 0 ? size.w / visibleView.w : 1
 
+  // Zoom relative to the default framing (glossary: Zoom): 1 whenever the
+  // view frames DEFAULT_VIEW in the current window, whatever its size. The
+  // reference follows the window, so resizing leaves the ratio stable.
+  const defaultScale = size.w > 0 ? size.w / visibleRect(DEFAULT_VIEW, size.w, size.h).w : 1
+  const zoomRatio = zoomScale / defaultScale
+
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
@@ -107,7 +113,7 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, visibleView, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan }
+  return { view, visibleView, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan }
 }
 
 export function useSpaceHeld() {
