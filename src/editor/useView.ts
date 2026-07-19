@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { planBBox } from '../model/geometry'
 import type { Plan } from '../model/types'
 
@@ -95,9 +96,11 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
 
   // On-screen size of the SVG, tracked as state so the viewBox and the zoom
   // percentage derive from it during render. A size change re-renders with the
-  // same camera: that is the whole resize behavior.
+  // same camera: that is the whole resize behavior. Layout effect: the first
+  // measure must commit before the first paint, or the unmeasured fallback
+  // frame flashes for one frame.
   const [size, setSize] = useState({ w: 0, h: 0 })
-  useEffect(() => {
+  useLayoutEffect(() => {
     const svg = svgRef.current
     if (!svg) return
     const measure = () => {
@@ -105,14 +108,19 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
       setSize((s) => (s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height }))
     }
     measure()
+    // ResizeObserver fires after layout, before paint. Committing synchronously
+    // paints the new size and its viewBox in the same frame; an async commit
+    // paints one frame with the old viewBox — "meet" recenters it, which reads
+    // as jitter while the window edge is dragged.
+    const syncMeasure = () => flushSync(measure)
     if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(measure)
+      const ro = new ResizeObserver(syncMeasure)
       ro.observe(svg)
       return () => ro.disconnect()
     }
     // jsdom has no ResizeObserver; tests drive resizes through window events
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    window.addEventListener('resize', syncMeasure)
+    return () => window.removeEventListener('resize', syncMeasure)
     // svgRef is stable; the ref is filled by the time effects run
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
