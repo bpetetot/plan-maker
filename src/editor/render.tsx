@@ -263,9 +263,9 @@ export function OpeningHit({
 }
 
 // Distance from the wall centerline to the line the dimension text is
-// vertically centered on — the same line the rails materialise (4px gap from
-// the wall face + half the 11px text height).
-const dimLineOffset = (wall: Wall) => wall.thickness + 8
+// vertically centered on — the same line the rails materialise. A constant
+// 10 cm from the wall face, whatever the thickness.
+const dimLineOffset = (wall: Wall) => wall.thickness / 2 + 10
 
 // Frame of a wall's dimension line, shared by everything that draws on it:
 // unit axis, ISO reading angle (and whether it flipped the wall's own frame),

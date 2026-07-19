@@ -86,9 +86,10 @@ broken dimension line and perpendicular ticks marking the measured extent.
 The value is computed from the plan, never stored. Its placement — where along
 the wall it sits and on which side — belongs to the plan, like any edit;
 dragging it is purely positional, and crossing sides switches between the
-interior and exterior readings. Its text always reads from the bottom or the
-right of the sheet (ISO convention) — the reading direction never depends on
-which side of the wall it sits.
+interior and exterior readings. It sits at a constant distance from the Face
+it measures, whatever the wall's thickness. Its text always reads from the
+bottom or the right of the sheet (ISO convention) — the reading direction
+never depends on which side of the wall it sits.
 _Avoid_: Measurement, cote
 
 **Room area**:

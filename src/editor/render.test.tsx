@@ -8,9 +8,15 @@ import { COLORS, DimLabel, JunctionPatches, labelAngle, RubberWall, WallLine } f
 
 afterEach(cleanup)
 
-// A single-wall plan from (x1,y1) to (x2,y2), thickness 10.
-function planWith(x1: number, y1: number, x2: number, y2: number): { plan: Plan; wall: Wall } {
-  const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness: 10 }
+// A single-wall plan from (x1,y1) to (x2,y2), thickness 10 unless given.
+function planWith(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  thickness = 10,
+): { plan: Plan; wall: Wall } {
+  const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness }
   const plan: Plan = {
     points: {
       a: { id: 'a', x: x1, y: y1 },
@@ -146,14 +152,27 @@ describe('DimLabel on a vertical wall', () => {
   it('defaults to the left side of the wall (above the reading line)', () => {
     const { plan, wall } = planWith(0, 0, 0, 200)
     const { group } = renderDim(plan, wall)
-    // the text group sits on the dimension line, 18 left of the wall axis
-    expect(group.getAttribute('transform')).toBe('translate(-18,100) rotate(-90)')
+    // the text group sits on the dimension line, 15 left of the wall axis
+    expect(group.getAttribute('transform')).toBe('translate(-15,100) rotate(-90)')
+  })
+
+  it('keeps a constant 10 cm distance from the face, whatever the thickness', () => {
+    // face at thickness/2 from the axis, dimension line 10 cm beyond it
+    for (const [thickness, off] of [
+      [10, 15],
+      [30, 25],
+    ] as const) {
+      const { plan, wall } = planWith(0, 0, 0, 200, thickness)
+      const { group } = renderDim(plan, wall)
+      expect(group.getAttribute('transform')).toBe(`translate(-${off},100) rotate(-90)`)
+      cleanup()
+    }
   })
 
   it('keeps a stored placement on its geometric side', () => {
     // Geometric right is side -1 when drawn downward, side +1 when drawn
     // upward (side is a sign along the start→end left normal). Both must
-    // land 18 right of the wall axis.
+    // land 15 right of the wall axis.
     for (const [y1, y2, side] of [
       [0, 200, -1],
       [200, 0, 1],
@@ -161,7 +180,7 @@ describe('DimLabel on a vertical wall', () => {
       const { plan, wall } = planWith(0, y1, 0, y2)
       wall.dimPlacement = { t: 0.5, side }
       const { group } = renderDim(plan, wall)
-      expect(group.getAttribute('transform')).toBe('translate(18,100) rotate(-90)')
+      expect(group.getAttribute('transform')).toBe('translate(15,100) rotate(-90)')
       cleanup()
     }
   })

@@ -72,9 +72,9 @@ describe('PlacementDims', () => {
     const groups = Array.from(container.querySelectorAll('g[transform]')).map((g) =>
       g.getAttribute('transform'),
     )
-    // thickness 10 → offset 18 above the wall, like DimLabel's default;
+    // thickness 10 → offset 15 above the wall, like DimLabel's default;
     // segments run from the overhang (-5) to the opening edges (60 / 140)
-    expect(groups).toEqual(['translate(27.5,-18) rotate(0)', 'translate(272.5,-18) rotate(0)'])
+    expect(groups).toEqual(['translate(27.5,-15) rotate(0)', 'translate(272.5,-15) rotate(0)'])
   })
 
   it('follows a custom dimPlacement side when the wall borders no room', () => {
@@ -82,7 +82,7 @@ describe('PlacementDims', () => {
     plan.walls.w.dimPlacement = { t: 0.5, side: 1 }
     const container = renderDims(plan, opening)
     const group = container.querySelector('g[transform]')!
-    expect(group.getAttribute('transform')).toBe('translate(27.5,18) rotate(0)')
+    expect(group.getAttribute('transform')).toBe('translate(27.5,15) rotate(0)')
   })
 
   it('always sits on the interior side when the wall borders exactly one room', () => {
@@ -100,7 +100,7 @@ describe('PlacementDims', () => {
     expect(texts).toEqual(['1,55 m', '1,55 m'])
     // the dims sit below the wall (interior side): positive y offset
     expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
-      'translate(82.5,18) rotate(0)',
+      'translate(82.5,15) rotate(0)',
     )
     cleanup()
     // dragging the Dimension outside changes nothing for placement dims
