@@ -127,7 +127,7 @@ const isTypingTarget = (e: KeyboardEvent) => {
 
 export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
-  const { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan } = useView(svgRef)
+  const { view, visibleView, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
   const planEpoch = usePlanStore((s) => s.planEpoch)
@@ -571,7 +571,7 @@ export default function Editor() {
         onDoubleClick={onCanvasDoubleClick}
       >
         {/* purely visual (CONTEXT.md: Grid) — grid snapping stays active either way */}
-        {gridVisible && <GridLines view={view} pxPerCm={zoomScale} />}
+        {gridVisible && <GridLines view={visibleView} pxPerCm={zoomScale} />}
         {Object.values(plan.walls).map((wall) => (
           <WallLine
             key={wall.id}
@@ -782,6 +782,7 @@ export default function Editor() {
           >
             <ZoomIn size={16} aria-hidden />
           </button>
+          <span className="floating-sep" />
           <button
             className={gridVisible ? 'floating-btn icon active' : 'floating-btn icon'}
             title={gridVisible ? 'Hide grid' : 'Show grid'}

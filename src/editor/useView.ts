@@ -11,6 +11,17 @@ export interface View {
 
 const DEFAULT_VIEW: View = { x: -80, y: -80, w: 820, h: 620 }
 
+// The plan rect actually on screen. With preserveAspectRatio "xMidYMid meet"
+// the screen shows more than the viewBox on the non-limiting axis; anything
+// drawn to cover the screen (the Grid) must cover this rect, not the viewBox.
+export function visibleRect(view: View, screenW: number, screenH: number): View {
+  const scale = Math.min(screenW / view.w, screenH / view.h)
+  if (!(scale > 0)) return view
+  const w = screenW / scale
+  const h = screenH / scale
+  return { x: view.x + (view.w - w) / 2, y: view.y + (view.h - h) / 2, w, h }
+}
+
 // Zoom/pan via the SVG viewBox (spec §3): scroll zooms toward the cursor,
 // callers pan by screen pixels, Fit frames the plan's bounding box.
 export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
@@ -78,9 +89,10 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Same rule as preserveAspectRatio="xMidYMid meet": uniform scale, min of
-  // the two ratios. This is the render-safe counterpart of pxPerCm().
-  const zoomScale = size.w > 0 ? Math.min(size.w / view.w, size.h / view.h) : 1
+  // The "meet" scale, read off the visible rect (screen px per plan cm).
+  // This is the render-safe counterpart of pxPerCm().
+  const visibleView = visibleRect(view, size.w, size.h)
+  const zoomScale = size.w > 0 ? size.w / visibleView.w : 1
 
   useEffect(() => {
     const svg = svgRef.current
@@ -95,7 +107,7 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan }
+  return { view, visibleView, toPlan, pxPerCm, zoomScale, zoomCenter, panByPx, fitPlan }
 }
 
 export function useSpaceHeld() {

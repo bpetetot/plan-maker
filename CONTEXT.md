@@ -147,7 +147,8 @@ _Avoid_: Free mode, no-grid mode
 
 **Grid**:
 The sheet's visible ruling, materializing what Snap aligns to: minor grid
-lines every 10 cm — the snap step — and major grid lines every meter. Purely
+lines — dashed — every 10 cm, the snap step, and major grid lines — solid —
+every 50 cm. Purely
 visual: showing or hiding it never affects Snap. Always legible, never noise:
 minor lines fade out when their cells get too small on screen, major lines
 follow at extreme zoom-out. Shown by default; the show/hide choice is a

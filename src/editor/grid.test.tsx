@@ -7,7 +7,7 @@ import { GridLines, gridLevels, loadGridVisible, saveGridVisible } from './grid'
 // too small on screen"): a line family is fully opaque while its cells are
 // 8 px or wider on screen, gone at 4 px or below, linear in between.
 describe('gridLevels', () => {
-  it('shows both families fully at 100% zoom (10 cm = 10 px, 1 m = 100 px)', () => {
+  it('shows both families fully at 100% zoom (10 cm = 10 px, 50 cm = 50 px)', () => {
     expect(gridLevels(1)).toEqual({ minor: 1, major: 1 })
   })
 
@@ -19,12 +19,12 @@ describe('gridLevels', () => {
     expect(gridLevels(0.4)).toEqual({ minor: 0, major: 1 })
   })
 
-  it('fades the major family halfway when meters are 6 px', () => {
-    expect(gridLevels(0.06)).toEqual({ minor: 0, major: 0.5 })
+  it('fades the major family halfway when 50 cm cells are 6 px', () => {
+    expect(gridLevels(0.12)).toEqual({ minor: 0, major: 0.5 })
   })
 
-  it('drops everything when even meters are 4 px or less', () => {
-    expect(gridLevels(0.04)).toEqual({ minor: 0, major: 0 })
+  it('drops everything when even 50 cm cells are 4 px or less', () => {
+    expect(gridLevels(0.08)).toEqual({ minor: 0, major: 0 })
   })
 })
 
@@ -60,11 +60,17 @@ describe('GridLines', () => {
     return container
   }
 
-  it('rules the view every 10 cm, meter lines drawn as major', () => {
-    // x: 31 multiples of 10 in [0, 300], 4 of them meters; y: 21 in [0, 200], 3 meters
+  it('rules the view every 10 cm, 50 cm lines drawn as major', () => {
+    // x: 31 multiples of 10 in [0, 300], 7 of them 50s; y: 21 in [0, 200], 5 of them 50s
     const c = draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
-    expect(c.querySelectorAll('[data-grid="minor"] line')).toHaveLength(27 + 18)
-    expect(c.querySelectorAll('[data-grid="major"] line')).toHaveLength(4 + 3)
+    expect(c.querySelectorAll('[data-grid="minor"] line')).toHaveLength(24 + 16)
+    expect(c.querySelectorAll('[data-grid="major"] line')).toHaveLength(7 + 5)
+  })
+
+  it('dashes the minor family, keeps the major solid', () => {
+    const c = draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
+    expect(c.querySelector('[data-grid="minor"]')?.getAttribute('stroke-dasharray')).toBe('3 3')
+    expect(c.querySelector('[data-grid="major"]')?.hasAttribute('stroke-dasharray')).toBe(false)
   })
 
   it('spans each line across the whole view', () => {

@@ -1,11 +1,11 @@
 // Grid (see CONTEXT.md): the sheet's visible ruling — minor lines every
-// 10 cm (the snap step), major lines every meter. Purely visual; the
+// 10 cm (the snap step), major lines every 50 cm. Purely visual; the
 // show/hide choice is a per-device preference, like the Theme.
 import { GRID } from '../model/types'
 import type { View } from './useView'
 
 const MINOR = GRID
-const MAJOR = 10 * GRID
+const MAJOR = 5 * GRID
 
 // A line family is fully opaque while its cells are FULL_PX or wider on
 // screen, gone at GONE_PX or below, linear in between — the grid stays
@@ -42,7 +42,15 @@ function GridFamily({
     <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} vectorEffect="non-scaling-stroke" />
   )
   return (
-    <g data-grid={kind} opacity={opacity} stroke={`var(--grid-${kind})`} strokeWidth={1}>
+    <g
+      data-grid={kind}
+      opacity={opacity}
+      stroke={`var(--grid-${kind})`}
+      strokeWidth={1}
+      // dashes are in screen px too under non-scaling-stroke — the texture
+      // stays constant at any zoom
+      strokeDasharray={kind === 'minor' ? '3 3' : undefined}
+    >
       {ticks(view.x, view.x + view.w, step)
         .filter((x) => kind === 'major' || x % MAJOR !== 0)
         .map((x) => line(`v${x}`, x, view.y, x, view.y + view.h))}

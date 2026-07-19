@@ -123,7 +123,7 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 - To wall endpoints — green ring feedback.
 - 45° axis lock — dashed green guide from the anchor.
 - 10 cm grid fallback — small green dot. The sheet shows a visible grid by
-  default — minor lines every 10 cm (the snap step), major lines every meter,
+  default — dashed minor lines every 10 cm (the snap step), solid major lines every 50 cm,
   fading out when too dense on screen. A toggle next to the zoom controls
   shows/hides it (per-device preference); purely visual, grid snapping stays
   active either way.
