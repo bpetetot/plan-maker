@@ -49,7 +49,7 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
 // fall back to black in the standalone SVG.
 const EXPORT_STYLE = `
   svg { --wall: #2f2f2f; --sheet: #ffffff; --rail: #c9cdd4; }
-  text.dim { font: 11px system-ui, sans-serif; fill: #8a8a8a; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+  text.dim { font: 11px system-ui, sans-serif; fill: #8a8a8a; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
   text.room-name { font: 600 12px system-ui, sans-serif; fill: #374151; }
   text.room-area { font: 12px system-ui, sans-serif; fill: #6b7280; }
 `

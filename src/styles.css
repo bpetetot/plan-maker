@@ -108,8 +108,11 @@ svg text.dim {
   fill: var(--dim-text);
   paint-order: stroke;
   stroke: var(--sheet);
-  /* thick enough to fully mask a rail passing through the text, spaces included */
-  stroke-width: 6px;
+  /* thick enough to fully mask a rail passing through the text, spaces
+     included; round joins so acute glyph corners don't grow miter spikes */
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
   user-select: none;
 }
 svg text.dim-live {
