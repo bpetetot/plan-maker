@@ -38,5 +38,6 @@ importing a plan normalizes it, healing plans produced before this decision.
   physically identical).
 - The merge happens inside the gesture's history entry: undo restores the
   exact pre-gesture plan, including the merged-away point.
-- Dragging a point onto a wall's *body* still bypasses ADR 0002's invariant —
-  known limitation, tracked as issue 08; only point-on-point contacts merge.
+- Dragging a point onto a wall's *body* is ADR 0002's invariant, not this
+  one: since issue 08, drag end also planarizes — coincident points merge
+  first, then walls split at the remaining junctions.

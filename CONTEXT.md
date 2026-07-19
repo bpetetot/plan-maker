@@ -19,9 +19,10 @@ _Avoid_: Vertex, node, corner
 
 **Wall**:
 A straight edge between two points, with a thickness. The only thing the user
-draws to shape the plan. Walls only meet at Points: drawing a wall onto or
-across another wall splits the existing wall at the junction — no wall ever
-crosses or overlaps another away from a shared Point. Drawing and snapping
+draws to shape the plan. Walls only meet at Points: any gesture — drawing or
+dragging — that lands a wall onto or across another wall splits the existing
+wall at the junction — no wall ever crosses or overlaps another away from a
+shared Point. Drawing and snapping
 happen on the axis — the line between the two Points; the thickness spreads
 half on each side of it. The length drawn or typed is the overall (hors-tout)
 extent — axis length plus the thickness — and the ghost previews the body

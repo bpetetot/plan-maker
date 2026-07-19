@@ -1,0 +1,94 @@
+// @vitest-environment jsdom
+// Planar insertion at the end of a drag (issue 08, extending ADR 0002): a
+// point dropped onto another wall's body splits that wall (T junction), and a
+// dragged wall crossing another gets both split at the intersection (X
+// junction) — the whole gesture one history entry.
+import { cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import type { Plan } from '../model/types'
+import { usePlanStore } from '../store/planStore'
+import Editor from './Editor'
+import { clientAt, installSvgGeometry } from './testHelpers'
+
+beforeAll(installSvgGeometry)
+
+beforeEach(() => {
+  usePlanStore.temporal.getState().clear()
+})
+
+afterEach(cleanup)
+
+// A long horizontal wall and a detached vertical wall below it.
+function tPlan(): Plan {
+  return {
+    points: {
+      a: { id: 'a', x: 0, y: 0 },
+      b: { id: 'b', x: 400, y: 0 },
+      c: { id: 'c', x: 200, y: 100 },
+      d: { id: 'd', x: 200, y: 300 },
+    },
+    walls: {
+      w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 },
+      w2: { id: 'w2', startPointId: 'c', endPointId: 'd', thickness: 10 },
+    },
+    openings: {},
+    roomLabels: {},
+  }
+}
+
+const plan = () => usePlanStore.getState().plan
+const undoDepth = () => usePlanStore.temporal.getState().pastStates.length
+
+function setup() {
+  usePlanStore.setState({ plan: tPlan(), planEpoch: 0 })
+  usePlanStore.temporal.getState().clear()
+  const { container } = render(<Editor />)
+  const svg = container.querySelector('svg')!
+  return { svg }
+}
+
+function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b: { x: number; y: number }) {
+  fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, a.x, a.y) })
+  fireEvent.pointerMove(svg, clientAt(svg, b.x, b.y))
+  fireEvent.pointerUp(svg)
+}
+
+describe('point drag ending on a wall body', () => {
+  it('splits the host wall at the dropped point (T junction), in one history entry', () => {
+    const { svg } = setup()
+    // select w2 to reveal its point handles
+    marqueeSelect(svg, { x: 150, y: 50 }, { x: 250, y: 350 })
+    const handles = svg.querySelectorAll('circle')
+    expect(handles).toHaveLength(2)
+    // drag c (200,100) onto w1's body at (200,0)
+    fireEvent.pointerDown(handles[0], { button: 0, ...clientAt(svg, 200, 100) })
+    fireEvent.pointerMove(svg, clientAt(svg, 200, 0))
+    fireEvent.pointerUp(svg)
+    expect(plan().points.c).toMatchObject({ x: 200, y: 0 })
+    expect(Object.keys(plan().walls)).toHaveLength(3)
+    expect(plan().walls.w1).toMatchObject({ startPointId: 'a', endPointId: 'c' })
+    const endHalf = Object.values(plan().walls).find((w) => w.startPointId === 'c' && w.endPointId === 'b')
+    expect(endHalf).toBeDefined()
+    expect(undoDepth()).toBe(1)
+  })
+})
+
+describe('group move ending wall-across-wall', () => {
+  it('splits both walls at the crossing (X junction), in one history entry', () => {
+    const { svg } = setup()
+    // select w2 and move it up by 150: it now spans (200,-50)→(200,150), crossing w1
+    marqueeSelect(svg, { x: 150, y: 150 }, { x: 250, y: 350 })
+    const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[1]
+    fireEvent.pointerDown(wallHit, { button: 0, ...clientAt(svg, 200, 200) })
+    fireEvent.pointerMove(svg, clientAt(svg, 200, 50))
+    fireEvent.pointerUp(svg)
+    const cross = Object.values(plan().points).find((p) => p.x === 200 && p.y === 0)!
+    expect(cross).toBeDefined()
+    expect(Object.keys(plan().walls)).toHaveLength(4)
+    const atCross = Object.values(plan().walls).filter(
+      (w) => w.startPointId === cross.id || w.endPointId === cross.id,
+    )
+    expect(atCross).toHaveLength(4)
+    expect(undoDepth()).toBe(1)
+  })
+})

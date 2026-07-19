@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import type { Vec } from './geometry'
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry'
 import type { Snap } from './snap'
 import type { Opening, Plan, Wall } from './types'
@@ -105,6 +106,28 @@ function findPointNear(plan: Plan, x: number, y: number): string | null {
   return best
 }
 
+// The shared Point at (x, y), reusing one within the junction tolerance
+// before minting a new one.
+function ensurePointAt(plan: Plan, x: number, y: number): [Plan, string] {
+  const existing = findPointNear(plan, x, y)
+  if (existing) return [plan, existing]
+  const id = newId()
+  return [{ ...plan, points: { ...plan.points, [id]: { id, x, y } } }, id]
+}
+
+// Distance along a→b of p's projection when p lies on the segment's open
+// interior — within the junction tolerance of the axis, clear of both ends —
+// null otherwise.
+function interiorProjection(a: Vec, b: Vec, p: Vec): number | null {
+  const length = distance(a.x, a.y, b.x, b.y)
+  if (length < 1) return null
+  const t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / length
+  if (t < JUNCTION_TOLERANCE || t > length - JUNCTION_TOLERANCE) return null
+  const off = Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / length
+  if (off > JUNCTION_TOLERANCE) return null
+  return t
+}
+
 // Resolves a drawing click to a point id, splitting the host wall when the
 // snap targets a wall body. The host is looked up at resolution time (not
 // trusted from the snap) because an earlier split may have replaced it.
@@ -157,10 +180,8 @@ export function commitWall(
   // existing points lying on the new wall's interior (reversed T junction)
   for (const point of Object.values(next.points)) {
     if (point.id === startId || point.id === endId) continue
-    const t = along(point.x, point.y)
-    if (t < JUNCTION_TOLERANCE || t > length - JUNCTION_TOLERANCE) continue
-    const off = Math.abs((b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)) / length
-    if (off <= JUNCTION_TOLERANCE) cuts.set(point.id, t)
+    const t = interiorProjection(a, b, point)
+    if (t !== null) cuts.set(point.id, t)
   }
 
   for (const wall of Object.values(next.walls)) {
@@ -169,11 +190,8 @@ export function commitWall(
     if (!crossing) continue
     const x = Math.round(crossing.x)
     const y = Math.round(crossing.y)
-    let pointId = findPointNear(next, x, y)
-    if (!pointId) {
-      pointId = newId()
-      next = { ...next, points: { ...next.points, [pointId]: { id: pointId, x, y } } }
-    }
+    let pointId: string
+    ;[next, pointId] = ensurePointAt(next, x, y)
     next = splitWall(next, wall.id, pointId)
     if (pointId !== startId && pointId !== endId) cuts.set(pointId, along(x, y))
   }
@@ -184,48 +202,39 @@ export function commitWall(
   return [next, endId]
 }
 
-// Merges the absorbed point into the survivor: walls are rewired to the
-// survivor; a wall whose two ends collapse onto it is deleted with its
-// openings; a wall made identical to another (same endpoint pair) is deleted
-// and its openings transpose onto the surviving twin — the geometry is the
-// same; when the twins run in opposite directions the offset mirrors and a
-// door's wall-relative hinge and swing flip with the frame, keeping the door
-// physically identical.
-function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
-  const points = { ...plan.points }
-  delete points[absorbedId]
-
+// Two walls spanning the same endpoint pair collapse into the first-seen one
+// (ADR 0003); the removed twin's openings transpose onto the survivor — the
+// geometry is the same; when the twins run in opposite directions the offset
+// mirrors and a door's wall-relative hinge and swing flip with the frame,
+// keeping the door physically identical.
+function dedupeTwinWalls(plan: Plan): Plan {
   const walls: Record<string, Wall> = {}
-  const twinOf = new Map<string, string>() // removed twin id → surviving wall id
-  const byEndpoints = new Map<string, string>() // unordered endpoint pair → wall id
+  const twinOf = new Map<string, Wall>() // removed twin id → surviving wall
+  const byEndpoints = new Map<string, Wall>() // unordered endpoint pair → wall
   for (const wall of Object.values(plan.walls)) {
-    const startPointId = wall.startPointId === absorbedId ? survivorId : wall.startPointId
-    const endPointId = wall.endPointId === absorbedId ? survivorId : wall.endPointId
-    if (startPointId === endPointId) continue // degenerate: both ends merged
-    const pair = JSON.stringify([startPointId, endPointId].sort())
+    const pair = JSON.stringify([wall.startPointId, wall.endPointId].sort())
     const twin = byEndpoints.get(pair)
     if (twin) {
       twinOf.set(wall.id, twin)
       continue
     }
-    byEndpoints.set(pair, wall.id)
-    walls[wall.id] = { ...wall, startPointId, endPointId }
+    byEndpoints.set(pair, wall)
+    walls[wall.id] = wall
   }
+  if (twinOf.size === 0) return plan
 
-  const next = { ...plan, points, walls }
+  const next = { ...plan, walls }
   const openings: Record<string, Opening> = {}
   for (const opening of Object.values(plan.openings)) {
-    if (walls[opening.wallId]) {
+    const host = twinOf.get(opening.wallId)
+    if (!host) {
       openings[opening.id] = opening
       continue
     }
-    const hostId = twinOf.get(opening.wallId)
-    if (!hostId) continue // its wall degenerated: the opening goes with it
     const removed = plan.walls[opening.wallId]
-    const removedStart = removed.startPointId === absorbedId ? survivorId : removed.startPointId
-    const reversed = removedStart !== walls[hostId].startPointId
-    const offset = reversed ? Math.round(wallLength(next, walls[hostId]) - opening.offset) : opening.offset
-    let moved: Opening = { ...opening, wallId: hostId, offset }
+    const reversed = removed.startPointId !== host.startPointId
+    const offset = reversed ? Math.round(wallLength(next, host) - opening.offset) : opening.offset
+    let moved: Opening = { ...opening, wallId: host.id, offset }
     if (reversed && moved.type === 'door') {
       moved = {
         ...moved,
@@ -236,6 +245,29 @@ function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
     openings[opening.id] = moved
   }
   return { ...next, openings }
+}
+
+// Merges the absorbed point into the survivor: walls are rewired to the
+// survivor; a wall whose two ends collapse onto it is deleted with its
+// openings; a wall made identical to another dedupes per the twin rule above.
+function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
+  const points = { ...plan.points }
+  delete points[absorbedId]
+
+  const walls: Record<string, Wall> = {}
+  for (const wall of Object.values(plan.walls)) {
+    const startPointId = wall.startPointId === absorbedId ? survivorId : wall.startPointId
+    const endPointId = wall.endPointId === absorbedId ? survivorId : wall.endPointId
+    if (startPointId === endPointId) continue // degenerate: both ends merged
+    walls[wall.id] = { ...wall, startPointId, endPointId }
+  }
+
+  const openings: Record<string, Opening> = {}
+  for (const opening of Object.values(plan.openings)) {
+    // an opening whose wall degenerated goes with it
+    if (walls[opening.wallId]) openings[opening.id] = opening
+  }
+  return dedupeTwinWalls({ ...plan, points, walls, openings })
 }
 
 // Enforces the invariant "two Points never coincide" (ADR 0003): every pair
@@ -258,6 +290,50 @@ export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
         next = mergePoints(next, survivor.id, absorbed.id)
         merged = true
         break outer
+      }
+    }
+  }
+  return next
+}
+
+// Enforces the invariant "walls only meet at shared Points" (ADR 0002) on an
+// already-built plan — the drag-end counterpart of commitWall's planar
+// insertion: a point lying on a wall's body splits that wall (T junction),
+// and two crossing walls are both split at their intersection (X junction).
+// Runs to a fixpoint; returns the same plan when nothing violates the
+// invariant.
+export function planarize(plan: Plan): Plan {
+  let next = plan
+  for (let changed = true; changed;) {
+    changed = false
+    // splits along a collinear overlap leave two walls on the same pair
+    next = dedupeTwinWalls(next)
+    outer: for (const point of Object.values(next.points)) {
+      for (const wall of Object.values(next.walls)) {
+        if (wall.startPointId === point.id || wall.endPointId === point.id) continue
+        const [a, b] = wallPoints(next, wall)
+        if (interiorProjection(a, b, point) === null) continue
+        next = splitWall(next, wall.id, point.id)
+        changed = true
+        break outer
+      }
+    }
+    if (changed) continue
+    // T junctions first: once no point sits on a wall body, remaining
+    // contacts are proper crossings, cut like commitWall's X junctions.
+    const walls = Object.values(next.walls)
+    crossings: for (let i = 0; i < walls.length; i++) {
+      for (let j = i + 1; j < walls.length; j++) {
+        const [a, b] = wallPoints(next, walls[i])
+        const [c, d] = wallPoints(next, walls[j])
+        const crossing = segmentIntersection(a, b, c, d)
+        if (!crossing) continue
+        let pointId: string
+        ;[next, pointId] = ensurePointAt(next, Math.round(crossing.x), Math.round(crossing.y))
+        next = splitWall(next, walls[i].id, pointId)
+        next = splitWall(next, walls[j].id, pointId)
+        changed = true
+        break crossings
       }
     }
   }

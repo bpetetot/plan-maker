@@ -14,6 +14,7 @@ import {
   moveRoomLabel,
   moveOpening,
   placeOpening,
+  planarize,
   renameRoomLabel,
   setDimPlacement,
   setOpeningWidth,
@@ -409,6 +410,85 @@ describe('mergeCoincidentPoints', () => {
   it('returns the same plan when no points coincide', () => {
     const plan = squareRoomPlan()
     expect(mergeCoincidentPoints(plan)).toBe(plan)
+  })
+})
+
+describe('planarize', () => {
+  it('splits a wall under a point lying on its body (T junction)', () => {
+    // w1 spans (0,0)→(400,0); the free end of w2 sits on its body at (150,0)
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const t = b.point(150, 0)
+      const below = b.point(150, 200)
+      b.wall(p1, p2)
+      b.wall(t, below)
+    })
+    const [p1, p2, t] = Object.keys(plan.points)
+    const w1 = Object.keys(plan.walls)[0]
+    const next = planarize(plan)
+    expect(Object.keys(next.walls)).toHaveLength(3)
+    expect(next.walls[w1]).toMatchObject({ startPointId: p1, endPointId: t })
+    const endHalf = Object.values(next.walls).find((w) => w.startPointId === t && w.endPointId === p2)
+    expect(endHalf).toBeDefined()
+  })
+
+  it('splits both walls at a crossing (X junction)', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(200, -100)
+      const p4 = b.point(200, 100)
+      b.wall(p1, p2)
+      b.wall(p3, p4)
+    })
+    const next = planarize(plan)
+    expect(Object.keys(next.walls)).toHaveLength(4)
+    const cross = Object.values(next.points).find((p) => p.x === 200 && p.y === 0)!
+    expect(cross).toBeDefined()
+    const atCross = Object.values(next.walls).filter(
+      (w) => w.startPointId === cross.id || w.endPointId === cross.id,
+    )
+    expect(atCross).toHaveLength(4)
+  })
+
+  it('resolves every crossing of a wall spanning two others', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, -100)
+      const p2 = b.point(0, 100)
+      const p3 = b.point(300, -100)
+      const p4 = b.point(300, 100)
+      const p5 = b.point(-100, 0)
+      const p6 = b.point(400, 0)
+      b.wall(p1, p2)
+      b.wall(p3, p4)
+      b.wall(p5, p6)
+    })
+    const next = planarize(plan)
+    // each vertical wall splits in two, the long wall in three
+    expect(Object.keys(next.walls)).toHaveLength(7)
+  })
+
+  it('returns the same plan when the invariant already holds', () => {
+    const plan = squareRoomPlan()
+    expect(planarize(plan)).toBe(plan)
+  })
+
+  it('collapses a wall dropped along another into shared pieces, never twins', () => {
+    // w2 (100,0)→(300,0) lies on w1's body: the T splits carve w1 at both
+    // ends of w2, and the middle piece would span the same pair as w2
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(100, 0)
+      const p4 = b.point(300, 0)
+      b.wall(p1, p2)
+      b.wall(p3, p4)
+    })
+    const next = planarize(plan)
+    expect(Object.keys(next.walls)).toHaveLength(3)
+    const pairs = Object.values(next.walls).map((w) => [w.startPointId, w.endPointId].sort().join('-'))
+    expect(new Set(pairs).size).toBe(3)
   })
 })
 

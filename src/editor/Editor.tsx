@@ -33,6 +33,7 @@ import {
   moveOpening,
   moveRoomLabel,
   placeOpening,
+  planarize,
   renameRoomLabel,
   setDimPlacement,
 } from '../model/operations'
@@ -457,9 +458,10 @@ export default function Editor() {
     }
     if (d.kind === 'point') setSnap(null)
     if (d.kind === 'opening') setMovingOpeningId(null)
-    // wall geometry changed: coincident points merge (ADR 0003) and labels
-    // reconcile once, at the end of the gesture (CONTEXT.md: Room label),
-    // inside the same history group
+    // wall geometry changed: coincident points merge (ADR 0003), walls split
+    // at new junctions (ADR 0002, issue 08) and labels reconcile once, at the
+    // end of the gesture (CONTEXT.md: Room label), inside the same history
+    // group
     if (d.kind === 'point' || d.kind === 'group') {
       setPlan((p) => {
         const moving = new Set<string>()
@@ -472,7 +474,7 @@ export default function Editor() {
               moving.add(wall.endPointId)
             }
           }
-        return reconcileRoomLabels(d.orig, mergeCoincidentPoints(p, moving))
+        return reconcileRoomLabels(d.orig, planarize(mergeCoincidentPoints(p, moving)))
       })
     }
     if (d.kind !== 'pan') endHistoryGroup()

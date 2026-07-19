@@ -36,5 +36,8 @@ topological.
   ratio chosen on the full wall means nothing on a half.
 - The whole commit (splits + reassignments + new wall) is a single history
   entry: undo restores the exact pre-gesture plan.
-- Dragging a point onto a wall body still bypasses the invariant — known
-  limitation, tracked as issue 08.
+- Drag gestures initially bypassed the invariant (tracked as issue 08); the
+  end of a point or group drag now runs the same planar insertion
+  (`planarize`), so a point dropped on a wall body or a dragged wall crossing
+  another splits walls under the same rules, inside the gesture's history
+  entry.
