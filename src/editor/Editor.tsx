@@ -15,14 +15,7 @@ import {
 } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
-import {
-  clampToPolygon,
-  nearestWall,
-  projectOnWall,
-  wallLength,
-  wallPoints,
-  wallSide,
-} from '../model/geometry'
+import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry'
 import {
   addRoomLabel,
   clampOpeningOffset,
@@ -38,7 +31,7 @@ import {
   setDimPlacement,
 } from '../model/operations'
 import type { Room } from '../model/rooms'
-import { detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms'
+import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms'
 import type { ElementRef } from '../model/selection'
 import {
   deleteElements,
@@ -97,7 +90,7 @@ type Drag =
   // plain click — the placement dimensions only show once it becomes a move
   | { kind: 'opening'; id: string; start: Vec; moved?: boolean }
   // dragging a room's text block. `room` is the room containing the block at
-  // drag start: the block can never leave it (the drag clamps to its polygon).
+  // drag start: the block can never leave it (the drag clamps to its region).
   // null is defensive — an orphan label cannot arise from plan operations
   // (CONTEXT.md: Room label) — and lets such a label move freely.
   | { kind: 'label'; id: string; room: Room | null }
@@ -180,7 +173,7 @@ export default function Editor() {
   const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan])
   // While walls are dragged the plan only reconciles labels at the end of the
   // gesture — but the displayed labels preview that reconciliation live, so a
-  // default-placement block keeps tracking its room's centroid mid-gesture.
+  // default-placement block keeps tracking its room's anchor mid-gesture.
   const dragNow = drag.current
   const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null
   const overlayLabels = useMemo(
@@ -374,10 +367,10 @@ export default function Editor() {
           setPlan((p) => moveOpening(p, d.id, t))
         }
       } else if (d.kind === 'label') {
-        const t = d.room ? clampToPolygon(c, d.room.polygon) : c
+        const t = d.room ? clampToRoom(c, d.room) : c
         setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y))
       } else if (d.kind === 'newLabel') {
-        const t = clampToPolygon(c, d.room.polygon)
+        const t = clampToRoom(c, d.room)
         if (d.id) {
           setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y))
         } else if (Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
@@ -666,6 +659,7 @@ export default function Editor() {
               key={wall.id}
               plan={plan}
               wall={wall}
+              selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
               onPointerDown={
                 tool === 'select'
                   ? (e) => {

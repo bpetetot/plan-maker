@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { commitWall, deleteWall, setPoints } from './operations'
-import { detectRooms, interiorSide, reconcileRoomLabels, roomAt, wallMeasures } from './rooms'
+import {
+  clampToRoom,
+  detectRooms,
+  interiorSide,
+  reconcileRoomLabels,
+  roomAt,
+  roomContains,
+  wallMeasures,
+} from './rooms'
+import type { Plan } from './types'
 import { buildPlan, squareRoomPlan } from './testHelpers'
 
 describe('detectRooms after planar insertion (ADR 0002)', () => {
@@ -41,7 +50,7 @@ describe('detectRooms', () => {
     expect(detectRooms(chain)).toEqual([])
   })
 
-  it('detects a single rectangular room with its area and centroid', () => {
+  it('detects a single rectangular room with its area and anchor', () => {
     const plan = buildPlan((b) => {
       const a = b.point(0, 0)
       const c = b.point(400, 0)
@@ -55,7 +64,7 @@ describe('detectRooms', () => {
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
     expect(rooms[0].areaCm2).toBe(390 * 290)
-    expect(rooms[0].centroid).toEqual({ x: 200, y: 150 })
+    expect(rooms[0].anchor).toEqual({ x: 200, y: 150 })
   })
 
   it('detects two rooms split by an inner wall', () => {
@@ -168,6 +177,141 @@ describe('detectRooms', () => {
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
     expect(rooms[0].areaCm2).toBe(390 * 190 + 190 * 200)
+  })
+})
+
+describe('nested rooms (an island punches a hole in its containing room)', () => {
+  // 400×400 outer room with a disconnected 150×100 island at (100,100)
+  const nestedPlan = () => {
+    let ids = { islandTopWall: '', islandWallIds: [] as string[], islandPointIds: [] as string[] }
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 400)
+      const e = b.point(0, 400)
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      const i1 = b.point(100, 100)
+      const i2 = b.point(250, 100)
+      const i3 = b.point(250, 200)
+      const i4 = b.point(100, 200)
+      const top = b.wall(i1, i2)
+      const walls = [top, b.wall(i2, i3), b.wall(i3, i4), b.wall(i4, i1)]
+      ids = {
+        islandTopWall: top.id,
+        islandWallIds: walls.map((w) => w.id),
+        islandPointIds: [i1, i2, i3, i4].map((p) => p.id),
+      }
+    })
+    return { plan, ...ids }
+  }
+
+  const byArea = (plan: Plan) => {
+    const rooms = detectRooms(plan)
+    rooms.sort((a, b) => a.areaCm2 - b.areaCm2)
+    return { inner: rooms[0], outer: rooms[1], rooms }
+  }
+
+  it('detects both rooms and excludes the island footprint from the outer area', () => {
+    const { plan } = nestedPlan()
+    const { inner, outer, rooms } = byArea(plan)
+    expect(rooms).toHaveLength(2)
+    expect(inner.areaCm2).toBe(140 * 90)
+    // outer interior faces 390×390, minus the island out to its exterior
+    // faces (160×110): walls included in the hole
+    expect(outer.areaCm2).toBe(390 * 390 - 160 * 110)
+    expect(outer.holes).toHaveLength(1)
+    expect(inner.holes).toHaveLength(0)
+  })
+
+  it('resolves a point inside the island to the inner room only', () => {
+    const { plan } = nestedPlan()
+    const { inner, outer, rooms } = byArea(plan)
+    expect(roomAt(rooms, 175, 150)).toBe(inner)
+    expect(roomAt(rooms, 320, 300)).toBe(outer)
+    expect(roomContains(outer, 175, 150)).toBe(false)
+  })
+
+  it('anchors the outer block at the centroid of the holed region', () => {
+    const { plan } = nestedPlan()
+    const { outer } = byArea(plan)
+    expect(outer.anchor.x).toBeCloseTo(202.59, 1)
+    expect(outer.anchor.y).toBeCloseTo(205.17, 1)
+  })
+
+  it('falls back to the pole of inaccessibility when the centroid lands in the island', () => {
+    // centered island: the naive centroid (200,200) sits inside the hole
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 400)
+      const e = b.point(0, 400)
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      const i1 = b.point(150, 150)
+      const i2 = b.point(250, 150)
+      const i3 = b.point(250, 250)
+      const i4 = b.point(150, 250)
+      b.wall(i1, i2)
+      b.wall(i2, i3)
+      b.wall(i3, i4)
+      b.wall(i4, i1)
+    })
+    const { outer } = byArea(plan)
+    expect(roomContains(outer, outer.anchor.x, outer.anchor.y)).toBe(true)
+    expect(Math.hypot(outer.anchor.x - 200, outer.anchor.y - 200)).toBeGreaterThan(50)
+  })
+
+  it('treats an island wall as a party wall between the two rooms', () => {
+    const { plan, islandTopWall } = nestedPlan()
+    const rooms = detectRooms(plan)
+    const wall = plan.walls[islandTopWall]
+    expect(interiorSide(rooms, wall)).toBeNull()
+    // hors-tout across the mitered exterior faces: 150 + 2×5
+    expect(wallMeasures(plan, rooms, wall)).toEqual({ kind: 'plain', length: 160, thickness: 10 })
+  })
+
+  it('clamps a label drag out of the island', () => {
+    const { plan } = nestedPlan()
+    const { outer } = byArea(plan)
+    const clamped = clampToRoom({ x: 175, y: 180 }, outer)
+    expect(clamped.y).toBeGreaterThan(200)
+    expect(roomContains(outer, clamped.x, clamped.y)).toBe(true)
+    expect(clampToRoom({ x: 320, y: 300 }, outer)).toEqual({ x: 320, y: 300 })
+  })
+
+  it('keeps an island label with the inner room and pins the outer label to the outer anchor', () => {
+    const { plan: bare } = nestedPlan()
+    const plan: Plan = {
+      ...bare,
+      roomLabels: {
+        li: { id: 'li', name: 'Inner', x: 175, y: 150 },
+        lo: { id: 'lo', name: 'Outer', x: 320, y: 300 },
+      },
+    }
+    const next = reconcileRoomLabels(plan, plan)
+    // both labels survive: they live in different rooms
+    expect(next.roomLabels.li).toMatchObject({ name: 'Inner', x: 175, y: 150 })
+    expect(next.roomLabels.lo).toMatchObject({ name: 'Outer', x: 203, y: 205 })
+  })
+
+  it('reverts a custom placement swallowed by a newly drawn island', () => {
+    const { plan: bare, islandWallIds, islandPointIds } = nestedPlan()
+    const after: Plan = {
+      ...bare,
+      roomLabels: { l: { id: 'l', name: 'Kitchen', x: 175, y: 150, placed: true } },
+    }
+    const before: Plan = {
+      ...after,
+      points: Object.fromEntries(Object.entries(after.points).filter(([id]) => !islandPointIds.includes(id))),
+      walls: Object.fromEntries(Object.entries(after.walls).filter(([id]) => !islandWallIds.includes(id))),
+    }
+    const next = reconcileRoomLabels(before, after)
+    expect(next.roomLabels.l).toEqual({ id: 'l', name: 'Kitchen', x: 203, y: 205 })
   })
 })
 
@@ -360,13 +504,12 @@ describe('reconcileRoomLabels', () => {
     return { plan, ...ids }
   }
 
-  it('leaves a label alone while a room still contains it', () => {
-    const { plan, right } = labeledSquare(200, 200)
-    const after = setPoints(plan, { [right[0]]: { x: 300, y: 0 }, [right[1]]: { x: 300, y: 400 } })
-    expect(reconcileRoomLabels(plan, after)).toBe(after)
+  it('returns the same plan when every label already sits at its centroid', () => {
+    const { plan } = labeledSquare(200, 200)
+    expect(reconcileRoomLabels(plan, plan)).toBe(plan)
   })
 
-  it('snaps a label to its room centroid when the room deforms away from it', () => {
+  it('pins a default label to the live centroid when the room deforms', () => {
     const { plan, right, label } = labeledSquare(350, 200)
     const after = setPoints(plan, { [right[0]]: { x: 300, y: 0 }, [right[1]]: { x: 300, y: 400 } })
     const next = reconcileRoomLabels(plan, after)
@@ -377,6 +520,58 @@ describe('reconcileRoomLabels', () => {
     const { plan, wall } = labeledSquare(200, 200)
     const after = deleteWall(plan, wall)
     expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({})
+  })
+
+  // Two stacked rooms sharing a wall; returns the plan plus the ids needed
+  // to drag the shared wall.
+  const stackedRooms = () => {
+    let ids = { shared: ['', ''], top: '', bottom: '' }
+    const plan = buildPlan((b) => {
+      const tl = b.point(250, -90)
+      const tr = b.point(450, -90)
+      const ml = b.point(250, 60)
+      const mr = b.point(450, 60)
+      const bl = b.point(250, 300)
+      const br = b.point(450, 300)
+      b.wall(tl, tr)
+      b.wall(tl, ml)
+      b.wall(tr, mr)
+      b.wall(ml, mr) // the shared wall
+      b.wall(ml, bl)
+      b.wall(mr, br)
+      b.wall(bl, br)
+      ids = {
+        shared: [ml.id, mr.id],
+        top: b.label('AAA', 350, -15).id,
+        bottom: b.label('BBB', 350, 180).id,
+      }
+    })
+    return { plan, ...ids }
+  }
+
+  it('keeps each label with its room when a shared wall sweeps past a label', () => {
+    const { plan, shared, top, bottom } = stackedRooms()
+    // drag the shared wall down past BBB's position: the room sizes invert
+    const after = setPoints(plan, { [shared[0]]: { x: 250, y: 250 }, [shared[1]]: { x: 450, y: 250 } })
+    const next = reconcileRoomLabels(plan, after)
+    expect(next.roomLabels[top]).toMatchObject({ name: 'AAA', x: 350, y: 80 })
+    expect(next.roomLabels[bottom]).toMatchObject({ name: 'BBB', x: 350, y: 275 })
+  })
+
+  it('keeps a label whose room loop changed but still contains it (position fallback)', () => {
+    const { plan, label } = labeledSquare(200, 200)
+    // draw a dangling wall from the left wall inward: planar insertion splits
+    // the boundary wall, so the room loop gains a point
+    const left = Object.values(plan.walls).find(
+      (w) => plan.points[w.startPointId].x === 0 && plan.points[w.endPointId].x === 0,
+    )!
+    const [after] = commitWall(
+      plan,
+      { x: 0, y: 200, kind: 'wall', wallId: left.id },
+      { x: 100, y: 200, kind: 'free' },
+    )
+    const next = reconcileRoomLabels(plan, after)
+    expect(next.roomLabels[label]).toMatchObject({ name: 'Kitchen' })
   })
 
   it('drops orphan labels when reconciling a plan against itself', () => {

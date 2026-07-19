@@ -112,11 +112,10 @@ function nearestOnSegment(p: Vec, a: Vec, b: Vec): Vec {
   return { x: a.x + t * dx, y: a.y + t * dy }
 }
 
-// Nearest interior point of `polygon` to `point`: the point itself when it
-// already lies inside, else its projection on the boundary nudged one unit
-// inward — so the result still tests as inside even after integer rounding.
-export function clampToPolygon(point: Vec, polygon: Vec[]): Vec {
-  if (pointInPolygon(point, polygon)) return point
+// Projection of `point` on the polygon's boundary, nudged one unit to the
+// side that satisfies `wantInside` — so the result still tests correctly
+// even after integer rounding.
+function nudgeAcrossBoundary(point: Vec, polygon: Vec[], wantInside: boolean): Vec {
   let best: { p: Vec; d: number; a: Vec; b: Vec } | null = null
   for (let i = 0; i < polygon.length; i++) {
     const a = polygon[i]
@@ -131,13 +130,118 @@ export function clampToPolygon(point: Vec, polygon: Vec[]): Vec {
   const len = Math.hypot(dx, dy) || 1
   for (const sign of [1, -1]) {
     const candidate = { x: best.p.x + (sign * -dy) / len, y: best.p.y + (sign * dx) / len }
-    if (pointInPolygon(candidate, polygon)) return candidate
+    if (pointInPolygon(candidate, polygon) === wantInside) return candidate
   }
-  // vertex case: both edge normals fall outside — step toward the centroid
+  // vertex case: both edge normals fall on the wrong side — step along the
+  // centroid direction instead
   const centroid = polygonCentroid(polygon)
   const cd = Math.hypot(centroid.x - best.p.x, centroid.y - best.p.y) || 1
-  const inward = { x: best.p.x + (centroid.x - best.p.x) / cd, y: best.p.y + (centroid.y - best.p.y) / cd }
-  return pointInPolygon(inward, polygon) ? inward : best.p
+  const step = wantInside ? 1 : -1
+  const nudged = {
+    x: best.p.x + (step * (centroid.x - best.p.x)) / cd,
+    y: best.p.y + (step * (centroid.y - best.p.y)) / cd,
+  }
+  return pointInPolygon(nudged, polygon) === wantInside ? nudged : best.p
+}
+
+// Nearest interior point of `polygon` to `point`: the point itself when it
+// already lies inside, else its projection on the boundary nudged one unit
+// inward.
+export function clampToPolygon(point: Vec, polygon: Vec[]): Vec {
+  return pointInPolygon(point, polygon) ? point : nudgeAcrossBoundary(point, polygon, true)
+}
+
+// Mirror of clampToPolygon: nearest point *outside* `polygon`.
+export function clampOutsidePolygon(point: Vec, polygon: Vec[]): Vec {
+  return pointInPolygon(point, polygon) ? nudgeAcrossBoundary(point, polygon, false) : point
+}
+
+// Centroid of a region with holes, area-weighted; ring windings need not
+// agree — absolute areas are used. Falls back to the outer ring's centroid
+// for a degenerate region.
+export function regionCentroid(polygon: Vec[], holes: Vec[][]): Vec {
+  const outer = polygonCentroid(polygon)
+  let area = Math.abs(polygonArea(polygon))
+  let cx = outer.x * area
+  let cy = outer.y * area
+  for (const hole of holes) {
+    const a = Math.abs(polygonArea(hole))
+    const c = polygonCentroid(hole)
+    cx -= c.x * a
+    cy -= c.y * a
+    area -= a
+  }
+  if (area < 1e-9) return outer
+  return { x: cx / area, y: cy / area }
+}
+
+// Pole of inaccessibility of a region with holes: the interior point farthest
+// from every boundary — the center of the largest inscribed circle — found by
+// polylabel-style grid subdivision down to `precision` centimeters.
+export function poleOfInaccessibility(polygon: Vec[], holes: Vec[][], precision = 1): Vec {
+  const rings = [polygon, ...holes]
+  const boundaryDistance = (p: Vec) => {
+    let best = Infinity
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i++) {
+        const q = nearestOnSegment(p, ring[i], ring[(i + 1) % ring.length])
+        best = Math.min(best, Math.hypot(q.x - p.x, q.y - p.y))
+      }
+    }
+    return best
+  }
+  const inside = (p: Vec) => pointInPolygon(p, polygon) && !holes.some((hole) => pointInPolygon(p, hole))
+  const signedDistance = (p: Vec) => (inside(p) ? 1 : -1) * boundaryDistance(p)
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of polygon) {
+    minX = Math.min(minX, p.x)
+    minY = Math.min(minY, p.y)
+    maxX = Math.max(maxX, p.x)
+    maxY = Math.max(maxY, p.y)
+  }
+  const cellSize = Math.min(maxX - minX, maxY - minY)
+  if (cellSize <= 0) return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
+
+  interface Cell {
+    x: number
+    y: number
+    h: number // half the cell size
+    d: number // signed distance at the center
+    max: number // upper bound of d over the cell
+  }
+  const cell = (x: number, y: number, h: number): Cell => {
+    const d = signedDistance({ x, y })
+    return { x, y, h, d, max: d + h * Math.SQRT2 }
+  }
+
+  const queue: Cell[] = []
+  for (let x = minX; x < maxX; x += cellSize) {
+    for (let y = minY; y < maxY; y += cellSize)
+      queue.push(cell(x + cellSize / 2, y + cellSize / 2, cellSize / 2))
+  }
+  const centroid = regionCentroid(polygon, holes)
+  let best = cell(centroid.x, centroid.y, 0)
+  const bboxCenter = cell((minX + maxX) / 2, (minY + maxY) / 2, 0)
+  if (bboxCenter.d > best.d) best = bboxCenter
+  while (queue.length > 0) {
+    let top = 0
+    for (let i = 1; i < queue.length; i++) if (queue[i].max > queue[top].max) top = i
+    const current = queue.splice(top, 1)[0]
+    if (current.d > best.d) best = current
+    if (current.max - best.d <= precision) continue
+    const h = current.h / 2
+    queue.push(
+      cell(current.x - h, current.y - h, h),
+      cell(current.x + h, current.y - h, h),
+      cell(current.x - h, current.y + h, h),
+      cell(current.x + h, current.y + h, h),
+    )
+  }
+  return { x: best.x, y: best.y }
 }
 
 export function pointInPolygon(point: Vec, polygon: Vec[]): boolean {

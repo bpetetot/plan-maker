@@ -2,7 +2,7 @@
 // Room label lifecycle on wall gestures (CONTEXT.md: Room label) — an orphan
 // label never exists: a wall drag that deforms the room away from its label
 // snaps the label to the room's centroid at the end of the gesture, and a
-// rigid group move carries labels along.
+// rigid group move carries a custom-placed label along.
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Plan } from '../model/types'
@@ -19,7 +19,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 // A closed square room (100,100)-(500,500) with a label near its right wall.
-function labeledSquare(): Plan {
+function labeledSquare(placed?: true): Plan {
   return {
     points: {
       a: { id: 'a', x: 100, y: 100 },
@@ -34,15 +34,19 @@ function labeledSquare(): Plan {
       w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
     },
     openings: {},
-    roomLabels: { l1: { id: 'l1', name: 'Kitchen', x: 480, y: 250 } },
+    roomLabels: {
+      l1: placed
+        ? { id: 'l1', name: 'Kitchen', x: 480, y: 250, placed }
+        : { id: 'l1', name: 'Kitchen', x: 480, y: 250 },
+    },
   }
 }
 
 const label = () => usePlanStore.getState().plan.roomLabels.l1
 const undoDepth = () => usePlanStore.temporal.getState().pastStates.length
 
-function setup() {
-  usePlanStore.setState({ plan: labeledSquare(), planEpoch: 0 })
+function setup(placed?: true) {
+  usePlanStore.setState({ plan: labeledSquare(placed), planEpoch: 0 })
   usePlanStore.temporal.getState().clear()
   const { container } = render(<Editor />)
   const svg = container.querySelector('svg')!
@@ -73,14 +77,14 @@ describe('label reconciliation at the end of a wall gesture', () => {
     expect(undoDepth()).toBe(1)
   })
 
-  it('moves the label with the room on a select-all group move', () => {
-    const { svg } = setup()
+  it('moves a custom-placed label with the room on a select-all group move', () => {
+    const { svg } = setup(true)
     marqueeSelect(svg, { x: 0, y: 0 }, { x: 600, y: 600 })
     const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[0]
     fireEvent.pointerDown(wallHit, { button: 0, ...clientAt(svg, 300, 100) })
     fireEvent.pointerMove(svg, clientAt(svg, 350, 150))
     fireEvent.pointerUp(svg)
-    expect(label()).toMatchObject({ name: 'Kitchen', x: 530, y: 300 })
+    expect(label()).toMatchObject({ name: 'Kitchen', x: 530, y: 300, placed: true })
     expect(undoDepth()).toBe(1)
   })
 })

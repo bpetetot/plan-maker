@@ -96,10 +96,10 @@ describe('parsePlanFile — coincident points', () => {
 })
 
 describe('transferFileName', () => {
-  it('formats plan-YYYY-MM-DD with the extension', () => {
-    const date = new Date(2026, 6, 18)
-    expect(transferFileName('json', date)).toBe('plan-2026-07-18.json')
-    expect(transferFileName('png', date)).toBe('plan-2026-07-18.png')
+  it('formats plan-YYYY-MM-DD-HHmm with the extension', () => {
+    const date = new Date(2026, 6, 18, 9, 5)
+    expect(transferFileName('json', date)).toBe('plan-2026-07-18-0905.json')
+    expect(transferFileName('png', date)).toBe('plan-2026-07-18-0905.png')
   })
 })
 

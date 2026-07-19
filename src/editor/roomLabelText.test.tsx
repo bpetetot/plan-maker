@@ -104,6 +104,66 @@ describe('inline room-name editing', () => {
   })
 })
 
+describe('a room inside a room', () => {
+  // The bug's plan: outer room (130,40)-(520,430) labeled 'AAA', with a
+  // disconnected island room (250,80)-(400,180) inside it.
+  function nestedRooms(): Plan {
+    return {
+      points: {
+        a: { id: 'a', x: 130, y: 40 },
+        b: { id: 'b', x: 520, y: 40 },
+        c: { id: 'c', x: 520, y: 430 },
+        d: { id: 'd', x: 130, y: 430 },
+        e: { id: 'e', x: 250, y: 80 },
+        f: { id: 'f', x: 400, y: 80 },
+        g: { id: 'g', x: 400, y: 180 },
+        h: { id: 'h', x: 250, y: 180 },
+      },
+      walls: {
+        w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 },
+        w2: { id: 'w2', startPointId: 'b', endPointId: 'c', thickness: 10 },
+        w3: { id: 'w3', startPointId: 'c', endPointId: 'd', thickness: 10 },
+        w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
+        w5: { id: 'w5', startPointId: 'e', endPointId: 'f', thickness: 10 },
+        w6: { id: 'w6', startPointId: 'f', endPointId: 'g', thickness: 10 },
+        w7: { id: 'w7', startPointId: 'g', endPointId: 'h', thickness: 10 },
+        w8: { id: 'w8', startPointId: 'h', endPointId: 'e', thickness: 10 },
+      },
+      openings: {},
+      roomLabels: { l1: { id: 'l1', name: 'AAA', x: 325, y: 235 } },
+    }
+  }
+
+  function setupNested() {
+    usePlanStore.setState({ plan: nestedRooms(), planEpoch: 0 })
+    usePlanStore.temporal.getState().clear()
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    const nameInput = () => container.querySelector<HTMLInputElement>('input.room-name-input')
+    return { svg, nameInput }
+  }
+
+  it('double-clicking inside the inner room edits its own label, not the outer one', () => {
+    const { svg, nameInput } = setupNested()
+    fireEvent.doubleClick(svg, clientAt(svg, 325, 130))
+    const input = nameInput()!
+    expect(input).toBeTruthy()
+    expect(input.value).toBe('')
+    fireEvent.change(input, { target: { value: 'Cellier' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const all = labels()
+    expect(all).toHaveLength(2)
+    expect(all.find((l) => l.name === 'Cellier')).toMatchObject({ x: 325, y: 130 })
+    expect(all.find((l) => l.name === 'AAA')).toMatchObject({ x: 325, y: 235 })
+  })
+
+  it('double-clicking in the outer room still edits the outer label', () => {
+    const { svg, nameInput } = setupNested()
+    fireEvent.doubleClick(svg, clientAt(svg, 200, 350))
+    expect(nameInput()!.value).toBe('AAA')
+  })
+})
+
 describe('dragging the area text', () => {
   it('a drag on an unlabeled room creates a nameless label in one undo entry', () => {
     const { svg, areaBlock } = setup()

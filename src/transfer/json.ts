@@ -40,5 +40,6 @@ export function parsePlanFile(text: string): ParseResult {
 
 export function transferFileName(extension: 'json' | 'png', date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `plan-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.${extension}`
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return `plan-${day}-${pad(date.getHours())}${pad(date.getMinutes())}.${extension}`
 }

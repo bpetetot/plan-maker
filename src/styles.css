@@ -119,6 +119,10 @@ svg text.dim-live {
   fill: var(--accent);
   font-weight: 600;
 }
+/* the dimension of a selected wall shares the wall's selection accent */
+svg text.dim-selected {
+  fill: var(--accent);
+}
 svg text.room-name {
   font:
     600 12px system-ui,

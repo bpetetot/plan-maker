@@ -146,6 +146,36 @@ describe('DimLabel value', () => {
   })
 })
 
+describe('DimLabel selection', () => {
+  // The whole dimension — text, line pieces, ticks — shares the selected
+  // wall's accent, so the wall and its measure read as one selected thing.
+  it('renders the whole dimension in accent when its wall is selected', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const { container } = render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} selected />
+      </svg>,
+    )
+    expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(true)
+    const lines = Array.from(container.querySelectorAll('line'))
+    expect(lines).toHaveLength(4)
+    for (const line of lines) expect(line.getAttribute('stroke')).toBe(COLORS.wallSelected)
+  })
+
+  it('keeps the plain grays when its wall is not selected', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const { container } = render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} />
+      </svg>,
+    )
+    expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(false)
+    for (const line of Array.from(container.querySelectorAll('line'))) {
+      expect(line.getAttribute('stroke')).toBe('var(--rail)')
+    }
+  })
+})
+
 describe('WallLine', () => {
   function renderWall(plan: Plan, wall: Wall) {
     const { container } = render(

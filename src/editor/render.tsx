@@ -312,6 +312,7 @@ function ExtentLine({
   to,
   gapFrom,
   gapTo,
+  stroke = 'var(--rail)',
 }: {
   at: (t: number) => { x: number; y: number }
   ux: number
@@ -320,6 +321,7 @@ function ExtentLine({
   to: number
   gapFrom: number
   gapTo: number
+  stroke?: string
 }) {
   // never eat more than a quarter of the span at each end, so a segment too
   // short to absorb the inset degrades instead of folding onto itself
@@ -333,10 +335,10 @@ function ExtentLine({
   return (
     <g pointerEvents="none">
       {gapFrom - start > 2 && (
-        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke="var(--rail)" strokeWidth={EXTENT_STROKE} />
+        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke={stroke} strokeWidth={EXTENT_STROKE} />
       )}
       {end - gapTo > 2 && (
-        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke="var(--rail)" strokeWidth={EXTENT_STROKE} />
+        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={EXTENT_STROKE} />
       )}
       {[p1, p2].map((p, i) => (
         <line
@@ -345,7 +347,7 @@ function ExtentLine({
           y1={p.y - ux * 4}
           x2={p.x - uy * 4}
           y2={p.y + ux * 4}
-          stroke="var(--rail)"
+          stroke={stroke}
           strokeWidth={EXTENT_STROKE}
         />
       ))}
@@ -364,10 +366,12 @@ function ExtentLine({
 export function DimLabel({
   plan,
   wall,
+  selected,
   onPointerDown,
 }: {
   plan: Plan
   wall: Wall
+  selected?: boolean
   onPointerDown?: (e: React.PointerEvent) => void
 }) {
   const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
@@ -394,6 +398,7 @@ export function DimLabel({
           to={span.to}
           gapFrom={tText - gapHalf}
           gapTo={tText + gapHalf}
+          stroke={selected ? COLORS.wallSelected : undefined}
         />
       )}
       <g
@@ -403,7 +408,11 @@ export function DimLabel({
         onPointerDown={onPointerDown}
       >
         {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
-        <text textAnchor="middle" dominantBaseline="central" className="dim">
+        <text
+          textAnchor="middle"
+          dominantBaseline="central"
+          className={selected ? 'dim dim-selected' : 'dim'}
+        >
           {label}
         </text>
       </g>
@@ -562,8 +571,8 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
     if (defaults.length === 0 && oldest) continue // all labels custom: no centroid block
     blocks.push({
       key: defaults[0]?.id ?? `room-${room.pointIds.join(':')}`,
-      x: room.centroid.x,
-      y: room.centroid.y,
+      x: room.anchor.x,
+      y: room.anchor.y,
       labels: defaults,
       room,
       area: !oldest || defaults.includes(oldest) ? room.areaCm2 : undefined,
