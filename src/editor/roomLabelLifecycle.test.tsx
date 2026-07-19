@@ -84,3 +84,64 @@ describe('label reconciliation at the end of a wall gesture', () => {
     expect(undoDepth()).toBe(1)
   })
 })
+
+describe('default placement follows the live centroid', () => {
+  function setupUnlabeled() {
+    const base = labeledSquare()
+    usePlanStore.setState({ plan: { ...base, roomLabels: {} }, planEpoch: 0 })
+    usePlanStore.temporal.getState().clear()
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    return { container, svg }
+  }
+
+  const blockTransform = (container: HTMLElement) =>
+    container.querySelector('text.room-name')!.closest('g')!.getAttribute('transform')
+
+  it('naming a room does not freeze its block: it tracks the centroid through a wall drag', () => {
+    const { container, svg } = setupUnlabeled()
+    // name the room: the label is created with default placement
+    fireEvent.doubleClick(svg, clientAt(svg, 300, 300))
+    const input = container.querySelector<HTMLInputElement>('input.room-name-input')!
+    fireEvent.change(input, { target: { value: 'Kitchen' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(usePlanStore.getState().plan.roomLabels).not.toEqual({})
+
+    // drag the right wall inward: the room becomes (100,100)-(250,500)
+    const wallHits = svg.querySelectorAll('line[stroke="transparent"]')
+    fireEvent.pointerDown(wallHits[1], { button: 0, ...clientAt(svg, 500, 300) })
+    fireEvent.pointerMove(svg, clientAt(svg, 250, 300))
+    // mid-gesture the block already sits at the live centroid
+    expect(blockTransform(container)).toBe('translate(175,300)')
+    fireEvent.pointerUp(svg)
+    expect(blockTransform(container)).toBe('translate(175,300)')
+    // the anchor was reconciled inside the room, still default placement
+    const created = Object.values(usePlanStore.getState().plan.roomLabels)[0]
+    expect(created).toMatchObject({ name: 'Kitchen', x: 175, y: 300 })
+    expect(created.placed).toBeUndefined()
+  })
+})
+
+describe('stacked labels', () => {
+  it('dragging a stacked name line gives that label a custom placement, the other stays stacked', () => {
+    const base = labeledSquare()
+    base.roomLabels = {
+      l1: { id: 'l1', name: 'Kitchen', x: 150, y: 150 },
+      l2: { id: 'l2', name: 'Dining', x: 250, y: 250 },
+    }
+    usePlanStore.setState({ plan: base, planEpoch: 0 })
+    usePlanStore.temporal.getState().clear()
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    // one stacked block at the centroid: Kitchen at y=0, Dining at y=14
+    const nameHits = svg.querySelectorAll('rect.room-name-hit')
+    expect(nameHits).toHaveLength(2)
+    fireEvent.pointerDown(nameHits[1], { button: 0, ...clientAt(svg, 300, 314) })
+    fireEvent.pointerMove(svg, clientAt(svg, 400, 400))
+    fireEvent.pointerUp(svg)
+    const { roomLabels } = usePlanStore.getState().plan
+    expect(roomLabels.l2).toMatchObject({ x: 400, y: 400, placed: true })
+    expect(roomLabels.l1).toMatchObject({ x: 150, y: 150 })
+    expect(roomLabels.l1.placed).toBeUndefined()
+  })
+})

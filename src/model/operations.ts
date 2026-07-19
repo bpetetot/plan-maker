@@ -324,12 +324,32 @@ export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {
   return { ...plan, roomLabels: { ...plan.roomLabels, [id]: { ...label, name } } }
 }
 
+// Moving a label is the user's placement gesture: it gives the label its
+// custom placement (CONTEXT.md: Room label).
 export function moveRoomLabel(plan: Plan, id: string, x: number, y: number): Plan {
   const label = plan.roomLabels[id]
   if (!label) return plan
   return {
     ...plan,
-    roomLabels: { ...plan.roomLabels, [id]: { ...label, x: Math.round(x), y: Math.round(y) } },
+    roomLabels: {
+      ...plan.roomLabels,
+      [id]: { ...label, x: Math.round(x), y: Math.round(y), placed: true },
+    },
+  }
+}
+
+// Rigid-move companion of moveRoomLabel: shifts the label without touching
+// its placement state — the room is carrying its label along, this is not a
+// user placement gesture.
+export function translateRoomLabel(plan: Plan, id: string, dx: number, dy: number): Plan {
+  const label = plan.roomLabels[id]
+  if (!label) return plan
+  return {
+    ...plan,
+    roomLabels: {
+      ...plan.roomLabels,
+      [id]: { ...label, x: Math.round(label.x + dx), y: Math.round(label.y + dy) },
+    },
   }
 }
 

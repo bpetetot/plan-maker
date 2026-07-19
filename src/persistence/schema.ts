@@ -80,6 +80,7 @@ export function validatePlan(value: unknown): Plan | null {
   for (const [id, label] of Object.entries(roomLabels)) {
     if (!isRecord(label) || label.id !== id) return null
     if (typeof label.name !== 'string' || !isCm(label.x) || !isCm(label.y)) return null
+    if (label.placed !== undefined && label.placed !== true) return null
   }
 
   return value as unknown as Plan

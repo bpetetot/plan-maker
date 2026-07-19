@@ -397,3 +397,40 @@ describe('reconcileRoomLabels', () => {
     expect(Object.keys(next.roomLabels)).toEqual([insideId])
   })
 })
+
+describe('reconcileRoomLabels — placement state', () => {
+  it('reverts a custom placement to default when the room deforms away from it', () => {
+    let ids = { right: ['', ''], label: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      b.wall(p1, p2)
+      b.wall(p2, p3)
+      b.wall(p3, p4)
+      b.wall(p4, p1)
+      ids = { right: [p2.id, p3.id], label: b.label('Kitchen', 350, 200, true).id }
+    })
+    const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } })
+    const next = reconcileRoomLabels(plan, after)
+    expect(next.roomLabels[ids.label]).toEqual({ id: ids.label, name: 'Kitchen', x: 150, y: 200 })
+  })
+
+  it('keeps a custom placement that is still inside the room', () => {
+    let ids = { right: ['', ''], label: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      b.wall(p1, p2)
+      b.wall(p2, p3)
+      b.wall(p3, p4)
+      b.wall(p4, p1)
+      ids = { right: [p2.id, p3.id], label: b.label('Kitchen', 150, 200, true).id }
+    })
+    const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } })
+    expect(reconcileRoomLabels(plan, after)).toBe(after)
+  })
+})

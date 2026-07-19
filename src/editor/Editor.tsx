@@ -38,12 +38,14 @@ import {
 } from '../model/selection'
 import type { Snap } from '../model/snap'
 import { snapDelta, snapPoint } from '../model/snap'
-import type { Opening, Plan } from '../model/types'
+import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import type { RoomTextBlock } from './render'
 import { ToolPanel } from './ToolPanel'
 import {
+  BLOCK_LINE_HEIGHT,
+  blockNameSlots,
   COLORS,
   DimLabel,
   DimRails,
@@ -162,6 +164,16 @@ export default function Editor() {
 
   const rooms = useMemo(() => detectRooms(plan), [plan])
   const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan])
+  // While walls are dragged the plan only reconciles labels at the end of the
+  // gesture — but the displayed labels preview that reconciliation live, so a
+  // default-placement block keeps tracking its room's centroid mid-gesture.
+  const dragNow = drag.current
+  const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null
+  const overlayLabels = useMemo(
+    () => Object.values((wallDrag ? reconcileRoomLabels(wallDrag.orig, plan) : plan).roomLabels),
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [wallDrag, plan],
+  )
 
   const tolerance = () => 14 / pxPerCm()
 
@@ -467,22 +479,33 @@ export default function Editor() {
   // dimensions and temporarily hides its wall's own dimension.
   const placementOpening = ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null)
 
-  // Room labels are never selected (CONTEXT.md: Selection) — the text block is
-  // dragged and double-click-edited directly.
-  const onBlockPointerDown = (block: RoomTextBlock, e: React.PointerEvent) => {
+  // Room labels are never selected (CONTEXT.md: Selection) — each line of a
+  // text block is dragged and double-click-edited directly. Dragging a line
+  // gives its label a custom placement; on an unlabeled room the drag
+  // creates the label.
+  const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
     if (tool !== 'select' || e.button !== 0 || space) return
-    if (block.label) startPlanDrag({ kind: 'label', id: block.label.id, room: block.room ?? null })
+    if (label) startPlanDrag({ kind: 'label', id: label.id, room: block.room ?? null })
     else if (block.room)
       startPlanDrag({ kind: 'newLabel', start: toPlan(e.clientX, e.clientY), room: block.room })
   }
 
-  const startEditing = (block: RoomTextBlock) => {
+  const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
+    // the input overlays the label's own name slot in the (possibly stacked)
+    // block; creation targets the top slot
+    const named = blockNameSlots(block, label?.id)
+    const line = label
+      ? Math.max(
+          0,
+          named.findIndex((l) => l.id === label.id),
+        )
+      : 0
     setEditing({
-      key: block.key,
-      labelId: block.label?.id ?? null,
+      key: label?.id ?? block.key,
+      labelId: label?.id ?? null,
       x: block.x,
-      y: block.y,
-      initial: block.label?.name ?? '',
+      y: block.y + line * BLOCK_LINE_HEIGHT,
+      initial: label?.name ?? '',
     })
   }
 
@@ -503,10 +526,10 @@ export default function Editor() {
     else if (name) setPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0])
   }
 
-  const onBlockDoubleClick = (block: RoomTextBlock, e: React.MouseEvent) => {
+  const onLineDoubleClick = (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => {
     if (tool !== 'select') return
     e.stopPropagation()
-    startEditing(block)
+    startEditing(block, label)
   }
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
@@ -518,8 +541,9 @@ export default function Editor() {
     if (tool !== 'select') return
     const c = toPlan(e.clientX, e.clientY)
     const room = roomAt(rooms, c.x, c.y)
-    const block = room ? blocks.find((b) => b.room === room) : undefined
-    if (block) startEditing(block)
+    // edit the room's area-carrying block: its oldest label, or create one
+    const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined
+    if (block) startEditing(block, block.labels[0] ?? null)
   }
 
   return (
@@ -560,10 +584,10 @@ export default function Editor() {
         ))}
         <RoomOverlay
           rooms={rooms}
-          labels={Object.values(plan.roomLabels)}
+          labels={overlayLabels}
           editingKey={editing?.key}
-          onBlockPointerDown={onBlockPointerDown}
-          onBlockDoubleClick={onBlockDoubleClick}
+          onLinePointerDown={onLinePointerDown}
+          onLineDoubleClick={onLineDoubleClick}
         />
         {tool === 'select' &&
           Object.values(plan.walls).map((wall) => (

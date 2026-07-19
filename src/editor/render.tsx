@@ -445,106 +445,147 @@ export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: O
   )
 }
 
-// One text block per room — the optional name above the area — anchored at
-// the room's label when it has one, else at its centroid. A label outside any
-// room cannot arise from plan operations (CONTEXT.md: Room label), but is
-// defensively rendered as its name alone.
+// Room texts group into blocks (CONTEXT.md: Room label): a custom-placed
+// label is its own block where it was dragged; the default-placement labels
+// of a room share one block at the room's live centroid, stacked oldest
+// first — so does the bare area of an unlabeled room. The room's oldest
+// label carries the area, in whichever block it renders. A label outside any
+// room cannot arise from plan operations, but is defensively rendered as its
+// name alone.
 export interface RoomTextBlock {
   key: string
   x: number
   y: number
-  label?: RoomLabel
-  // the detected room this block belongs to; unset for a label outside any
-  // room, or shadowed by an earlier label of the same room
+  // labels rendered in this block, oldest first; empty for the bare area
+  // block of an unlabeled room
+  labels: RoomLabel[]
+  // the detected room this block belongs to; unset for an orphan label
   room?: Room
-  name?: string
+  // set when this block holds the room's area (its oldest label is here, or
+  // the room has no label at all)
   area?: number
 }
 
 export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBlock[] {
-  const labeledRooms = new Set<Room>()
   const blocks: RoomTextBlock[] = []
+  const defaultsByRoom = new Map<Room, RoomLabel[]>()
+  const oldestByRoom = new Map<Room, RoomLabel>()
   for (const label of labels) {
     const room = roomAt(rooms, label.x, label.y)
-    if (room && !labeledRooms.has(room)) {
-      labeledRooms.add(room)
+    if (room && !oldestByRoom.has(room)) oldestByRoom.set(room, label)
+    if (room && !label.placed) {
+      const defaults = defaultsByRoom.get(room)
+      if (defaults) defaults.push(label)
+      else defaultsByRoom.set(room, [label])
+    } else {
       blocks.push({
         key: label.id,
         x: label.x,
         y: label.y,
-        name: label.name,
-        area: room.areaCm2,
-        label,
-        room,
+        labels: [label],
+        room: room ?? undefined,
+        area: room && oldestByRoom.get(room) === label ? room.areaCm2 : undefined,
       })
-    } else {
-      blocks.push({ key: label.id, x: label.x, y: label.y, name: label.name, label })
     }
   }
   for (const room of rooms) {
-    if (!labeledRooms.has(room)) {
-      blocks.push({
-        key: `room-${room.pointIds.join(':')}`,
-        x: room.centroid.x,
-        y: room.centroid.y,
-        area: room.areaCm2,
-        room,
-      })
-    }
+    const defaults = defaultsByRoom.get(room) ?? []
+    const oldest = oldestByRoom.get(room)
+    if (defaults.length === 0 && oldest) continue // all labels custom: no centroid block
+    blocks.push({
+      key: defaults[0]?.id ?? `room-${room.pointIds.join(':')}`,
+      x: room.centroid.x,
+      y: room.centroid.y,
+      labels: defaults,
+      room,
+      area: !oldest || defaults.includes(oldest) ? room.areaCm2 : undefined,
+    })
   }
   return blocks
 }
 
-// Room labels are never selected — the block is dragged and double-click-edited
-// directly (CONTEXT.md: Selection). While the block named by editingKey is
-// edited the editor overlays an input on its name line, so the name text hides
-// but the area keeps its two-line offset.
+// Vertical pitch of a block's text lines; the editor positions its inline
+// name input on the same grid.
+export const BLOCK_LINE_HEIGHT = 14
+
+// The labels of a block with a visible name slot: named, or being edited in
+// place (the input overlays the slot, so the layout must keep reserving it).
+// Shared with the editor so the input lands exactly on its line.
+export const blockNameSlots = (block: RoomTextBlock, editingKey?: string) =>
+  block.labels.filter((label) => label.name || label.id === editingKey)
+
+// Room labels are never selected — each line of a block is dragged and
+// double-click-edited directly (CONTEXT.md: Selection): a name line targets
+// its label, the area line targets the block's oldest label (or, on an
+// unlabeled room, a label to be created). While the line named by editingKey
+// is edited the editor overlays an input on it, so its text hides but the
+// slot stays and the area keeps its offset.
 export function RoomOverlay({
   rooms,
   labels,
   editingKey,
-  onBlockPointerDown,
-  onBlockDoubleClick,
+  onLinePointerDown,
+  onLineDoubleClick,
 }: {
   rooms: Room[]
   labels: RoomLabel[]
   editingKey?: string
-  onBlockPointerDown?: (block: RoomTextBlock, e: React.PointerEvent) => void
-  onBlockDoubleClick?: (block: RoomTextBlock, e: React.MouseEvent) => void
+  onLinePointerDown?: (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => void
+  onLineDoubleClick?: (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => void
 }) {
+  const interactive = Boolean(onLinePointerDown || onLineDoubleClick)
+  const hitRect = (
+    key: string,
+    y: number,
+    className: string,
+    label: RoomLabel | null,
+    block: RoomTextBlock,
+  ) => (
+    <rect
+      key={key}
+      className={className}
+      x={-50}
+      y={y - 12}
+      width={100}
+      height={16}
+      fill="transparent"
+      style={{ cursor: 'move' }}
+      onPointerDown={onLinePointerDown ? (e) => onLinePointerDown(block, label, e) : undefined}
+      onDoubleClick={onLineDoubleClick ? (e) => onLineDoubleClick(block, label, e) : undefined}
+    />
+  )
   return (
     <g>
       {roomTextBlocks(rooms, labels).map((block) => {
-        const editing = block.key === editingKey
-        const nameLine = Boolean(block.name) || editing
+        const named = blockNameSlots(block, editingKey)
+        // creating a label on an unlabeled room also reserves a name slot
+        const slots = named.length > 0 ? named.length : block.key === editingKey ? 1 : 0
+        const areaY = slots > 0 ? slots * BLOCK_LINE_HEIGHT : 5
         // a block that renders nothing (nameless label whose room is gone)
         // must not linger as an invisible drag target
-        const interactive =
-          Boolean(onBlockPointerDown || onBlockDoubleClick) && (nameLine || block.area !== undefined)
+        if (named.length === 0 && block.area === undefined) return null
         return (
-          <g
-            key={block.key}
-            transform={`translate(${block.x},${block.y})`}
-            style={interactive ? { cursor: 'move' } : undefined}
-            onPointerDown={
-              interactive && onBlockPointerDown ? (e) => onBlockPointerDown(block, e) : undefined
-            }
-            onDoubleClick={
-              interactive && onBlockDoubleClick ? (e) => onBlockDoubleClick(block, e) : undefined
-            }
-            pointerEvents={interactive ? 'auto' : 'none'}
-          >
-            {block.name && !editing && (
-              <text textAnchor="middle" className="room-name">
-                {block.name}
-              </text>
+          <g key={block.key} transform={`translate(${block.x},${block.y})`}>
+            {named.map(
+              (label, i) =>
+                label.id !== editingKey && (
+                  <text key={label.id} y={i * BLOCK_LINE_HEIGHT} textAnchor="middle" className="room-name">
+                    {label.name}
+                  </text>
+                ),
             )}
             {block.area !== undefined && (
-              <text y={nameLine ? 14 : 5} textAnchor="middle" className="room-area">
+              <text y={areaY} textAnchor="middle" className="room-area">
                 {formatArea(block.area)}
               </text>
             )}
-            {interactive && <rect x={-50} y={-16} width={100} height={36} fill="transparent" />}
+            {interactive &&
+              named.map((label, i) =>
+                hitRect(`hit-${label.id}`, i * BLOCK_LINE_HEIGHT, 'room-name-hit', label, block),
+              )}
+            {interactive &&
+              block.area !== undefined &&
+              hitRect('hit-area', areaY, 'room-area-hit', block.labels[0] ?? null, block)}
           </g>
         )
       })}

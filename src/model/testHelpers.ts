@@ -1,11 +1,11 @@
 import type { Opening, Plan, Point, RoomLabel, Wall } from './types'
 import { defaultOpeningWidth, emptyPlan, WALL_THICKNESS } from './types'
 
-interface PlanBuilder {
+export interface PlanBuilder {
   point: (x: number, y: number) => Point
   wall: (a: Point, b: Point) => Wall
   opening: (wall: Wall, type: Opening['type'], offset: number, width?: number) => Opening
-  label: (name: string, x: number, y: number) => RoomLabel
+  label: (name: string, x: number, y: number, placed?: true) => RoomLabel
 }
 
 let counter = 0
@@ -34,9 +34,9 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
       plan.openings[id] = opening
       return opening
     },
-    label(name, x, y) {
+    label(name, x, y, placed) {
       const id = `l${++counter}`
-      const label: RoomLabel = { id, name, x, y }
+      const label: RoomLabel = placed ? { id, name, x, y, placed } : { id, name, x, y }
       plan.roomLabels[id] = label
       return label
     },

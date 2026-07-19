@@ -147,7 +147,11 @@ export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
     const homeRoom = roomAt(roomsBefore, pos.x, pos.y)
     const target = homeRoom && roomsAfter.find((room) => sameLoop(room, homeRoom))
     if (target) {
-      next[label.id] = { ...label, x: Math.round(target.centroid.x), y: Math.round(target.centroid.y) }
+      // the room survived but no longer contains the label: revert to default
+      // placement — a custom placement holds only while the room contains it
+      const reverted = { ...label, x: Math.round(target.centroid.x), y: Math.round(target.centroid.y) }
+      delete reverted.placed
+      next[label.id] = reverted
     }
   }
   return changed ? { ...after, roomLabels: next } : after

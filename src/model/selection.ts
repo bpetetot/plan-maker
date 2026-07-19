@@ -1,7 +1,7 @@
 import type { Vec } from './geometry'
 import { wallPoints } from './geometry'
 import { openingPlacement } from './openings'
-import { deleteOpening, deleteWall, moveRoomLabel, setPoints } from './operations'
+import { deleteOpening, deleteWall, setPoints, translateRoomLabel } from './operations'
 import type { Room } from './rooms'
 import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms'
 import type { Plan } from './types'
@@ -99,7 +99,7 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
     const rooms = detectRooms(plan)
     for (const label of labels) {
       const room = roomAt(rooms, label.x, label.y)
-      if (room && rigid(room)) next = moveRoomLabel(next, label.id, label.x + dx, label.y + dy)
+      if (room && rigid(room)) next = translateRoomLabel(next, label.id, dx, dy)
     }
   }
   return next

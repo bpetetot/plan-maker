@@ -182,3 +182,23 @@ describe('loadPlan — orphan room labels', () => {
     expect(Object.keys(loaded?.roomLabels ?? {})).toEqual([inside])
   })
 })
+
+describe('validatePlan — label placement state', () => {
+  it('accepts placed: true and rejects other values', () => {
+    const base = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, a)
+      b.label('Kitchen', 200, 150, true)
+    })
+    expect(validatePlan(base)).not.toBeNull()
+    const label = Object.values(base.roomLabels)[0]
+    const bad = { ...base, roomLabels: { [label.id]: { ...label, placed: 'yes' } } }
+    expect(validatePlan(bad)).toBeNull()
+  })
+})

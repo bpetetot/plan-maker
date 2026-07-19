@@ -44,11 +44,17 @@ export interface Window extends BaseOpening {
 
 export type Opening = Door | Window
 
+// A room's name and area render as one text block (CONTEXT.md: Room label).
+// `placed` absent = default placement: the block sits at the room's live
+// centroid and (x, y) is only the association anchor, maintained inside the
+// room. `placed: true` = custom placement (the user dragged the block):
+// (x, y) is where the block renders.
 export interface RoomLabel {
   id: string
   name: string
   x: Cm
   y: Cm
+  placed?: true
 }
 
 export interface Plan {

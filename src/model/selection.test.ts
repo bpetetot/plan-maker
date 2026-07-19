@@ -275,3 +275,25 @@ describe('translateElements — room label rigid move', () => {
     expect(next.roomLabels[ids.rightLabel]).toMatchObject({ x: 650, y: 150 })
   })
 })
+
+describe('translateElements — placement state', () => {
+  it('translates the anchor without changing the placement state', () => {
+    let ids = { walls: [] as string[], byDefault: '', custom: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(400, 400)
+      const p4 = b.point(0, 400)
+      const walls = [b.wall(p1, p2), b.wall(p2, p3), b.wall(p3, p4), b.wall(p4, p1)]
+      ids = {
+        walls: walls.map((w) => w.id),
+        byDefault: b.label('Kitchen', 200, 200).id,
+        custom: b.label('Nook', 350, 120, true).id,
+      }
+    })
+    const next = translateElements(plan, ids.walls.map(wallRef), 50, -30)
+    expect(next.roomLabels[ids.byDefault]).toMatchObject({ x: 250, y: 170 })
+    expect(next.roomLabels[ids.byDefault].placed).toBeUndefined()
+    expect(next.roomLabels[ids.custom]).toMatchObject({ x: 400, y: 90, placed: true })
+  })
+})

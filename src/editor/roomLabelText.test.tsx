@@ -47,7 +47,7 @@ function setup(label?: { name: string; x: number; y: number }) {
   usePlanStore.temporal.getState().clear()
   const { container } = render(<Editor />)
   const svg = container.querySelector('svg')!
-  const areaBlock = () => container.querySelector('text.room-area')!.closest('g')!
+  const areaBlock = () => container.querySelector('rect.room-area-hit')!
   const nameInput = () => container.querySelector<HTMLInputElement>('input.room-name-input')
   return { container, svg, areaBlock, nameInput }
 }
@@ -145,7 +145,7 @@ describe('dragging the area text', () => {
 
   it('a label outside any room (defensive: unreachable via plan operations) drags freely', () => {
     const { container, svg } = setup({ name: 'Kitchen', x: 700, y: 300 })
-    const nameBlock = container.querySelector('text.room-name')!.closest('g')!
+    const nameBlock = container.querySelector('rect.room-name-hit')!
     fireEvent.pointerDown(nameBlock, { button: 0, ...clientAt(svg, 700, 300) })
     fireEvent.pointerMove(svg, clientAt(svg, 650, 200))
     fireEvent.pointerUp(svg)

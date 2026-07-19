@@ -52,19 +52,28 @@ walls, never drawn or stored; they appear as soon as walls close a loop.
 _Avoid_: Zone, area, space
 
 **Room label**:
-A marker placed inside a room that positions the room's texts — its optional
-name and its area. It applies to whichever detected room contains its
-position, and is always inside a detected room — an orphan label never
+The name given to a room, shown with the room's area as one text block —
+label and area always share one position and one behavior. Its placement has
+two states, like a Dimension's: by default the block sits at the room's
+centroid, continuously recomputed — creating the label, resizing or moving
+the room never detaches it; dragging the block gives the label a custom
+placement, which from then on is the position that holds. It applies to
+whichever detected room contains its position, and is always inside a
+detected room — an orphan label never
 exists: it cannot be created or dragged outside a room, and labels that
 would arrive orphaned (e.g. from an imported plan) are dropped. After every
 wall change, each label reconciles against the room that contained it: still
 inside a detected room — untouched; its room still detected but no longer
-containing it — the label jumps to that room's centroid; its room no longer
-detected — the label is deleted. When a move translates every wall of its
-room, the label translates with the room, keeping its position relative to
-the room. A room without a label shows its area at its centroid. When one
+containing it — the label reverts to default placement (a custom placement
+holds only while the room contains it); its room no longer detected — the
+label is deleted. When a move translates every wall of its room, a custom
+placement translates with the room, keeping its position relative to the
+room — a default placement simply follows the centroid. A room without a
+label shows its area at its centroid. When one
 room contains several labels (e.g. after deleting a dividing wall), all are
-kept: the oldest carries the area, the others show only their name.
+kept: the oldest carries the area, the others show only their name; those
+with default placement share one block at the centroid, stacked oldest
+first.
 _Avoid_: Room name, tag
 
 **Dimension**:
