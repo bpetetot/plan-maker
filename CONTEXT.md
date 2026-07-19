@@ -12,7 +12,9 @@ _Avoid_: Document, project, drawing
 
 **Point**:
 A shared corner in the plan, at integer-centimeter coordinates. Walls reference
-points; moving a point moves every wall attached to it.
+points; moving a point moves every wall attached to it. Two Points never
+coincide: any gesture that would land one Point on another merges them into a
+single shared Point.
 _Avoid_: Vertex, node, corner
 
 **Wall**:

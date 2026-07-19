@@ -9,6 +9,7 @@ import {
   deleteRoomLabel,
   deleteWall,
   ensurePoint,
+  mergeCoincidentPoints,
   movePoint,
   moveRoomLabel,
   moveOpening,
@@ -22,7 +23,7 @@ import {
   toggleHingeSide,
   toggleSwing,
 } from './operations'
-import { buildPlan } from './testHelpers'
+import { buildPlan, squareRoomPlan } from './testHelpers'
 import { DOOR_WIDTH } from './types'
 
 const rectPlan = () =>
@@ -194,6 +195,25 @@ describe('commitPoint', () => {
     expect(next.walls).toEqual(plan.walls)
   })
 
+  it('reuses a coincident existing point on a grid snap instead of duplicating it', () => {
+    // The grid rounding can land exactly on a point that sat just outside the
+    // snap-to-point tolerance: the commit must not mint a coincident twin.
+    const plan = rectPlan()
+    const endId = plan.walls[Object.keys(plan.walls)[0]].endPointId // (400, 0)
+    const [next, id] = commitPoint(plan, { x: 400, y: 0, kind: 'grid' })
+    expect(id).toBe(endId)
+    expect(next).toBe(plan)
+  })
+
+  it('reuses a coincident existing point on axis and free snaps too', () => {
+    const plan = rectPlan()
+    const endId = plan.walls[Object.keys(plan.walls)[0]].endPointId // (400, 0)
+    expect(commitPoint(plan, { x: 400, y: 0, kind: 'axis', axisFrom: { x: 0, y: 0 } })[1]).toBe(endId)
+    // Alt suspends snapping, not the invariant: within the 1 cm junction
+    // tolerance the placement still lands on the existing point.
+    expect(commitPoint(plan, { x: 400.4, y: 0.4, kind: 'free' })[1]).toBe(endId)
+  })
+
   it('still splits the host when reusing a point that is not one of its ends', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0)
@@ -314,6 +334,81 @@ describe('addWall', () => {
     expect(addWall(plan, p1, p1)).toBe(plan)
     expect(addWall(plan, p1, p2)).toBe(plan)
     expect(addWall(plan, p2, p1)).toBe(plan)
+  })
+})
+
+describe('mergeCoincidentPoints', () => {
+  it('merges coincident points, rewiring walls to the first-seen survivor', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const twin = b.point(400, 0)
+      const p4 = b.point(400, 300)
+      b.wall(p1, p2)
+      b.wall(twin, p4)
+    })
+    const [p1, p2, twin, p4] = Object.keys(plan.points)
+    const [w1, w2] = Object.keys(plan.walls)
+    const next = mergeCoincidentPoints(plan)
+    expect(Object.keys(next.points).sort()).toEqual([p1, p2, p4].sort())
+    expect(next.points[twin]).toBeUndefined()
+    expect(next.walls[w1]).toMatchObject({ startPointId: p1, endPointId: p2 })
+    expect(next.walls[w2]).toMatchObject({ startPointId: p2, endPointId: p4 })
+  })
+
+  it('prefers a stationary survivor over a moved point', () => {
+    const plan = buildPlan((b) => {
+      const dragged = b.point(400, 0)
+      const still = b.point(400, 0)
+      b.wall(b.point(0, 0), dragged)
+      b.wall(still, b.point(400, 300))
+    })
+    const [dragged, still] = Object.keys(plan.points)
+    const next = mergeCoincidentPoints(plan, new Set([dragged]))
+    expect(next.points[still]).toBeDefined()
+    expect(next.points[dragged]).toBeUndefined()
+  })
+
+  it('deletes a wall whose two ends merge, along with its openings', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(1, 0) // within the 1 cm junction tolerance of p1
+      const shrunk = b.wall(p1, p2)
+      b.wall(p2, b.point(300, 0))
+      b.opening(shrunk, 'door', 0)
+    })
+    const next = mergeCoincidentPoints(plan)
+    expect(next.walls[Object.keys(plan.walls)[0]]).toBeUndefined()
+    expect(Object.keys(next.openings)).toHaveLength(0)
+  })
+
+  it('dedupes twin walls, transposing the removed twin openings onto the survivor', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const twin = b.point(400, 0)
+      b.wall(p1, p2)
+      const reversedTwin = b.wall(twin, p1) // same span, opposite direction
+      b.opening(reversedTwin, 'door', 100)
+    })
+    const [w1, w2] = Object.keys(plan.walls)
+    const doorId = Object.keys(plan.openings)[0]
+    const next = mergeCoincidentPoints(plan)
+    expect(next.walls[w2]).toBeUndefined()
+    // 100 cm from the twin's start = 100 cm from the survivor's end; hinge
+    // and swing are wall-relative, so the reversed frame flips both to keep
+    // the door physically identical
+    expect(next.openings[doorId]).toMatchObject({
+      wallId: w1,
+      offset: 300,
+      hingeSide: 'end',
+      swing: 'out',
+    })
+  })
+
+  it('returns the same plan when no points coincide', () => {
+    const plan = squareRoomPlan()
+    expect(mergeCoincidentPoints(plan)).toBe(plan)
   })
 })
 

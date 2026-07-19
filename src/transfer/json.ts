@@ -1,6 +1,5 @@
-import { dropOrphanRoomLabels } from '../model/rooms'
 import type { Plan } from '../model/types'
-import { runMigrations, SCHEMA_VERSION, validatePlan } from '../persistence/schema'
+import { decodePlanPayload, SCHEMA_VERSION } from '../persistence/schema'
 
 // JSON transfer file (spec §7): persisted model + envelope. `format` cleanly
 // rejects foreign JSON; `version` replays the same migration chain as storage.
@@ -28,16 +27,15 @@ export function parsePlanFile(text: string): ParseResult {
   if (typeof version !== 'number' || version > SCHEMA_VERSION) {
     return { ok: false, reason: 'unsupported-version' }
   }
-  let migrated: unknown
+  let decoded: Plan | null
   try {
-    migrated = runMigrations(version, plan)
+    decoded = decodePlanPayload(version, plan)
   } catch {
     // an old version with no registered migration path is unreadable, not "newer"
-    return { ok: false, reason: 'invalid-plan' }
+    decoded = null
   }
-  const validated = validatePlan(migrated)
-  if (!validated) return { ok: false, reason: 'invalid-plan' }
-  return { ok: true, plan: dropOrphanRoomLabels(validated) }
+  if (!decoded) return { ok: false, reason: 'invalid-plan' }
+  return { ok: true, plan: decoded }
 }
 
 export function transferFileName(extension: 'json' | 'png', date: Date = new Date()): string {

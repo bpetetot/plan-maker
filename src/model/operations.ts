@@ -108,19 +108,22 @@ function findPointNear(plan: Plan, x: number, y: number): string | null {
 // Resolves a drawing click to a point id, splitting the host wall when the
 // snap targets a wall body. The host is looked up at resolution time (not
 // trusted from the snap) because an earlier split may have replaced it.
+// Whatever the snap kind, a position landing on an existing point reuses it:
+// two Points never coincide (ADR 0003).
 export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
   if (snap.pointId) return [plan, snap.pointId]
   const x = Math.round(snap.x)
   const y = Math.round(snap.y)
+  const existing = findPointNear(plan, x, y)
   if (snap.kind === 'wall') {
     const host = nearestWall(plan, x, y, JUNCTION_TOLERANCE + 1)
-    const existing = findPointNear(plan, x, y)
     // A reused point still splits the host (no-op when it is one of its
     // ends): the contact must be a junction, not a dangling overlap.
     if (existing) return [host ? splitWall(plan, host.wall.id, existing) : plan, existing]
     const [next, id] = ensurePoint(plan, snap)
     return [host ? splitWall(next, host.wall.id, id) : next, id]
   }
+  if (existing) return [plan, existing]
   return ensurePoint(plan, snap)
 }
 
@@ -179,6 +182,86 @@ export function commitWall(
   const stops = [startId, ...ordered, endId]
   for (let i = 0; i < stops.length - 1; i++) next = addWall(next, stops[i], stops[i + 1], thickness)
   return [next, endId]
+}
+
+// Merges the absorbed point into the survivor: walls are rewired to the
+// survivor; a wall whose two ends collapse onto it is deleted with its
+// openings; a wall made identical to another (same endpoint pair) is deleted
+// and its openings transpose onto the surviving twin — the geometry is the
+// same; when the twins run in opposite directions the offset mirrors and a
+// door's wall-relative hinge and swing flip with the frame, keeping the door
+// physically identical.
+function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
+  const points = { ...plan.points }
+  delete points[absorbedId]
+
+  const walls: Record<string, Wall> = {}
+  const twinOf = new Map<string, string>() // removed twin id → surviving wall id
+  const byEndpoints = new Map<string, string>() // unordered endpoint pair → wall id
+  for (const wall of Object.values(plan.walls)) {
+    const startPointId = wall.startPointId === absorbedId ? survivorId : wall.startPointId
+    const endPointId = wall.endPointId === absorbedId ? survivorId : wall.endPointId
+    if (startPointId === endPointId) continue // degenerate: both ends merged
+    const pair = JSON.stringify([startPointId, endPointId].sort())
+    const twin = byEndpoints.get(pair)
+    if (twin) {
+      twinOf.set(wall.id, twin)
+      continue
+    }
+    byEndpoints.set(pair, wall.id)
+    walls[wall.id] = { ...wall, startPointId, endPointId }
+  }
+
+  const next = { ...plan, points, walls }
+  const openings: Record<string, Opening> = {}
+  for (const opening of Object.values(plan.openings)) {
+    if (walls[opening.wallId]) {
+      openings[opening.id] = opening
+      continue
+    }
+    const hostId = twinOf.get(opening.wallId)
+    if (!hostId) continue // its wall degenerated: the opening goes with it
+    const removed = plan.walls[opening.wallId]
+    const removedStart = removed.startPointId === absorbedId ? survivorId : removed.startPointId
+    const reversed = removedStart !== walls[hostId].startPointId
+    const offset = reversed ? Math.round(wallLength(next, walls[hostId]) - opening.offset) : opening.offset
+    let moved: Opening = { ...opening, wallId: hostId, offset }
+    if (reversed && moved.type === 'door') {
+      moved = {
+        ...moved,
+        hingeSide: moved.hingeSide === 'start' ? 'end' : 'start',
+        swing: moved.swing === 'in' ? 'out' : 'in',
+      }
+    }
+    openings[opening.id] = moved
+  }
+  return { ...next, openings }
+}
+
+// Enforces the invariant "two Points never coincide" (ADR 0003): every pair
+// of points within the junction tolerance is merged into one. When `moving`
+// lists the points a gesture displaced, a stationary point survives over a
+// moved one; otherwise the first-seen point survives. Returns the same plan
+// when nothing coincides.
+export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
+  let next = plan
+  for (let merged = true; merged;) {
+    merged = false
+    const points = Object.values(next.points)
+    outer: for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const a = points[i]
+        const b = points[j]
+        if (distance(a.x, a.y, b.x, b.y) > JUNCTION_TOLERANCE) continue
+        const aMoved = moving ? moving.has(a.id) && !moving.has(b.id) : false
+        const [survivor, absorbed] = aMoved ? [b, a] : [a, b]
+        next = mergePoints(next, survivor.id, absorbed.id)
+        merged = true
+        break outer
+      }
+    }
+  }
+  return next
 }
 
 // Deleting a wall deletes its openings (spec §2) and any point no longer used by a wall.

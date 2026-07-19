@@ -1,3 +1,5 @@
+import { mergeCoincidentPoints } from '../model/operations'
+import { dropOrphanRoomLabels } from '../model/rooms'
 import type { Opening, Plan } from '../model/types'
 
 // One schema, one migration path (spec §7): the IndexedDB record and the JSON
@@ -30,6 +32,15 @@ export function runMigrations(
     current = migrate(current)
   }
   return current
+}
+
+// Shared load path for storage records and transfer files: migrate, validate,
+// then normalize — coincident points merge first (ADR 0003), since closing a
+// loop may give an otherwise-orphan label its room back. Throws like
+// runMigrations on a missing migration step.
+export function decodePlanPayload(fromVersion: number, plan: unknown): Plan | null {
+  const validated = validatePlan(runMigrations(fromVersion, plan))
+  return validated && dropOrphanRoomLabels(mergeCoincidentPoints(validated))
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

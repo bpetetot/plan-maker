@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { clear, get, set } from 'idb-keyval'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addRoomLabel } from '../model/operations'
+import { detectRooms } from '../model/rooms'
 import { buildPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
@@ -180,6 +181,26 @@ describe('loadPlan — orphan room labels', () => {
     await savePlan(plan)
     const loaded = await loadPlan()
     expect(Object.keys(loaded?.roomLabels ?? {})).toEqual([inside])
+  })
+})
+
+describe('loadPlan — coincident points', () => {
+  it('merges coincident points so a visually closed loop loads as a room', async () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 300)
+      const e = b.point(0, 300)
+      const twin = b.point(0, 0) // twin of a: closed on screen, open in the graph
+      b.wall(a, c)
+      b.wall(c, d)
+      b.wall(d, e)
+      b.wall(e, twin)
+    })
+    await savePlan(plan)
+    const loaded = await loadPlan()
+    expect(Object.keys(loaded!.points)).toHaveLength(4)
+    expect(detectRooms(loaded!)).toHaveLength(1)
   })
 })
 

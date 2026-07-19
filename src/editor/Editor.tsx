@@ -28,6 +28,7 @@ import {
   clampOpeningOffset,
   commitPoint,
   commitWall,
+  mergeCoincidentPoints,
   movePoint,
   moveOpening,
   moveRoomLabel,
@@ -456,9 +457,24 @@ export default function Editor() {
     }
     if (d.kind === 'point') setSnap(null)
     if (d.kind === 'opening') setMovingOpeningId(null)
-    // wall geometry changed: labels reconcile once, at the end of the gesture
-    // (CONTEXT.md: Room label), inside the same history group
-    if (d.kind === 'point' || d.kind === 'group') setPlan((p) => reconcileRoomLabels(d.orig, p))
+    // wall geometry changed: coincident points merge (ADR 0003) and labels
+    // reconcile once, at the end of the gesture (CONTEXT.md: Room label),
+    // inside the same history group
+    if (d.kind === 'point' || d.kind === 'group') {
+      setPlan((p) => {
+        const moving = new Set<string>()
+        if (d.kind === 'point') moving.add(d.id)
+        else
+          for (const ref of d.refs) {
+            const wall = ref.type === 'wall' ? p.walls[ref.id] : undefined
+            if (wall) {
+              moving.add(wall.startPointId)
+              moving.add(wall.endPointId)
+            }
+          }
+        return reconcileRoomLabels(d.orig, mergeCoincidentPoints(p, moving))
+      })
+    }
     if (d.kind !== 'pan') endHistoryGroup()
   }
 
