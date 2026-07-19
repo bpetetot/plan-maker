@@ -32,12 +32,47 @@ export const labelAngle = (dx: number, dy: number) => {
 
 export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?: string }) {
   const outline = wallOutline(plan, wall)
+  const points = outline.map((p) => `${p.x},${p.y}`).join(' ')
+  const gaps = Object.values(plan.openings).filter((o) => o.wallId === wall.id)
+  if (gaps.length === 0) {
+    return <polygon points={points} fill={color ?? COLORS.wall} pointerEvents="none" />
+  }
+  // Openings cut real holes in the body (mask), so whatever lies beneath —
+  // the Grid — stays visible through the gap. Region: the outline's bbox,
+  // grown past the ±1 cm the gap rects overhang the faces.
+  const xs = outline.map((p) => p.x)
+  const ys = outline.map((p) => p.y)
+  const x = Math.min(...xs) - 2
+  const y = Math.min(...ys) - 2
+  const maskId = `wall-gaps-${wall.id}`
   return (
-    <polygon
-      points={outline.map((p) => `${p.x},${p.y}`).join(' ')}
-      fill={color ?? COLORS.wall}
-      pointerEvents="none"
-    />
+    <g pointerEvents="none">
+      <mask
+        id={maskId}
+        maskUnits="userSpaceOnUse"
+        x={x}
+        y={y}
+        width={Math.max(...xs) - x + 2}
+        height={Math.max(...ys) - y + 2}
+      >
+        <rect x={x} y={y} width={Math.max(...xs) - x + 2} height={Math.max(...ys) - y + 2} fill="#fff" />
+        {gaps.map((o) => {
+          const placement = openingPlacement(plan, o)
+          return placement ? (
+            <rect
+              key={o.id}
+              transform={`translate(${placement.cx},${placement.cy}) rotate(${placement.angleDeg})`}
+              x={-o.width / 2}
+              y={-wall.thickness / 2 - 1}
+              width={o.width}
+              height={wall.thickness + 2}
+              fill="#000"
+            />
+          ) : null
+        })}
+      </mask>
+      <polygon points={points} fill={color ?? COLORS.wall} mask={`url(#${maskId})`} />
+    </g>
   )
 }
 
@@ -131,14 +166,17 @@ export function OpeningGlyph({
       opacity={ghost ? 0.55 : 1}
       pointerEvents="none"
     >
-      {/* gap in the wall */}
-      <rect
-        x={-halfWidth}
-        y={-thickness / 2 - 1}
-        width={opening.width}
-        height={thickness + 2}
-        fill="var(--sheet)"
-      />
+      {/* a placed opening's gap is cut from the wall by WallLine's mask; the
+          ghost is not in the plan, so it previews its future hole itself */}
+      {ghost && (
+        <rect
+          x={-halfWidth}
+          y={-thickness / 2 - 1}
+          width={opening.width}
+          height={thickness + 2}
+          fill="var(--sheet)"
+        />
+      )}
       {opening.type === 'door' ? (
         <g transform={doorMirror(opening)}>
           <line {...doorLeaf(opening)} stroke={stroke} strokeWidth={3} />
