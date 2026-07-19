@@ -2,7 +2,17 @@
 // prototype: full-bleed canvas, floating toolbar, click-to-click walls,
 // selection panel on the left, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BrickWall, DoorClosed, Grid2x2, MousePointer2, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import {
+  BrickWall,
+  DoorClosed,
+  Grid2x2,
+  Grid3x3,
+  MousePointer2,
+  Redo2,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Vec } from '../model/geometry'
 import {
@@ -41,6 +51,7 @@ import { snapDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
+import { GridLines, loadGridVisible, saveGridVisible } from './grid'
 import type { RoomTextBlock } from './render'
 import { ToolPanel } from './ToolPanel'
 import {
@@ -123,6 +134,7 @@ export default function Editor() {
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [tool, setTool] = useState<Tool>('select')
+  const [gridVisible, setGridVisible] = useState(loadGridVisible)
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
@@ -558,7 +570,8 @@ export default function Editor() {
         onContextMenu={onSvgContextMenu}
         onDoubleClick={onCanvasDoubleClick}
       >
-        {/* the grid is not displayed (spec §4) — grid snapping stays active */}
+        {/* purely visual (CONTEXT.md: Grid) — grid snapping stays active either way */}
+        {gridVisible && <GridLines view={view} pxPerCm={zoomScale} />}
         {Object.values(plan.walls).map((wall) => (
           <WallLine
             key={wall.id}
@@ -768,6 +781,18 @@ export default function Editor() {
             onClick={() => zoomCenter(1 / 1.25)}
           >
             <ZoomIn size={16} aria-hidden />
+          </button>
+          <button
+            className={gridVisible ? 'floating-btn icon active' : 'floating-btn icon'}
+            title={gridVisible ? 'Hide grid' : 'Show grid'}
+            aria-label="Grid"
+            aria-pressed={gridVisible}
+            onClick={() => {
+              setGridVisible(!gridVisible)
+              saveGridVisible(!gridVisible)
+            }}
+          >
+            <Grid3x3 size={16} aria-hidden />
           </button>
         </div>
         <div className="floating">

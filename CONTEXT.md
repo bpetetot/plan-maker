@@ -145,6 +145,16 @@ integer-centimeter rounding remains (Points have integer coordinates).
 Toggles immediately, both ways, including mid-gesture.
 _Avoid_: Free mode, no-grid mode
 
+**Grid**:
+The sheet's visible ruling, materializing what Snap aligns to: minor grid
+lines every 10 cm — the snap step — and major grid lines every meter. Purely
+visual: showing or hiding it never affects Snap. Always legible, never noise:
+minor lines fade out when their cells get too small on screen, major lines
+follow at extreme zoom-out. Shown by default; the show/hide choice is a
+per-device preference, like the Theme — never part of the plan, never
+exported.
+_Avoid_: Sur-grille, sous-grille, overlay, mesh
+
 **Placement dimension**:
 The pair of temporary dimensions flanking an Opening while it is being placed
 or moved. They sit on the interior side whenever exactly one side of the wall
