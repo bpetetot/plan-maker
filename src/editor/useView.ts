@@ -9,23 +9,41 @@ export interface View {
   h: number
 }
 
-const DEFAULT_VIEW: View = { x: -80, y: -80, w: 820, h: 620 }
+// The framing an empty plan opens with, in plan cm.
+const DEFAULT_FRAME: View = { x: -80, y: -80, w: 820, h: 620 }
 
-// The plan rect actually on screen. With preserveAspectRatio "xMidYMid meet"
-// the screen shows more than the viewBox on the non-limiting axis; anything
-// drawn to cover the screen (the Grid) must cover this rect, not the viewBox.
-export function visibleRect(view: View, screenW: number, screenH: number): View {
-  const scale = Math.min(screenW / view.w, screenH / view.h)
-  if (!(scale > 0)) return view
-  const w = screenW / scale
-  const h = screenH / scale
-  return { x: view.x + (view.w - w) / 2, y: view.y + (view.h - h) / 2, w, h }
+// The camera is the stable view state, Excalidraw-style: the plan point at the
+// screen's top-left corner plus the scale (screen px per plan cm). The viewBox
+// is derived from camera + measured screen size, so resizing the window is a
+// state no-op: it reveals or hides plan, never pans or rescales it.
+interface Camera {
+  x: number
+  y: number
+  scale: number
+}
+
+// The "meet" scale framing `rect` on a w×h screen (screen px per plan cm).
+const frameScale = (rect: View, w: number, h: number) => Math.min(w / rect.w, h / rect.h)
+
+// The camera centering `rect` on a w×h screen at that scale.
+function frameCamera(rect: View, w: number, h: number): Camera {
+  const scale = frameScale(rect, w, h)
+  if (!(scale > 0)) return { x: rect.x, y: rect.y, scale: 1 }
+  return {
+    x: rect.x + rect.w / 2 - w / (2 * scale),
+    y: rect.y + rect.h / 2 - h / (2 * scale),
+    scale,
+  }
 }
 
 // Zoom/pan via the SVG viewBox (spec §3): scroll zooms toward the cursor,
 // callers pan by screen pixels, Fit frames the plan's bounding box.
 export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
-  const [view, setView] = useState<View>(DEFAULT_VIEW)
+  const [camera, setCamera] = useState<Camera>({ x: DEFAULT_FRAME.x, y: DEFAULT_FRAME.y, scale: 1 })
+  // Scale of the default framing at the last framing event (mount, Fit) — the
+  // Zoom reference (glossary: Zoom). Captured, not derived from the live
+  // window size, so a resize changes neither the view nor the percentage.
+  const [refScale, setRefScale] = useState(1)
 
   const toPlan = (clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -36,16 +54,18 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
   }
 
   // screen pixels per plan cm at the current zoom
-  const pxPerCm = () => svgRef.current?.getScreenCTM()?.a ?? 1
+  const pxPerCm = () => camera.scale
 
   const zoomAt = (clientX: number, clientY: number, factor: number) => {
-    const c = toPlan(clientX, clientY)
-    setView((v) => ({
-      x: c.x - (c.x - v.x) * factor,
-      y: c.y - (c.y - v.y) * factor,
-      w: v.w * factor,
-      h: v.h * factor,
-    }))
+    const r = svgRef.current?.getBoundingClientRect()
+    if (!r) return
+    setCamera((c) => {
+      const scale = c.scale / factor
+      const px = clientX - r.left
+      const py = clientY - r.top
+      // the plan point under the cursor stays under the cursor
+      return { x: c.x + px / c.scale - px / scale, y: c.y + py / c.scale - py / scale, scale }
+    })
   }
 
   const zoomCenter = (factor: number) => {
@@ -55,25 +75,27 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor)
   }
 
-  const panByPx = (dxPx: number, dyPx: number) => {
-    const scale = pxPerCm()
-    setView((v) => ({ ...v, x: v.x - dxPx / scale, y: v.y - dyPx / scale }))
-  }
+  const panByPx = (dxPx: number, dyPx: number) =>
+    setCamera((c) => ({ ...c, x: c.x - dxPx / c.scale, y: c.y - dyPx / c.scale }))
 
   const fitPlan = (plan: Plan) => {
+    const r = svgRef.current?.getBoundingClientRect()
+    const w = r?.width ?? 0
+    const h = r?.height ?? 0
     const box = planBBox(plan)
-    if (!box) {
-      setView(DEFAULT_VIEW)
-      return
-    }
     const margin = 120
-    setView({ x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin })
+    const target = box
+      ? { x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin }
+      : DEFAULT_FRAME
+    setCamera(frameCamera(target, w, h))
+    // unmeasurable screen: frameCamera fell back to scale 1, keep 100% coherent
+    const ref = frameScale(DEFAULT_FRAME, w, h)
+    setRefScale(ref > 0 ? ref : 1)
   }
 
-  // On-screen size of the SVG, tracked as state so the zoom percentage can be
-  // derived from `view` + `size` during render. Reading getScreenCTM() at
-  // render time instead would return the *committed* viewBox — one render
-  // behind the state — making the displayed percentage lag every zoom.
+  // On-screen size of the SVG, tracked as state so the viewBox and the zoom
+  // percentage derive from it during render. A size change re-renders with the
+  // same camera: that is the whole resize behavior.
   const [size, setSize] = useState({ w: 0, h: 0 })
   useEffect(() => {
     const svg = svgRef.current
@@ -83,22 +105,27 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
       setSize((s) => (s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height }))
     }
     measure()
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(measure)
+      ro.observe(svg)
+      return () => ro.disconnect()
+    }
+    // jsdom has no ResizeObserver; tests drive resizes through window events
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
     // svgRef is stable; the ref is filled by the time effects run
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // The "meet" scale, read off the visible rect (screen px per plan cm).
-  // This is the render-safe counterpart of pxPerCm().
-  const visibleView = visibleRect(view, size.w, size.h)
-  const zoomScale = size.w > 0 ? size.w / visibleView.w : 1
+  // The viewBox always matches the screen's aspect ratio, so "meet" leaves no
+  // slack: what the viewBox frames is exactly what is on screen.
+  const view: View =
+    size.w > 0 && size.h > 0
+      ? { x: camera.x, y: camera.y, w: size.w / camera.scale, h: size.h / camera.scale }
+      : DEFAULT_FRAME
 
-  // Zoom relative to the default framing (glossary: Zoom): 1 whenever the
-  // view frames DEFAULT_VIEW in the current window, whatever its size. The
-  // reference follows the window, so resizing leaves the ratio stable.
-  const defaultScale = size.w > 0 ? size.w / visibleRect(DEFAULT_VIEW, size.w, size.h).w : 1
-  const zoomRatio = zoomScale / defaultScale
+  const zoomScale = camera.scale
+  const zoomRatio = camera.scale / refScale
 
   useEffect(() => {
     const svg = svgRef.current
@@ -113,7 +140,7 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, visibleView, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan }
+  return { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan }
 }
 
 export function useSpaceHeld() {

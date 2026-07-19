@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { usePlanStore } from '../store/planStore'
 import { emptyPlan } from '../model/types'
 import Editor from './Editor'
-import { installSvgGeometry } from './testHelpers'
+import { installSvgGeometry, zoomLabel } from './testHelpers'
 
 beforeAll(installSvgGeometry)
 
@@ -15,12 +15,12 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-// The displayed percentage is relative to the default framing: 100% when the
-// view frames DEFAULT_VIEW (820×620) in the window — same min-ratio ("meet")
-// rule as the browser on both sides. The test screen is 800×600.
+// The displayed percentage is relative to the default framing (820×620 fitted
+// with the min ratio into the window at the last load or Fit). The window
+// never resizes here, so expected values read as ratios of framing scales.
+// The test screen is 800×600.
 const scale = (w: number, h: number) => Math.min(800 / w, 600 / h)
 const pct = (w: number, h: number) => `${Math.round((scale(w, h) / scale(820, 620)) * 100)}%`
-const zoomLabel = () => screen.getByTitle('Fit to plan').textContent
 
 describe('zoom percentage indicator', () => {
   it('shows 100% for the initial view', () => {

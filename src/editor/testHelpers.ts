@@ -1,3 +1,5 @@
+import { screen } from '@testing-library/react'
+
 // Shared jsdom shim for editor tests — jsdom has no SVG geometry or pointer
 // capture. Emulates the browser: the screen CTM is derived from the
 // *committed* viewBox attribute, so a component reading it during a React
@@ -60,6 +62,13 @@ export function installSvgGeometry() {
   }
   ;(globalThis as Record<string, unknown>).DOMPoint = FakeDOMPoint
 }
+
+// The committed viewBox as numbers [x, y, w, h].
+export const viewBoxOf = (container: HTMLElement) =>
+  container.querySelector('svg')!.getAttribute('viewBox')!.split(/\s+/).map(Number)
+
+// Text of the zoom percentage indicator (the Fit button doubles as it).
+export const zoomLabel = () => screen.getByTitle('Fit to plan').textContent
 
 // Client coordinates of a plan position under the current (possibly fitted)
 // viewBox — the inverse of the getScreenCTM shim above.

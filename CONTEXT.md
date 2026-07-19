@@ -205,8 +205,9 @@ _Avoid_: Fit zoom, zoom to fit, center
 
 **Zoom**:
 How far the view is zoomed in or out, expressed relative to the default
-framing: 100% means the view frames the same area an empty plan opens with,
-whatever the screen size, so resizing the window leaves it unchanged. Never a
-paper scale or a physical size. Pure editor state: never part of the plan,
-never exported.
+framing: 100% is the scale the default framing had in the window as of the
+last load or Fit. Resizing the window never pans or zooms the view — it only
+reveals or hides plan, the top-left corner staying put — so neither the plan
+on screen nor the Zoom changes. Never a paper scale or a physical size. Pure
+editor state: never part of the plan, never exported.
 _Avoid_: Zoom level, scale, magnification

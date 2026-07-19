@@ -129,8 +129,7 @@ const isTypingTarget = (e: KeyboardEvent) => {
 
 export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
-  const { view, visibleView, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan } =
-    useView(svgRef)
+  const { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
   const planEpoch = usePlanStore((s) => s.planEpoch)
@@ -590,7 +589,7 @@ export default function Editor() {
         onDoubleClick={onCanvasDoubleClick}
       >
         {/* purely visual (CONTEXT.md: Grid) — grid snapping stays active either way */}
-        {gridVisible && <GridLines view={visibleView} pxPerCm={zoomScale} />}
+        {gridVisible && <GridLines view={view} pxPerCm={zoomScale} />}
         {Object.values(plan.walls).map((wall) => (
           <WallLine
             key={wall.id}
