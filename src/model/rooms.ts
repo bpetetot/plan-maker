@@ -1,7 +1,7 @@
 import { faceLength, faceSpan, interiorPolygon } from './faces'
 import type { Vec } from './geometry'
 import { pointInPolygon, polygonArea, polygonCentroid } from './geometry'
-import type { Plan, Wall } from './types'
+import type { Plan, RoomLabel, Wall } from './types'
 
 // Rooms are derived, never stored (spec §2): the closed faces of the wall
 // graph, found by walking every directed edge with a "most clockwise turn"
@@ -122,21 +122,25 @@ const sameLoop = (a: Room, b: Room) => {
 }
 
 // Reconciliation after a wall change (CONTEXT.md: Room label) — an orphan
-// label never exists. Each label is checked against the rooms detected in
-// `after`: still inside a room — untouched; its room (the one containing it
-// in `before`, matched by point loop) still detected but no longer
-// containing it — snapped to that room's centroid; its room gone — deleted.
-// Reconciling a plan against itself purges plain orphans (import, restore).
+// label never exists, and a room never keeps more than one label. Each label
+// is checked against the rooms detected in `after`: still inside a room —
+// untouched; its room (the one containing it in `before`, matched by point
+// loop) still detected but no longer containing it — snapped to that room's
+// centroid; its room gone — deleted. When several labels end up in one room
+// (e.g. deleting a dividing wall merged two named rooms), only the oldest
+// survives. Reconciling a plan against itself purges plain orphans (import,
+// restore).
 export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
   const labels = Object.values(after.roomLabels)
   if (labels.length === 0) return after
   const roomsAfter = detectRooms(after)
   let roomsBefore: Room[] | null = null
   let changed = false
-  const next: Plan['roomLabels'] = {}
+  const kept: { label: RoomLabel; room: Room }[] = []
   for (const label of labels) {
-    if (roomAt(roomsAfter, label.x, label.y)) {
-      next[label.id] = label
+    const roomNow = roomAt(roomsAfter, label.x, label.y)
+    if (roomNow) {
+      kept.push({ label, room: roomNow })
       continue
     }
     changed = true
@@ -151,8 +155,19 @@ export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
       // placement — a custom placement holds only while the room contains it
       const reverted = { ...label, x: Math.round(target.centroid.x), y: Math.round(target.centroid.y) }
       delete reverted.placed
-      next[label.id] = reverted
+      kept.push({ label: reverted, room: target })
     }
+  }
+  // one label per room: labels iterate in creation order, the first claim wins
+  const next: Plan['roomLabels'] = {}
+  const claimed = new Set<Room>()
+  for (const { label, room } of kept) {
+    if (claimed.has(room)) {
+      changed = true
+      continue
+    }
+    claimed.add(room)
+    next[label.id] = label
   }
   return changed ? { ...after, roomLabels: next } : after
 }

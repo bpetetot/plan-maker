@@ -47,34 +47,6 @@ describe('roomTextBlocks', () => {
     expect(blocks[0]).toMatchObject({ x: 350, y: 120, labels: [label], area: 390 * 390 })
   })
 
-  it('stacks the default labels of one room in a single block, oldest first', () => {
-    let l1!: RoomLabel
-    let l2!: RoomLabel
-    const plan = square((b) => {
-      l1 = b.label('Kitchen', 150, 150)
-      l2 = b.label('Dining', 250, 250)
-    })
-    const blocks = blocksOf(plan)
-    expect(blocks).toHaveLength(1)
-    expect(blocks[0]).toMatchObject({ x: 200, y: 200, labels: [l1, l2], area: 390 * 390 })
-  })
-
-  it('keeps the area with the oldest label even when it is custom-placed', () => {
-    let older!: RoomLabel
-    let newer!: RoomLabel
-    const plan = square((b) => {
-      older = b.label('Kitchen', 350, 120, true)
-      newer = b.label('Dining', 250, 250)
-    })
-    const blocks = blocksOf(plan)
-    expect(blocks).toHaveLength(2)
-    const custom = blocks.find((block) => block.x === 350)!
-    const stack = blocks.find((block) => block.x === 200)!
-    expect(custom).toMatchObject({ y: 120, labels: [older], area: 390 * 390 })
-    expect(stack).toMatchObject({ y: 200, labels: [newer] })
-    expect(stack.area).toBeUndefined()
-  })
-
   it('shows the area alone at the centroid of an unlabeled room', () => {
     const plan = square(() => {})
     const blocks = blocksOf(plan)

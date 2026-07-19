@@ -69,11 +69,10 @@ holds only while the room contains it); its room no longer detected — the
 label is deleted. When a move translates every wall of its room, a custom
 placement translates with the room, keeping its position relative to the
 room — a default placement simply follows the centroid. A room without a
-label shows its area at its centroid. When one
-room contains several labels (e.g. after deleting a dividing wall), all are
-kept: the oldest carries the area, the others show only their name; those
-with default placement share one block at the centroid, stacked oldest
-first.
+label shows its area at its centroid. A room never keeps more than one
+label: when a wall change leaves several labels in one room (e.g. deleting
+a dividing wall merges two named rooms), only the oldest survives — the
+others are deleted.
 _Avoid_: Room name, tag
 
 **Dimension**:

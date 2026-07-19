@@ -121,27 +121,3 @@ describe('default placement follows the live centroid', () => {
     expect(created.placed).toBeUndefined()
   })
 })
-
-describe('stacked labels', () => {
-  it('dragging a stacked name line gives that label a custom placement, the other stays stacked', () => {
-    const base = labeledSquare()
-    base.roomLabels = {
-      l1: { id: 'l1', name: 'Kitchen', x: 150, y: 150 },
-      l2: { id: 'l2', name: 'Dining', x: 250, y: 250 },
-    }
-    usePlanStore.setState({ plan: base, planEpoch: 0 })
-    usePlanStore.temporal.getState().clear()
-    const { container } = render(<Editor />)
-    const svg = container.querySelector('svg')!
-    // one stacked block at the centroid: Kitchen at y=0, Dining at y=14
-    const nameHits = svg.querySelectorAll('rect.room-name-hit')
-    expect(nameHits).toHaveLength(2)
-    fireEvent.pointerDown(nameHits[1], { button: 0, ...clientAt(svg, 300, 314) })
-    fireEvent.pointerMove(svg, clientAt(svg, 400, 400))
-    fireEvent.pointerUp(svg)
-    const { roomLabels } = usePlanStore.getState().plan
-    expect(roomLabels.l2).toMatchObject({ x: 400, y: 400, placed: true })
-    expect(roomLabels.l1).toMatchObject({ x: 150, y: 150 })
-    expect(roomLabels.l1.placed).toBeUndefined()
-  })
-})

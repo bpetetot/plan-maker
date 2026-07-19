@@ -446,12 +446,13 @@ export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: O
 }
 
 // Room texts group into blocks (CONTEXT.md: Room label): a custom-placed
-// label is its own block where it was dragged; the default-placement labels
-// of a room share one block at the room's live centroid, stacked oldest
-// first — so does the bare area of an unlabeled room. The room's oldest
-// label carries the area, in whichever block it renders. A label outside any
-// room cannot arise from plan operations, but is defensively rendered as its
-// name alone.
+// label is its own block where it was dragged; a default-placement label
+// renders at its room's live centroid — as does the bare area of an
+// unlabeled room. Reconciliation keeps at most one label per room; should
+// several ever coexist (injected state), the centroid block stacks them
+// defensively, oldest first, and the oldest carries the area. A label
+// outside any room cannot arise from plan operations either, but is
+// defensively rendered as its name alone.
 export interface RoomTextBlock {
   key: string
   x: number

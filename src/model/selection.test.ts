@@ -213,10 +213,10 @@ describe('deleteElements — room label cascade', () => {
     expect(Object.keys(next.roomLabels)).toEqual([rightLabel])
   })
 
-  it('keeps both labels when deleting the divider merges the rooms', () => {
-    const { plan, divider, leftLabel, rightLabel } = twoLabeledRooms()
+  it('keeps only the oldest label when deleting the divider merges the rooms', () => {
+    const { plan, divider, leftLabel } = twoLabeledRooms()
     const next = deleteElements(plan, [wallRef(divider)])
-    expect(Object.keys(next.roomLabels).sort()).toEqual([leftLabel, rightLabel].sort())
+    expect(Object.keys(next.roomLabels)).toEqual([leftLabel])
   })
 
   it('deletes every label when the whole plan is deleted', () => {
