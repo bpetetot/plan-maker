@@ -7,6 +7,10 @@ Every decision below was locked through the wayfinder map
 ([map.md](map.md)); each section links the ticket holding the full
 rationale. This spec is the single reference for implementation.
 
+Amended 2026-07-19 by the [measure-semantics map](../measure-semantics/map.md):
+wall bodies, drawn length, dimension values, and opening placement dimensions
+(§2, §4).
+
 ## 1. Product overview
 
 A simple, intuitive web app for private individuals to draw 2D floor plans of a
@@ -45,10 +49,12 @@ Walls form a **shared-vertex planar graph**: `Point` entities are vertices,
   stretched; clamped if the wall shrinks. Deleting a wall deletes its openings.
 - **Units**: integer centimeters, metric only. SVG renders 1 unit = 1 cm.
   Dimension display: meters with 2 decimals ("3,50 m") when ≥ 1 m, else cm.
-- **Dimensions and areas are computed at render, never persisted.** Wall length
-  is the centerline point-to-point distance; room area is the shoelace formula
-  on the detected face polygon, shown in m² at the label position. Centerline
-  measurement slightly overestimates area vs inner-face — accepted.
+- **Dimensions and areas are computed at render, never persisted.** A wall's
+  dimension measures its rendered silhouette on the side it sits on (§4;
+  semantics locked in the
+  [measure-semantics map](../measure-semantics/map.md)). Room area is the
+  shoelace formula on the interior-face polygon — the real floor surface —
+  shown in m² at the label position.
 
 ```ts
 type Cm = number; // integer centimeters
@@ -106,6 +112,9 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 ### Drawing walls
 
 - Click-to-click polyline chain with rubber-band preview and live length label.
+  The ghost has square caps (the exact future body) and its label reads the
+  overall (hors-tout) extent — axis + thickness; the 10 cm step applies to
+  that value (the default thickness keeps anchors on the grid).
 - Clicking the chain's start point closes the room.
 - Esc or double-click ends the chain; Alt temporarily disables snapping.
 
@@ -131,6 +140,11 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
   wall hit targets).
 - Move by dragging along the wall; resize via a width select in the popover
   (60–160 cm).
+- While placing or moving, **placement dimensions** flank the opening on the
+  interior side when exactly one side of the wall faces a room (else the wall
+  dimension's side), each chaining from the nearest neighbouring opening's
+  edge when one intervenes, else from the silhouette end
+  ([ticket](../measure-semantics/issues/04-opening-placement-dims.md)).
 - Doors additionally get **⇋ Hinge** and **⇵ Swing** flip buttons in the
   popover.
 
@@ -139,6 +153,26 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 - Scroll wheel zooms toward the cursor; Space+drag or middle-drag pans; zoom
   buttons + Fit as fallback.
 - Dimensions are always visible on every wall (no toggle in the MVP).
+
+### Wall bodies and dimension semantics
+
+Tickets: [wall anchor](../measure-semantics/issues/02-wall-anchor-model.md),
+[dimension display](../measure-semantics/issues/03-dimension-display-prototype.md);
+prototype on branch `prototype/dim-display-variants`.
+
+- Wall bodies are mitered at junctions; at a free end the body overhangs its
+  Point by half the thickness (square cap). **Junction patches** — the
+  polygon of all incident face corners around a Point — fill the central
+  gaps outlines leave at T and angled crossings.
+- A dimension measures **exactly the rendered silhouette on the side it sits
+  on** (same corners as the outline: mitered faces at junctions, overhang at
+  free ends), drawn as a broken dimension line with perpendicular ticks at
+  the measured extent. Exterior of a closed room = hors-tout, invariant once
+  drawn; interior = edge-to-edge room span. A value may refine when a new
+  junction forms — accepted, made legible by the ticks.
+- Dragging a dimension is purely positional (t along the wall, side across
+  it); crossing sides switches between the interior and exterior readings.
+- PNG export renders the same bodies and dimension rules (§7).
 
 ## 5. State, persistence, and undo/redo
 

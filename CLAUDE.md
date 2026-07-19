@@ -24,6 +24,8 @@ idb-keyval (autosave), vite-plugin-pwa.
 
 ## Conventions
 
+- Not in production yet: the stored plan model can change freely — no schema
+  migrations for existing plans are required until production
 - All code, comments, and documentation should be written in English
 - Add comments to the code only when necessary and when they add value
 - UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
