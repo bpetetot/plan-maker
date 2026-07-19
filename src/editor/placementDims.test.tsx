@@ -181,9 +181,9 @@ describe('placement dimensions while moving an opening', () => {
     usePlanStore.setState({ plan })
     const { container } = render(<Editor />)
     const svg = container.querySelector('svg')!
-    // the opening's invisible hit target: its span (120) × 3.2 wall thicknesses
-    const hit = container.querySelector('rect[width="120"][height="32"]')!
-    fireEvent.pointerDown(hit, { button: 0, ...clientAt(svg, 250, 100) })
+    // the opening's grab zone: the only transparent rect spanning its width
+    const grab = container.querySelector('rect[width="120"][fill="transparent"]')!
+    fireEvent.pointerDown(grab, { button: 0, ...clientAt(svg, 250, 100) })
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
     // opening centered on the wall: 145 cm on each side (to the overhangs)
     expect(screen.getAllByText('1,45 m')).toHaveLength(2)
@@ -200,8 +200,8 @@ describe('placement dimensions while moving an opening', () => {
     usePlanStore.setState({ plan })
     const { container } = render(<Editor />)
     const svg = container.querySelector('svg')!
-    const hit = container.querySelector('rect[width="120"][height="32"]')!
-    fireEvent.pointerDown(hit, { button: 0, ...clientAt(svg, 150, 100) })
+    const grab = container.querySelector('rect[width="120"][fill="transparent"]')!
+    fireEvent.pointerDown(grab, { button: 0, ...clientAt(svg, 150, 100) })
     expect(screen.getByText('4,10 m')).toBeTruthy() // wall dimension never blinks
     fireEvent.pointerUp(svg)
     expect(screen.getByText('4,10 m')).toBeTruthy()

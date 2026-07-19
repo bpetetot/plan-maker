@@ -4,7 +4,16 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ElementRef } from '../model/selection'
 import { buildPlan, squareRoomPlan } from '../model/testHelpers'
 import type { Plan, Wall } from '../model/types'
-import { COLORS, DimLabel, JunctionPatches, labelAngle, RubberWall, WallLine } from './render'
+import {
+  COLORS,
+  DimLabel,
+  JunctionPatches,
+  labelAngle,
+  OpeningGrabZone,
+  RubberWall,
+  WallGrabZone,
+  WallLine,
+} from './render'
 
 afterEach(cleanup)
 
@@ -256,6 +265,61 @@ describe('JunctionPatches', () => {
     const { plan } = tJunctionPlan()
     const patch = renderPatch(plan)
     expect(patch.getAttribute('fill')).toBe(COLORS.wall)
+  })
+})
+
+describe('Grab zones', () => {
+  // The grab zone covers the element's body plus a constant on-screen margin
+  // (2 px per side), whatever the wall's thickness (CONTEXT.md: Grab zone).
+  it('sizes a wall grab zone to the body plus 2 screen px per side', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0, 30)
+    const { container } = render(
+      <svg>
+        <WallGrabZone plan={plan} wall={wall} pxPerCm={2} />
+      </svg>,
+    )
+    // 2 px at 2 px/cm is 1 cm per side: 30 + 2 = 32
+    expect(container.querySelector('line')!.getAttribute('stroke-width')).toBe('32')
+  })
+
+  it('keeps the wall margin constant on screen when zoomed out', () => {
+    const { plan, wall } = planWith(0, 0, 400, 0, 10)
+    const { container } = render(
+      <svg>
+        <WallGrabZone plan={plan} wall={wall} pxPerCm={0.5} />
+      </svg>,
+    )
+    // 2 px at 0.5 px/cm is 4 cm per side: 10 + 8 = 18
+    expect(container.querySelector('line')!.getAttribute('stroke-width')).toBe('18')
+  })
+
+  it('covers the square body overhang at a free wall end: square cap', () => {
+    // A round cap of radius thickness/2 + margin misses the square corners of
+    // the body overhang (at 0.707 × thickness from the Point on thick walls).
+    const { plan, wall } = planWith(0, 0, 400, 0, 30)
+    const { container } = render(
+      <svg>
+        <WallGrabZone plan={plan} wall={wall} pxPerCm={2} />
+      </svg>,
+    )
+    expect(container.querySelector('line')!.getAttribute('stroke-linecap')).toBe('square')
+  })
+
+  it('sizes an opening grab rect to the wall body plus 2 screen px per side', () => {
+    let openingId = ''
+    const plan = buildPlan((b) => {
+      const wall = b.wall(b.point(0, 0), b.point(400, 0))
+      wall.thickness = 30
+      openingId = b.opening(wall, 'window', 200).id
+    })
+    const { container } = render(
+      <svg>
+        <OpeningGrabZone plan={plan} opening={plan.openings[openingId]} pxPerCm={2} />
+      </svg>,
+    )
+    const rect = container.querySelector('rect')!
+    expect(rect.getAttribute('height')).toBe('32')
+    expect(rect.getAttribute('y')).toBe('-16')
   })
 })
 

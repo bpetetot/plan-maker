@@ -136,6 +136,14 @@ per-session editor state: never part of the plan, reset to the built-in
 values on load.
 _Avoid_: Tool options, tool settings, presets
 
+**Grab zone**:
+The invisible area around an element that reacts to the pointer — hover,
+click, drag. It covers the element's body plus a constant on-screen margin,
+whatever the element's thickness and the zoom: a thick wall never grabs the
+pointer far from its visible body, and a thin wall stays grabbable when
+zoomed out. Pure editor behavior: never part of the plan, never exported.
+_Avoid_: Hit zone, hit target, hover area
+
 **Snap**:
 The default magnetic guidance of any placement or move in the editor:
 positions are drawn to existing points, walls, 45° axes, or the 10 cm grid. A

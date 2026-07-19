@@ -96,10 +96,17 @@ export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: E
   )
 }
 
-// Invisible fat hit target for a wall; render above visible geometry.
-export function WallHit({
+// Grab-zone margin around an element's body, per side, in screen px
+// (CONTEXT.md: Grab zone). Converted to plan units at the current zoom so it
+// stays constant on screen, whatever the wall's thickness.
+const GRAB_MARGIN_PX = 2
+const grabMargin = (pxPerCm: number) => GRAB_MARGIN_PX / pxPerCm
+
+// Invisible grab zone for a wall; render above visible geometry.
+export function WallGrabZone({
   plan,
   wall,
+  pxPerCm,
   cursor,
   onPointerDown,
   onPointerEnter,
@@ -107,6 +114,7 @@ export function WallHit({
 }: {
   plan: Plan
   wall: Wall
+  pxPerCm: number
   cursor?: string
   onPointerDown?: (e: React.PointerEvent) => void
   onPointerEnter?: () => void
@@ -120,8 +128,8 @@ export function WallHit({
       x2={b.x}
       y2={b.y}
       stroke="transparent"
-      strokeWidth={wall.thickness * 2.6}
-      strokeLinecap="round"
+      strokeWidth={wall.thickness + 2 * grabMargin(pxPerCm)}
+      strokeLinecap="square"
       style={{ cursor: cursor ?? 'pointer' }}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
@@ -131,7 +139,7 @@ export function WallHit({
 }
 
 // Door geometry in the door's local frame (center of the wall gap, wall along
-// x) — single source shared by the visible glyph and the invisible hit target.
+// x) — single source shared by the visible glyph and the invisible grab zone.
 const doorMirror = (door: Door) =>
   `scale(${door.hingeSide === 'end' ? -1 : 1},${door.swing === 'out' ? -1 : 1})`
 const doorLeaf = (door: Door) => ({
@@ -208,52 +216,50 @@ export function OpeningGlyph({
   )
 }
 
-// Grabbable stroke width for the door leaf/arc hit shapes, in screen px
-// (non-scaling-stroke keeps it constant at every zoom level).
-const DOOR_HIT_STROKE = 12
+// Grabbable stroke width for the door leaf/arc grab shapes, in screen px
+// (non-scaling-stroke keeps it constant at every zoom level — no unit
+// conversion needed, unlike grabMargin, because no plan-unit body is added).
+const DOOR_GRAB_STROKE = 12
 
-// Invisible fat hit target for an opening (its full span on the wall).
-// Render AFTER wall hit targets so clicking the opening's span wins (spec §4).
-export function OpeningHit({
+// Invisible grab zone for an opening (its full span on the wall).
+// Render AFTER wall grab zones so clicking the opening's span wins (spec §4).
+export function OpeningGrabZone({
   plan,
   opening,
+  pxPerCm,
   onPointerDown,
 }: {
   plan: Plan
   opening: Opening
+  pxPerCm: number
   onPointerDown?: (e: React.PointerEvent) => void
 }) {
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
   const halfWidth = opening.width / 2
+  const halfHeight = wall.thickness / 2 + grabMargin(pxPerCm)
   return (
     <g
       transform={`translate(${placement.cx},${placement.cy}) rotate(${placement.angleDeg})`}
       style={{ cursor: 'move' }}
       onPointerDown={onPointerDown}
     >
-      <rect
-        x={-halfWidth}
-        y={-wall.thickness * 1.6}
-        width={opening.width}
-        height={wall.thickness * 3.2}
-        fill="transparent"
-      />
+      <rect x={-halfWidth} y={-halfHeight} width={opening.width} height={halfHeight * 2} fill="transparent" />
       {/* the door leaf and swing arc are grabbable too */}
       {opening.type === 'door' && (
         <g transform={doorMirror(opening)}>
           <line
             {...doorLeaf(opening)}
             stroke="transparent"
-            strokeWidth={DOOR_HIT_STROKE}
+            strokeWidth={DOOR_GRAB_STROKE}
             vectorEffect="non-scaling-stroke"
           />
           <path
             d={doorArc(opening)}
             fill="none"
             stroke="transparent"
-            strokeWidth={DOOR_HIT_STROKE}
+            strokeWidth={DOOR_GRAB_STROKE}
             vectorEffect="non-scaling-stroke"
           />
         </g>

@@ -65,13 +65,13 @@ import {
   Handle,
   JunctionPatches,
   OpeningGlyph,
-  OpeningHit,
+  OpeningGrabZone,
   PlacementDims,
   RoomOverlay,
   roomTextBlocks,
   RubberWall,
   SnapMarker,
-  WallHit,
+  WallGrabZone,
   WallLine,
 } from './render'
 import type { Tool, ToolDefaults } from './tools'
@@ -623,10 +623,11 @@ export default function Editor() {
         />
         {tool === 'select' &&
           Object.values(plan.walls).map((wall) => (
-            <WallHit
+            <WallGrabZone
               key={wall.id}
               plan={plan}
               wall={wall}
+              pxPerCm={zoomScale}
               cursor="move"
               onPointerDown={(e) =>
                 onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => ({
@@ -642,10 +643,11 @@ export default function Editor() {
           ))}
         {tool === 'select' &&
           Object.values(plan.openings).map((opening) => (
-            <OpeningHit
+            <OpeningGrabZone
               key={opening.id}
               plan={plan}
               opening={opening}
+              pxPerCm={zoomScale}
               onPointerDown={(e) =>
                 onElementPointerDown({ type: 'opening', id: opening.id }, e, (c) => ({
                   kind: 'opening',
@@ -656,7 +658,7 @@ export default function Editor() {
             />
           ))}
         {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
-        {/* after the hit targets so the label wins the hit-test where they overlap;
+        {/* after the grab zones so the label wins the hit-test where they overlap;
             the wall carrying a placement gesture shows the placement dimensions
             instead of its own */}
         {Object.values(plan.walls).map((wall) =>
