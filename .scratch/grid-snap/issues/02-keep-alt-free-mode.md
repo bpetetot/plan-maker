@@ -22,3 +22,9 @@ the offset (contradicts the realignment decision for those points).
 ## Comments
 
 Decided in the charting grilling session (2026-07-20).
+
+Partly overturned by [13](13-alt-keeps-connection-targets.md) (2026-07-20): Alt
+survives as the cm-precision escape hatch, as decided here, but it no longer
+suspends the *whole* ladder — the connection rungs (existing Point, wall body)
+stay live so a freely drawn wall can still join the plan's topology. Only the
+alignment rungs (45° axes, grid) are suspended.

@@ -17,7 +17,7 @@ export interface SnapOptions {
   anchor?: Vec
   exclude?: Set<string>
   walls?: boolean // wall bodies become snap targets (Wall tool)
-  free?: boolean // Alt held: no snapping, just integer rounding
+  free?: boolean // Alt held: alignment targets suspended, connection ones kept
 }
 
 const AXIS_STEP = Math.PI / 4
@@ -58,7 +58,7 @@ function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: 
 // pointer-down) exactly on a grid intersection, so an off-grid group heals on
 // its first ordinary move instead of carrying its offset forever. The grid is
 // the only target: a group move runs no part of the placement snap ladder.
-// Free mode (Alt) and a selection with no wall point to reference both fall
+// A free move (Alt) and a selection with no wall point to reference both fall
 // back to whole-centimeter rounding.
 export function realignDelta(
   ref: Vec | null,
@@ -73,8 +73,11 @@ export function realignDelta(
 
 // Snap priority (spec §4 + ADR 0002): existing point > wall body (when enabled)
 // > 45° axis from the anchor > 10 cm grid.
+// A free move (Alt) filters that ladder rather than short-circuiting it: the
+// alignment rungs are suspended, the connection ones are not, so a wall drawn
+// freely still joins the plan's topology instead of landing beside it.
 export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions): Snap {
-  if (options.free) return { x: Math.round(x), y: Math.round(y), kind: 'free' }
+  const aligning = !options.free
 
   let best: { id: string; x: number; y: number } | null = null
   let bestDistance = options.tolerance
@@ -102,7 +105,7 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
         let px = a.x + ((b.x - a.x) / length) * near.t
         let py = a.y + ((b.y - a.y) / length) * near.t
         let axisFrom: Vec | undefined
-        const axis = options.anchor && lockedAxis(options.anchor, x, y)
+        const axis = aligning && options.anchor ? lockedAxis(options.anchor, x, y) : null
         if (options.anchor && axis) {
           const direction = axis.direction
           const wx = b.x - a.x
@@ -129,6 +132,9 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
       }
     }
   }
+
+  // Below this line the ladder is pure alignment — a free move stops here.
+  if (!aligning) return { x: Math.round(x), y: Math.round(y), kind: 'free' }
 
   if (options.anchor) {
     const axis = lockedAxis(options.anchor, x, y)

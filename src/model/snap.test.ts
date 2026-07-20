@@ -70,6 +70,22 @@ describe('snapPoint', () => {
     const s = snapPoint(plan, 203.4, 117.8, { tolerance: 15, free: true })
     expect(s).toMatchObject({ x: 203, y: 118, kind: 'free' })
   })
+
+  it('a free move keeps the existing-point rung', () => {
+    const s = snapPoint(plan, 8, 5, { tolerance: 15, free: true })
+    expect(s).toMatchObject({ x: 0, y: 0, kind: 'point' })
+    expect(s.pointId).toBeDefined()
+  })
+
+  it('a free move drops the 45° axis rung', () => {
+    const s = snapPoint(plan, 200, 6, { tolerance: 5, anchor: { x: 0, y: 0 }, free: true })
+    expect(s).toMatchObject({ x: 200, y: 6, kind: 'free' })
+  })
+
+  it('a free move drops the grid rung', () => {
+    const s = snapPoint(plan, 203, 118, { tolerance: 5, free: true })
+    expect(s).toMatchObject({ x: 203, y: 118, kind: 'free' })
+  })
 })
 
 describe('realignDelta', () => {
@@ -168,6 +184,35 @@ describe('snapPoint on wall bodies', () => {
     // locked +x axis crosses the wall behind the anchor — not a valid target
     const s = snapPoint(target, 14, 1, { tolerance: 15, walls: true, anchor: { x: 2, y: 0 } })
     expect(s).toMatchObject({ x: 0, y: 1, kind: 'wall' })
+    expect(s.axisFrom).toBeUndefined()
+  })
+
+  it('stays a snap target under a free move (Alt)', () => {
+    const s = snapPoint(plan, 200, 6, { tolerance: 15, walls: true, free: true })
+    expect(s).toMatchObject({ x: 200, y: 0, kind: 'wall' })
+    expect(s.wallId).toBe(Object.keys(plan.walls)[0])
+  })
+
+  it('loses to a nearby existing point under a free move too', () => {
+    const s = snapPoint(plan, 8, 5, { tolerance: 15, walls: true, free: true })
+    expect(s.kind).toBe('point')
+  })
+
+  it('uses the plain projection under a free move — no axis ∩ wall refinement', () => {
+    const target = buildPlan((b) => {
+      const p1 = b.point(400, -200)
+      const p2 = b.point(400, 200)
+      b.wall(p1, p2)
+    })
+    // same cursor as the axis ∩ wall case above: with Alt held no axis locks,
+    // so the 6 cm drift is kept instead of being corrected to y = 0
+    const s = snapPoint(target, 395, 6, {
+      tolerance: 15,
+      walls: true,
+      anchor: { x: 0, y: 0 },
+      free: true,
+    })
+    expect(s).toMatchObject({ x: 400, y: 6, kind: 'wall' })
     expect(s.axisFrom).toBeUndefined()
   })
 

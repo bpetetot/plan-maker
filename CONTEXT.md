@@ -157,8 +157,12 @@ _Avoid_: Hit zone, hit target, hover area
 **Snap**:
 The default magnetic guidance of any placement or move in the editor:
 positions are drawn to existing points, walls, 45° axes, or the 10 cm grid —
-that ladder governs placing a point. A group move follows its own rule: it
-translates rigidly — the group's shape stays intact — and the translation is
+that ladder governs placing a point. Its rungs are of two natures: the
+connection targets — existing Point, wall body — which decide what the placed
+Point is attached to, and the alignment targets — 45° axis, grid — which only
+decide where it sits; a Free move keeps the first and drops the second. A group
+move follows its own rule: it translates rigidly — the group's shape stays
+intact — and the translation is
 chosen so the group's Reference point lands on a grid intersection, to the grid
 only and to nothing else. An off-grid element therefore realigns on its first
 non-Free move. Pure editor behavior: never part of the plan.
@@ -180,9 +184,16 @@ plan.
 _Avoid_: Pivot, handle
 
 **Free move**:
-Any placement or move with Alt held: snapping is suspended and only the
-integer-centimeter rounding remains (Points have integer coordinates).
-Toggles immediately, both ways, including mid-gesture.
+Any placement or move with Alt held: Snap's alignment targets are suspended,
+its connection targets are not — Alt filters the ladder, it never switches it
+off. A free placement is therefore drawn to an existing Point or to a wall's
+body exactly as an ordinary one is, but never to a 45° axis nor to the grid;
+away from every connection target only the integer-centimeter rounding remains
+(Points have integer coordinates). Connecting is topology, aligning is
+geometry, and only the second is what Alt escapes: a wall drawn freely still
+joins the plan instead of landing beside it. A group move, which runs no
+ladder, keeps its own rule: Alt suspends its realignment. Toggles immediately,
+both ways, including mid-gesture.
 _Avoid_: Free mode, no-grid mode
 
 **Grid**:

@@ -27,7 +27,10 @@ topological.
   intersection is used only when it falls within the wall's extent and within
   twice the snap tolerance of the cursor; otherwise the plain projection
   applies. Positions are rounded to integer cm; rounding drift is harmless
-  because the connection is topological.
+  because the connection is topological. A free move (Alt) keeps the wall-body
+  target — connecting is what it must never suspend — but drops the axis ∩ wall
+  refinement, since no axis locks under Alt: the plain projection always
+  applies there.
 - Splitting a wall reassigns each opening to the half containing its center;
   the start-side half keeps the original wall id so its openings keep their
   `wallId` and `offset`. An opening straddling the cut, or no longer fitting
