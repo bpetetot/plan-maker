@@ -58,24 +58,24 @@ See `.scratch/grid-snap/spec.md` §5–§7.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Dragging an off-grid wall body without Alt lands its reference endpoint
+- [x] Dragging an off-grid wall body without Alt lands its reference endpoint
       exactly on a grid intersection, and the wall's length and angle are
       unchanged.
-- [ ] The reference is the wall point nearest the grab position, and stays the
+- [x] The reference is the wall point nearest the grab position, and stays the
       same point for the whole drag even as the pointer moves closer to another
       one.
-- [ ] In a multi-selection the reference is the nearest wall point across all
+- [x] In a multi-selection the reference is the nearest wall point across all
       selected walls, including when the pointer went down on an opening.
-- [ ] With Alt held the group move rounds to whole centimetres and performs no
+- [x] With Alt held the group move rounds to whole centimetres and performs no
       snapping; pressing or releasing Alt mid-drag does not change the
       reference.
-- [ ] A selection containing no wall point drags without error and changes
+- [x] A selection containing no wall point drags without error and changes
       nothing.
-- [ ] A group move never snaps onto an existing point, a wall body, or an axis.
-- [ ] Coincident points still merge on drag-end, and a single undo restores the
+- [x] A group move never snaps onto an existing point, a wall body, or an axis.
+- [x] Coincident points still merge on drag-end, and a single undo restores the
       pre-drag plan.
-- [ ] Tests cover the realigned delta, the reference choice (single wall,
+- [x] Tests cover the realigned delta, the reference choice (single wall,
       multi-selection, tie-break), Alt free mode, and the empty-of-wall-points
       selection.
