@@ -40,6 +40,11 @@ implementation issues. Implementation itself happens outside this map.
   axis snapping is uniformly relative to the anchor (dx, dy multiples of GRID,
   minimum one step); the on-grid grid-crossing rule becomes a special case, and
   an off-grid anchor yields an exact 45° wall that inherits its offset.
+  **Off-grid half later reversed** by
+  [14](issues/14-axis-crossings-absolute-to-the-grid.md) /
+  [ADR 0006](../../docs/adr/0006-axis-snapping-targets-absolute-grid-crossings.md):
+  the endpoint lands on the grid crossings the axis meets, absolutely, and the
+  length absorbs the offset instead — the inherited offset was hereditary.
 - [09 — Realignment landing on existing points](issues/09-realignment-merge-interaction.md) —
   group moves snap to the grid only (the snap ladder governs point placement,
   not group drags), so a landing on an existing point is always a side effect;

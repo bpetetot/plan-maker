@@ -27,6 +27,11 @@ See `.scratch/grid-snap/spec.md` §3–§4.
 
 **Status:** done
 
+> **Superseded by [ADR 0006](../../../docs/adr/0006-axis-snapping-targets-absolute-grid-crossings.md)**
+> and ticket [14](14-axis-crossings-absolute-to-the-grid.md), which replaced the
+> stepping-from-the-anchor rule with absolute grid crossings. The on-grid
+> acceptance criteria below still hold; the off-grid one was reversed.
+
 - [x] From an on-grid anchor, a diagonal axis-locked endpoint lands on a grid
       intersection and the two components of the segment are equal in absolute
       value.

@@ -3,6 +3,13 @@
 Type: grilling
 Status: resolved
 
+> **Superseded by [ADR 0006](../../../docs/adr/0006-axis-snapping-targets-absolute-grid-crossings.md).**
+> The answer below stands for the on-grid anchor. For the off-grid anchor it was
+> reversed: the endpoint no longer inherits the offset — it lands on the grid
+> crossings the axis meets, and the length absorbs the offset. The inherited
+> offset turned out to be hereditary, propagating to every wall drawn from an
+> off-grid point, which no later group move was reliably going to catch.
+
 ## Question
 
 Decision [03](03-diagonal-grid-crossings.md) makes diagonals snap to grid

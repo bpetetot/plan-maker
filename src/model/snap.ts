@@ -52,6 +52,20 @@ function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: 
   return { direction: { x: step.x / norm, y: step.y / norm }, step }
 }
 
+// Where the locked axis crosses the grid lines of one component, expressed as
+// the ray parameter `t` in `anchor + t · step`, nearest to `projection`. The
+// crossings solve `anchor + t · step ≡ 0 (mod GRID)`, hence the progression
+// `t ≡ -anchor · step⁻¹` — written as `-anchor * step` because every axis step
+// is a unit lattice component, so `step⁻¹ = step`. Keeping `t > 0` is what
+// holds the endpoint strictly beyond the anchor. Null when the axis is parallel
+// to that component's lines — it then crosses none of them.
+function nearestCrossing(anchor: number, step: number, projection: number): number | null {
+  if (step === 0) return null
+  const residue = (((-anchor * step) % GRID) + GRID) % GRID
+  const n = Math.max(residue > 0 ? 0 : 1, Math.round((projection - residue) / GRID))
+  return residue + n * GRID
+}
+
 // A group move translates rigidly — the displacement applies to the group as a
 // whole, never to each element separately — and realigns it on the grid: the
 // delta is the one that lands the reference point (`referencePoint`, fixed at
@@ -139,19 +153,28 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
   if (options.anchor) {
     const axis = lockedAxis(options.anchor, x, y)
     if (axis) {
-      // The endpoint steps each component from the anchor, not the segment's
-      // length: k whole grid multiples of the integer axis step, k ≥ 1 so the
-      // endpoint never collapses onto the anchor. From an on-grid anchor that
-      // lands on a grid intersection; from an off-grid one it inherits the
-      // anchor's offset. Same formulation either way, no fallback branch.
+      // The endpoint lands where the axis crosses the grid lines, taken
+      // absolutely rather than stepped from the anchor (ADR 0006), so at least
+      // one of its coordinates is exactly on the grid while the segment stays
+      // exactly on its axis. A diagonal offers two interleaved families of
+      // crossings — one aligning x, the other y — and the nearest to the cursor
+      // wins; an orthogonal axis offers only the one it is not parallel to.
+      // From an on-grid anchor both families collapse onto the whole grid
+      // multiples, which is why there is no fallback branch: the first crossing
+      // beyond the anchor is then the one-grid-step minimum of old.
       const { step } = axis
       const projection =
         ((x - options.anchor.x) * step.x + (y - options.anchor.y) * step.y) /
         (step.x * step.x + step.y * step.y)
-      const k = Math.max(1, Math.round(projection / GRID))
+      const t = [
+        nearestCrossing(options.anchor.x, step.x, projection),
+        nearestCrossing(options.anchor.y, step.y, projection),
+      ]
+        .filter((c) => c !== null)
+        .reduce((near, c) => (Math.abs(c - projection) < Math.abs(near - projection) ? c : near))
       return {
-        x: Math.round(options.anchor.x + k * GRID * step.x),
-        y: Math.round(options.anchor.y + k * GRID * step.y),
+        x: Math.round(options.anchor.x + t * step.x),
+        y: Math.round(options.anchor.y + t * step.y),
         kind: 'axis',
         axisFrom: { x: options.anchor.x, y: options.anchor.y },
       }

@@ -160,7 +160,11 @@ positions are drawn to existing points, walls, 45° axes, or the 10 cm grid —
 that ladder governs placing a point. Its rungs are of two natures: the
 connection targets — existing Point, wall body — which decide what the placed
 Point is attached to, and the alignment targets — 45° axis, grid — which only
-decide where it sits; a Free move keeps the first and drops the second. A group
+decide where it sits; a Free move keeps the first and drops the second. An axis
+lock places the Point where the axis crosses the grid lines, absolutely and not
+by stepping from the Drawing anchor: the segment stays exactly on its axis, and
+at least one of the Point's coordinates lands exactly on the grid — both at once
+whenever the anchor is itself on the grid. A group
 move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
 chosen so the group's Reference point lands on a grid intersection, to the grid
@@ -170,8 +174,10 @@ _Avoid_: Magnetism, snapping grid, attach
 
 **Drawing anchor**:
 The Point a new wall segment is being drawn from — the origin of axis snapping,
-which steps relative to it. A group move has no Drawing anchor: it aims at no
-connection. Pure editor state: never part of the plan.
+which fixes the axis's direction but never its graduation: the placed Point
+lands on the grid crossings the axis meets, so an off-grid anchor yields an
+endpoint aligned to the grid and a length that is not a grid multiple, never the
+reverse. A group move has no Drawing anchor: it aims at no connection. Pure editor state: never part of the plan.
 _Avoid_: Origin, start point, pivot
 
 **Reference point**:
