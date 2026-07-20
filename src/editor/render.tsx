@@ -301,7 +301,7 @@ const EXTENT_STROKE = 1
 // it holds at every zoom. The value stays exact — only the line recedes.
 const EXTENT_INSET = EXTENT_STROKE / 2
 
-// The broken dimension line shared by DimLabel and PlacementDims: a piece on
+// The broken dimension line DimLabel draws: a piece on
 // each side of the text gap (only where it has room) and a perpendicular tick
 // at each end of the measured extent, held back by EXTENT_INSET.
 function ExtentLine({
@@ -452,24 +452,53 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
   )
 }
 
-// Placement dimensions: the pair of temporary dimensions flanking an opening
-// while it is being placed or moved. They sit on the interior side whenever
-// the wall borders exactly one room, else on the side the wall's (temporarily
-// hidden) Dimension sits on. Each runs to the near edge of the opening from
-// the silhouette end on that side, or from the near edge of the closest
-// neighbouring opening when one intervenes — every value is tape-measurable.
-// A side whose segment rounds to 0 cm shows nothing; a segment too short for
-// its text keeps the text and drops the line. Editor feedback — deliberately
-// absent from PlanScene.
-export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: Opening; rooms: Room[] }) {
+// The chip's on-screen metrics, in screen pixels: 9px text at roughly 5.2px
+// per character, plus 5px of padding on each side.
+const CHIP_HEIGHT = 16
+const chipWidth = (label: string) => label.length * 5.2 + 10
+
+// Placement dimensions: the pair of temporary measures flanking an opening,
+// shown while it is placed or moved and, past the release, for as long as it
+// stays in the selection (CONTEXT.md: Placement dimension).
+//
+// The side — interior whenever the wall borders exactly one room, else the
+// side the wall's Dimension sits on — decides the value read and nothing more:
+// each measure runs to the near edge of the opening from the silhouette end on
+// that side, or from the near edge of the closest neighbouring opening when one
+// intervenes, so every value is tape-measurable.
+//
+// It is deliberately not drawn as a Dimension: no dimension line, no ticks, no
+// witness lines, no offset from a face. Each value is a filled accent chip
+// centred on the clearance it measures, on the wall's axis, inside the wall
+// body — the one position no other register occupies, so it coexists with the
+// wall's Dimension instead of displacing it. Being interaction chrome, the chip
+// holds a constant size on screen while its centre stays in plan coordinates
+// (ADR 0005): it never shrinks, never shifts and never disappears, so a chip
+// wider than its clearance simply overflows it. A clearance reduced to nothing
+// shows no chip; the other side shows its own normally. Editor feedback —
+// deliberately absent from PlanScene.
+export function PlacementDims({
+  plan,
+  opening,
+  rooms,
+  pxPerCm,
+}: {
+  plan: Plan
+  opening: Opening
+  rooms: Room[]
+  pxPerCm: number
+}) {
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
-  const frame = dimLineFrame(plan, wall)
-  const side = interiorSide(rooms, wall) ?? frame.side
-  const { a, ux, uy, angle, off } = frame
-  // point on the dimension line at distance t along the wall axis
-  const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
+  const { a, ux, uy, angle, side: frameSide } = dimLineFrame(plan, wall)
+  const side = interiorSide(rooms, wall) ?? frameSide
+  // point on the wall axis at distance t from the start Point — the side never
+  // enters here, only the values below
+  const at = (t: number) => ({ x: a.x + ux * t, y: a.y + uy * t })
+  // a screen pixel expressed in plan units, so the chip keeps its size at
+  // every zoom while its centre stays where it measures
+  const k = 1 / Math.max(pxPerCm, 0.0001)
   const half = opening.width / 2
   // outer bounds: the silhouette span on the chosen side, cut back to the
   // near edge of the closest neighbouring opening when one intervenes
@@ -492,28 +521,20 @@ export function PlacementDims({ plan, opening, rooms }: { plan: Plan; opening: O
         if (Math.round(len) < 1) return null
         const label = formatLength(len)
         const mid = at((from + to) / 2)
-        // 9px text ≈ 5 units per character; the line breaks around it. A
-        // segment too short for its text keeps the text and drops the line.
-        const gapHalf = label.length * 2.5 + 4
-        const withLine = len / 2 > gapHalf + 4
+        const w = chipWidth(label)
         return (
-          <g key={key}>
-            {withLine && (
-              <ExtentLine
-                at={at}
-                ux={ux}
-                uy={uy}
-                from={from}
-                to={to}
-                gapFrom={(from + to) / 2 - gapHalf}
-                gapTo={(from + to) / 2 + gapHalf}
-              />
-            )}
-            <g transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}>
-              <text textAnchor="middle" dominantBaseline="central" className="dim">
-                {label}
-              </text>
-            </g>
+          <g key={key} transform={`translate(${mid.x},${mid.y}) rotate(${angle}) scale(${k})`}>
+            <rect
+              x={-w / 2}
+              y={-CHIP_HEIGHT / 2}
+              width={w}
+              height={CHIP_HEIGHT}
+              rx={CHIP_HEIGHT / 2}
+              fill="var(--accent)"
+            />
+            <text textAnchor="middle" dominantBaseline="central" className="placement-chip">
+              {label}
+            </text>
           </g>
         )
       })}

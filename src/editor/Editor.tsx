@@ -509,9 +509,24 @@ export default function Editor() {
           }
       : null
 
-  // The opening being placed (ghost) or moved: it carries the placement
-  // dimensions and temporarily hides its wall's own dimension.
+  // The opening being placed (ghost) or moved.
   const placementOpening = ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null)
+
+  // Openings showing placement dimensions: the one under the gesture, plus
+  // every opening of the selection — no cardinality threshold, and a selected
+  // wall stays silent for the openings it carries. Gesture and selection draw
+  // identically, so the drag merely continues past the release into the
+  // selection it leaves behind.
+  const dimmedOpenings = useMemo(() => {
+    const byId = new Map<string, Opening>()
+    if (placementOpening) byId.set(placementOpening.id, placementOpening)
+    for (const ref of sel) {
+      if (ref.type !== 'opening') continue
+      const o = plan.openings[ref.id]
+      if (o) byId.set(o.id, o)
+    }
+    return [...byId.values()]
+  }, [placementOpening, sel, plan.openings])
 
   // Room labels are never selected (CONTEXT.md: Selection) — each line of a
   // text block is dragged and double-click-edited directly. Dragging a line
@@ -665,28 +680,28 @@ export default function Editor() {
             />
           ))}
         {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
-        {/* after the grab zones so the label wins the hit-test where they overlap;
-            the wall carrying a placement gesture shows the placement dimensions
-            instead of its own */}
-        {Object.values(plan.walls).map((wall) =>
-          wall.id === placementOpening?.wallId ? null : (
-            <DimLabel
-              key={wall.id}
-              plan={plan}
-              wall={wall}
-              selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
-              onPointerDown={
-                tool === 'select'
-                  ? (e) => {
-                      if (e.button !== 0 || space) return
-                      startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
-                    }
-                  : undefined
-              }
-            />
-          ),
-        )}
-        {placementOpening && <PlacementDims plan={plan} opening={placementOpening} rooms={rooms} />}
+        {/* after the grab zones so the label wins the hit-test where they overlap.
+            Every wall keeps its own dimension throughout: placement dimensions
+            wear a different register and no longer share its slot */}
+        {Object.values(plan.walls).map((wall) => (
+          <DimLabel
+            key={wall.id}
+            plan={plan}
+            wall={wall}
+            selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
+            onPointerDown={
+              tool === 'select'
+                ? (e) => {
+                    if (e.button !== 0 || space) return
+                    startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
+                  }
+                : undefined
+            }
+          />
+        ))}
+        {dimmedOpenings.map((opening) => (
+          <PlacementDims key={opening.id} plan={plan} opening={opening} rooms={rooms} pxPerCm={zoomScale} />
+        ))}
         {selWall &&
           wallPoints(plan, selWall).map((p) => (
             <Handle

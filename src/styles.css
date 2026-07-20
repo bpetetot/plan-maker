@@ -123,6 +123,15 @@ svg text.dim-live {
 svg text.dim-selected {
   fill: var(--accent);
 }
+/* placement dimensions: the value sits on a filled accent chip, so it needs
+   the contrasting fill and none of .dim's sheet-coloured halo */
+svg text.placement-chip {
+  font:
+    600 9px system-ui,
+    sans-serif;
+  fill: var(--accent-contrast);
+  user-select: none;
+}
 svg text.room-name {
   font:
     600 12px system-ui,

@@ -36,10 +36,10 @@ function planWith(offset: number, width: number): { plan: Plan; opening: Opening
   return { plan, opening }
 }
 
-function renderDims(plan: Plan, opening: Opening, rooms: Room[] = []) {
+function renderDims(plan: Plan, opening: Opening, rooms: Room[] = [], pxPerCm = 1) {
   const { container } = render(
     <svg>
-      <PlacementDims plan={plan} opening={opening} rooms={rooms} />
+      <PlacementDims plan={plan} opening={opening} rooms={rooms} pxPerCm={pxPerCm} />
     </svg>,
   )
   return container
@@ -66,26 +66,29 @@ describe('PlacementDims', () => {
     expect(texts).toEqual(['3,15 m'])
   })
 
-  it('sits on the wall dimension line: default side, at the middle of each segment', () => {
+  it('centres a chip on each clearance, on the wall axis — never on a side', () => {
     const { plan, opening } = planWith(100, 80)
     const container = renderDims(plan, opening)
     const groups = Array.from(container.querySelectorAll('g[transform]')).map((g) =>
       g.getAttribute('transform'),
     )
-    // thickness 10 → offset 15 above the wall, like DimLabel's default;
-    // segments run from the overhang (-5) to the opening edges (60 / 140)
-    expect(groups).toEqual(['translate(27.5,-15) rotate(0)', 'translate(272.5,-15) rotate(0)'])
+    // segments run from the overhang (-5) to the opening edges (60 / 140); the
+    // chips sit at their middles, on the axis itself (y = 0), not offset above
+    expect(groups).toEqual(['translate(27.5,0) rotate(0) scale(1)', 'translate(272.5,0) rotate(0) scale(1)'])
+    // filled accent chip, no dimension line and no ticks
+    expect(container.querySelectorAll('line')).toHaveLength(0)
+    expect(container.querySelector('rect')!.getAttribute('fill')).toBe('var(--accent)')
   })
 
-  it('follows a custom dimPlacement side when the wall borders no room', () => {
+  it('keeps its position when the wall dimension is dragged to the other side', () => {
     const { plan, opening } = planWith(100, 80)
     plan.walls.w.dimPlacement = { t: 0.5, side: 1 }
     const container = renderDims(plan, opening)
     const group = container.querySelector('g[transform]')!
-    expect(group.getAttribute('transform')).toBe('translate(27.5,15) rotate(0)')
+    expect(group.getAttribute('transform')).toBe('translate(27.5,0) rotate(0) scale(1)')
   })
 
-  it('always sits on the interior side when the wall borders exactly one room', () => {
+  it('reads the interior side when the wall borders exactly one room, and only the value', () => {
     // 4×4 m square room; window (80) centered on the bottom wall. Whatever
     // side the wall's Dimension sits on, the placement dimensions measure on
     // the interior side: from the interior face corners at +5/395.
@@ -98,9 +101,9 @@ describe('PlacementDims', () => {
     let container = renderDims(plan, opening, rooms)
     let texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['1,55 m', '1,55 m'])
-    // the dims sit below the wall (interior side): positive y offset
+    // the side chose the value; the chip still sits on the axis
     expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
-      'translate(82.5,15) rotate(0)',
+      'translate(82.5,0) rotate(0) scale(1)',
     )
     cleanup()
     // dragging the Dimension outside changes nothing for placement dims
@@ -108,6 +111,18 @@ describe('PlacementDims', () => {
     container = renderDims(plan, opening, rooms)
     texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['1,55 m', '1,55 m'])
+  })
+
+  it('holds the same size on screen at every zoom, without moving its centre', () => {
+    const { plan, opening } = planWith(100, 80)
+    // zoomed out to half scale: the chip doubles in plan units to keep its
+    // on-screen size, and its centre stays on the clearance (ADR 0005)
+    const container = renderDims(plan, opening, [], 0.5)
+    expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
+      'translate(27.5,0) rotate(0) scale(2)',
+    )
+    const rect = container.querySelector('rect')!
+    expect(rect.getAttribute('height')).toBe('16')
   })
 
   it('chains from the near edge of the closest neighbouring opening', () => {
@@ -130,14 +145,18 @@ describe('PlacementDims', () => {
     expect(texts).toEqual(['65 cm'])
   })
 
-  it('draws a broken line with a tick at each end, dropped when the segment is too short', () => {
-    // left segment 10 cm: too short for its text — text only, no line
+  it('overflows a clearance too short for its chip, rather than shrinking or shifting it', () => {
+    // left clearance 20 cm, narrower than the chip that measures it
     const { plan, opening } = planWith(60, 90)
     const container = renderDims(plan, opening)
     const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['20 cm', '3,00 m'])
-    // only the right segment draws lines: 2 line pieces + 2 ticks
-    expect(container.querySelectorAll('line')).toHaveLength(4)
+    const [short, long] = Array.from(container.querySelectorAll('rect'))
+    // same height and the same per-character width rule on both: nothing shrank
+    expect(Number(short.getAttribute('width'))).toBeGreaterThan(20)
+    expect(short.getAttribute('height')).toBe(long.getAttribute('height'))
+    // and the short chip stayed centred on its clearance (-5 → 15)
+    expect(short.parentElement!.getAttribute('transform')).toBe('translate(5,0) rotate(0) scale(1)')
   })
 })
 
@@ -154,7 +173,7 @@ const editorPlan = (): Plan => ({
 })
 
 describe('placement dimensions while placing an opening', () => {
-  it('shows them on hover and hides the hovered wall dimension, both ways', () => {
+  it('shows them on hover while the wall keeps its own dimension, both ways', () => {
     usePlanStore.setState({ plan: editorPlan() })
     const { container } = render(<Editor />)
     const svg = container.querySelector('svg')!
@@ -162,9 +181,9 @@ describe('placement dimensions while placing an opening', () => {
     // ghost door (width 90) centered at wall middle: 160 cm on each side,
     // from the opening edge to the silhouette overhang
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
-    expect(screen.queryByText('4,10 m')).toBeNull()
+    expect(screen.getByText('4,10 m')).toBeTruthy() // the two registers coexist
     expect(screen.getAllByText('1,60 m')).toHaveLength(2)
-    // leaving the wall restores the wall dimension and drops the placement dimensions
+    // leaving the wall drops the placement dimensions
     fireEvent.pointerMove(svg, clientAt(svg, 300, 400))
     expect(screen.getByText('4,10 m')).toBeTruthy()
     expect(screen.queryByText('1,60 m')).toBeNull()
@@ -172,7 +191,7 @@ describe('placement dimensions while placing an opening', () => {
 })
 
 describe('placement dimensions while moving an opening', () => {
-  it('shows them during the drag, hides only that wall dimension, restores on release', () => {
+  it('shows them during the drag without touching any wall dimension', () => {
     const plan = editorPlan()
     plan.walls.w2 = { id: 'w2', startPointId: 'c', endPointId: 'd', thickness: 10 }
     plan.points.c = { id: 'c', x: 100, y: 300 }
@@ -187,23 +206,75 @@ describe('placement dimensions while moving an opening', () => {
     fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
     // opening centered on the wall: 145 cm on each side (to the overhangs)
     expect(screen.getAllByText('1,45 m')).toHaveLength(2)
-    expect(screen.queryByText('4,10 m')).toBeNull()
-    expect(screen.getByText('3,10 m')).toBeTruthy() // the other wall keeps its dimension
-    fireEvent.pointerUp(svg)
-    expect(screen.queryByText('1,45 m')).toBeNull()
     expect(screen.getByText('4,10 m')).toBeTruthy()
+    expect(screen.getByText('3,10 m')).toBeTruthy()
   })
 
-  it('does not show them on a plain click — selecting is not moving', () => {
+  it('continues past the release, because the drag leaves the opening selected', () => {
     const plan = editorPlan()
     plan.openings.o1 = { id: 'o1', wallId: 'w1', type: 'window', offset: 150, width: 120 }
     usePlanStore.setState({ plan })
     const { container } = render(<Editor />)
     const svg = container.querySelector('svg')!
     const grab = container.querySelector('rect[width="120"][fill="transparent"]')!
+    fireEvent.pointerDown(grab, { button: 0, ...clientAt(svg, 250, 100) })
+    fireEvent.pointerMove(svg, clientAt(svg, 300, 100))
+    fireEvent.pointerUp(svg)
+    // no transition: the same chips simply keep existing
+    expect(screen.getAllByText('1,45 m')).toHaveLength(2)
+  })
+})
+
+describe('placement dimensions on the selection', () => {
+  // two windows (120) on the same wall, at 150 and 300
+  const twoOpeningsPlan = (): Plan => {
+    const plan = editorPlan()
+    plan.openings.o1 = { id: 'o1', wallId: 'w1', type: 'window', offset: 150, width: 120 }
+    plan.openings.o2 = { id: 'o2', wallId: 'w1', type: 'window', offset: 300, width: 120 }
+    return plan
+  }
+
+  it('shows them on a plain click — a selected opening keeps its chips', () => {
+    usePlanStore.setState({ plan: editorPlan() })
+    const plan = usePlanStore.getState().plan
+    plan.openings.o1 = { id: 'o1', wallId: 'w1', type: 'window', offset: 150, width: 120 }
+    usePlanStore.setState({ plan: { ...plan } })
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    const grab = container.querySelector('rect[width="120"][fill="transparent"]')!
     fireEvent.pointerDown(grab, { button: 0, ...clientAt(svg, 150, 100) })
-    expect(screen.getByText('4,10 m')).toBeTruthy() // wall dimension never blinks
+    fireEvent.pointerUp(svg)
+    // from the silhouette overhang (-5) to each edge: 95 cm and 1,95 m
+    expect(screen.getByText('95 cm')).toBeTruthy()
+    expect(screen.getByText('1,95 m')).toBeTruthy()
+    expect(screen.getByText('4,10 m')).toBeTruthy() // and the wall dimension stays
+  })
+
+  it('shows them for every opening of a multi-selection, with no cardinality threshold', () => {
+    usePlanStore.setState({ plan: twoOpeningsPlan() })
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    const [g1, g2] = Array.from(container.querySelectorAll('rect[width="120"][fill="transparent"]'))
+    fireEvent.pointerDown(g1, { button: 0, ...clientAt(svg, 150, 100) })
+    fireEvent.pointerUp(svg)
+    fireEvent.pointerDown(g2, { button: 0, shiftKey: true, ...clientAt(svg, 300, 100) })
+    fireEvent.pointerUp(svg)
+    // o1 (edges 90/210): 95 cm to the overhang, then 30 cm to o2 (edges
+    // 240/360) — o2 chains from the same 30 cm gap, then 45 cm to its overhang
+    expect(screen.getByText('95 cm')).toBeTruthy()
+    expect(screen.getAllByText('30 cm')).toHaveLength(2)
+    expect(screen.getByText('45 cm')).toBeTruthy()
+  })
+
+  it('stays silent for the openings a selected wall carries', () => {
+    usePlanStore.setState({ plan: twoOpeningsPlan() })
+    const { container } = render(<Editor />)
+    const svg = container.querySelector('svg')!
+    // click the wall away from both openings
+    fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 480, 100) })
     fireEvent.pointerUp(svg)
     expect(screen.getByText('4,10 m')).toBeTruthy()
+    expect(screen.queryByText('95 cm')).toBeNull()
+    expect(screen.queryByText('90 cm')).toBeNull()
   })
 })

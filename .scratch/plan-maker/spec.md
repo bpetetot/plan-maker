@@ -11,6 +11,10 @@ Amended 2026-07-19 by the [measure-semantics map](../measure-semantics/map.md):
 wall bodies, drawn length, dimension values, and opening placement dimensions
 (§2, §4).
 
+Amended 2026-07-20 by the [placement-dims-ux map](../placement-dims-ux/map.md):
+placement dimensions get their own visual register — a chip, not a dimension
+line — and stop displacing the wall's dimension (§4).
+
 ## 1. Product overview
 
 A simple, intuitive web app for private individuals to draw 2D floor plans of a
@@ -146,11 +150,17 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
   wall hit targets).
 - Move by dragging along the wall; resize via a width select in the popover
   (60–160 cm).
-- While placing or moving, **placement dimensions** flank the opening on the
-  interior side when exactly one side of the wall faces a room (else the wall
-  dimension's side), each chaining from the nearest neighbouring opening's
-  edge when one intervenes, else from the silhouette end
-  ([ticket](../measure-semantics/issues/04-opening-placement-dims.md)).
+- While placing or moving an opening — and, past the release, for as long as it
+  stays selected — **placement dimensions** flank it: one accent chip per
+  clearance, centred on it, on the wall axis inside the wall body. No dimension
+  line, no ticks, no witness lines, and the wall's own dimension **stays
+  visible** throughout. Each value chains from the nearest neighbouring
+  opening's edge when one intervenes, else from the silhouette end; the side —
+  interior when exactly one side of the wall faces a room, else the wall
+  dimension's side — selects the value, never the position
+  ([semantics](../measure-semantics/issues/04-opening-placement-dims.md),
+  [register](../placement-dims-ux/issues/02-visual-register-prototype.md),
+  [display rules](../placement-dims-ux/issues/03-display-rules.md)).
 - Doors additionally get **⇋ Hinge** and **⇵ Swing** flip buttons in the
   popover.
 
@@ -159,6 +169,12 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 - Scroll wheel zooms toward the cursor; Space+drag or middle-drag pans; zoom
   buttons + Fit as fallback.
 - Dimensions are always visible on every wall (no toggle in the MVP).
+- Dimensions obey the **drawing scale**: they belong to the sheet and leave
+  through PNG export, so zooming out shrinks them with the plan. **Interaction
+  chrome does not** — placement dimension chips and grab zones hold a constant
+  size on screen at every zoom, because they are never exported
+  ([ADR 0005](../../docs/adr/0005-interaction-chrome-is-pinned-to-the-screen.md),
+  [pixel lock](../placement-dims-ux/issues/06-pixel-floor.md)).
 
 ### Wall bodies and dimension semantics
 

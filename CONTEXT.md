@@ -208,18 +208,30 @@ exported.
 _Avoid_: Sur-grille, sous-grille, overlay, mesh
 
 **Placement dimension**:
-The pair of temporary dimensions flanking an Opening while it is being placed
-or moved. They sit on the interior side whenever exactly one side of the wall
-faces a Room; else — dangling wall, party wall, or a wall jutting into its
-own Room, none of which has a single interior side — on the side the wall's
-Dimension sits on. Each runs to the near
-edge of the opening from the silhouette end on that side — the mitered Face
-corner at a junction, the body overhang at a free end — or from the near edge
-of the closest neighbouring opening when one intervenes, so every value is
-tape-measurable. They replace the wall's Dimension on that side's line for
-the duration of the gesture; a side reduced to nothing shows no dimension.
+The pair of temporary measures flanking an Opening, shown while it is being
+placed or moved and, past the release, for as long as it stays in the
+Selection — every Opening of the Selection shows its own, with no cardinality
+threshold, while a selected Wall stays silent for the Openings it carries.
+Each measures to the near edge of the opening from the silhouette end — the
+mitered Face corner at a junction, the body overhang at a free end — or from
+the near edge of the closest neighbouring opening when one intervenes, so
+every value is tape-measurable. The side — interior whenever exactly one side
+of the wall faces a Room; else, dangling wall, party wall, or a wall jutting
+into its own Room, the side the wall's Dimension sits on — decides the value
+read and nothing more: it never decides where the measure is drawn.
+It is deliberately not drawn as a Dimension: no dimension line, no ticks, no
+witness lines, no offset from a Face. Each value is a filled accent chip
+centred on the clearance it measures, on the wall's axis, inside the wall
+body — the one position no other register occupies, so it coexists with the
+wall's Dimension instead of displacing it. The chip holds the same size on
+screen at every Zoom, padding included; only its size escapes the drawing
+scale, its centre stays in plan coordinates. It never shrinks, never shifts
+and never disappears: a chip wider than the clearance it measures simply
+overflows it. A clearance reduced to nothing shows no chip at all, and the
+other side shows its own normally.
 Pure editor feedback, like the Rail: never part of the plan, never exported.
-_Avoid_: Side measure, clearance, flanking dimension
+_Avoid_: Side measure, clearance, flanking dimension, Chip — the graphic is a
+chip, the concept is not
 
 **Rail**:
 The pair of guide lines a Dimension slides along while it is being dragged —
