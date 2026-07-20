@@ -156,10 +156,28 @@ _Avoid_: Hit zone, hit target, hover area
 
 **Snap**:
 The default magnetic guidance of any placement or move in the editor:
-positions are drawn to existing points, walls, 45° axes, or the 10 cm grid. A
-group move snaps its displacement as a whole, never each element separately —
-the group's shape stays intact. Pure editor behavior: never part of the plan.
+positions are drawn to existing points, walls, 45° axes, or the 10 cm grid —
+that ladder governs placing a point. A group move follows its own rule: it
+translates rigidly — the group's shape stays intact — and the translation is
+chosen so the group's Reference point lands on a grid intersection, to the grid
+only and to nothing else. An off-grid element therefore realigns on its first
+non-Free move. Pure editor behavior: never part of the plan.
 _Avoid_: Magnetism, snapping grid, attach
+
+**Drawing anchor**:
+The Point a new wall segment is being drawn from — the origin of axis snapping,
+which steps relative to it. A group move has no Drawing anchor: it aims at no
+connection. Pure editor state: never part of the plan.
+_Avoid_: Origin, start point, pivot
+
+**Reference point**:
+The one Point of a moving group whose landing position a group move's
+realignment is computed for: the selection's wall Point nearest the grab,
+across every selected wall whatever element was actually grabbed, chosen at
+the start of the drag and fixed for its whole duration. A selection holding no
+wall Point has none, and realigns nothing. Pure editor state: never part of the
+plan.
+_Avoid_: Pivot, handle
 
 **Free move**:
 Any placement or move with Alt held: snapping is suspended and only the

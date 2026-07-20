@@ -135,8 +135,8 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 ### Selection and editing
 
 - Click an element to select; a floating contextual popover appears next to it.
-- Walls: endpoint handles to reshape, drag the body to move (grid-stepped);
-  popover shows length + Delete.
+- Walls: endpoint handles to reshape, drag the body to move (realigns to the
+  grid); popover shows length + Delete.
 - Delete/Backspace deletes the selection; Esc deselects.
 
 ### Doors and windows

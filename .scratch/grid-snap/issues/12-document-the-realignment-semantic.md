@@ -34,16 +34,16 @@ See `.scratch/grid-snap/spec.md` §9.
 **Blocked by:** 10 (axis snapping is relative to the anchor), 11 (group moves
 realign to the grid) — the docs describe shipped behaviour.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A new ADR exists next to 0002 and 0003, following their format, covering
+- [x] A new ADR exists next to 0002 and 0003, following their format, covering
       realign-not-step, the fixed nearest-wall-point reference, grid-only
       snapping for group moves, and the unconditional merge.
-- [ ] The ADR records the rejected alternatives and why they were rejected.
-- [ ] `.scratch/plan-maker/spec.md` §Snapping describes the relative-to-anchor
+- [x] The ADR records the rejected alternatives and why they were rejected.
+- [x] `.scratch/plan-maker/spec.md` §Snapping describes the relative-to-anchor
       axis rule.
-- [ ] `.scratch/plan-maker/spec.md` §Selection and editing no longer says
+- [x] `.scratch/plan-maker/spec.md` §Selection and editing no longer says
       "grid-stepped" for a body drag.
-- [ ] The **Snap** entry in `CONTEXT.md` no longer claims a group move snaps its
+- [x] The **Snap** entry in `CONTEXT.md` no longer claims a group move snaps its
       displacement as a whole, and the glossary covers the reference point.
-- [ ] No behaviour change: this ticket touches documentation only.
+- [x] No behaviour change: this ticket touches documentation only.
