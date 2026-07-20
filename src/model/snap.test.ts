@@ -22,12 +22,43 @@ describe('snapPoint', () => {
     expect(s.kind).not.toBe('point')
   })
 
-  it('locks to 45° axes from the anchor, stepping length to the grid', () => {
+  it('locks to 45° axes from the anchor, stepping the components to the grid', () => {
     const s = snapPoint(plan, 200, 6, { tolerance: 5, anchor: { x: 0, y: 0 } })
     expect(s.kind).toBe('axis')
     expect(s.y).toBe(0)
     expect(s.x % 10).toBe(0)
     expect(s.axisFrom).toEqual({ x: 0, y: 0 })
+  })
+
+  it('lands a diagonal on a grid intersection from an on-grid anchor', () => {
+    const s = snapPoint(plan, 137, 131, { tolerance: 5, anchor: { x: 0, y: 0 } })
+    expect(s).toMatchObject({ x: 130, y: 130, kind: 'axis' })
+  })
+
+  it('carries the anchor offset on a diagonal from an off-grid anchor', () => {
+    const anchor = { x: 3, y: 7 }
+    const s = snapPoint(plan, anchor.x + 137, anchor.y + 131, { tolerance: 5, anchor })
+    expect(s).toMatchObject({ x: 133, y: 137, kind: 'axis' })
+    expect(s.x - anchor.x).toBe(s.y - anchor.y)
+  })
+
+  it('steps only the moving component on an orthogonal lock', () => {
+    const anchor = { x: 3, y: 7 }
+    const s = snapPoint(plan, anchor.x + 204, anchor.y + 6, { tolerance: 5, anchor })
+    expect(s).toMatchObject({ x: 203, y: 7, kind: 'axis' })
+  })
+
+  it('steps the same way along negative axes', () => {
+    const anchor = { x: 500, y: 500 }
+    const diagonal = snapPoint(plan, anchor.x - 137, anchor.y - 131, { tolerance: 5, anchor })
+    expect(diagonal).toMatchObject({ x: 370, y: 370, kind: 'axis' })
+    const orthogonal = snapPoint(plan, anchor.x - 4, anchor.y - 204, { tolerance: 5, anchor })
+    expect(orthogonal).toMatchObject({ x: 500, y: 300, kind: 'axis' })
+  })
+
+  it('keeps a minimum of one grid step on each component', () => {
+    const s = snapPoint(plan, 5, 4, { tolerance: 5, anchor: { x: 0, y: 0 } })
+    expect(s).toMatchObject({ x: 10, y: 10, kind: 'axis' })
   })
 
   it('falls back to the 10 cm grid', () => {

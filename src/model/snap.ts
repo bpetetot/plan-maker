@@ -26,15 +26,30 @@ const AXIS_TOLERANCE = (8 * Math.PI) / 180
 // cursor (grazing angle) is not what the eye is aiming at (ADR 0002).
 const AXIS_INTERSECTION_REACH = 2
 
-// Unit direction of the 45° axis the anchor→cursor direction locks to, or
-// null when the cursor is not within the angular tolerance of any axis.
-function lockedAxisDirection(anchor: Vec, x: number, y: number): Vec | null {
+// The eight axes, as integer lattice steps ordered by octant from +x.
+const AXIS_LATTICE: Vec[] = [
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+  { x: -1, y: 0 },
+  { x: -1, y: -1 },
+  { x: 0, y: -1 },
+  { x: 1, y: -1 },
+]
+
+// The 45° axis the anchor→cursor direction locks to — as a unit `direction`
+// and as the integer `step` one grid multiple along it — or null when the
+// cursor is not within the angular tolerance of any axis.
+function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: Vec } | null {
   const length = Math.hypot(x - anchor.x, y - anchor.y)
   if (length <= 1) return null
   const angle = Math.atan2(y - anchor.y, x - anchor.x)
-  const snapped = Math.round(angle / AXIS_STEP) * AXIS_STEP
-  if (Math.abs(angle - snapped) >= AXIS_TOLERANCE) return null
-  return { x: Math.cos(snapped), y: Math.sin(snapped) }
+  const octant = Math.round(angle / AXIS_STEP)
+  if (Math.abs(angle - octant * AXIS_STEP) >= AXIS_TOLERANCE) return null
+  const step = AXIS_LATTICE[((octant % 8) + 8) % 8]
+  const norm = Math.hypot(step.x, step.y)
+  return { direction: { x: step.x / norm, y: step.y / norm }, step }
 }
 
 // A group move snaps its displacement as a whole — never each element
@@ -75,8 +90,9 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
         let px = a.x + ((b.x - a.x) / length) * near.t
         let py = a.y + ((b.y - a.y) / length) * near.t
         let axisFrom: Vec | undefined
-        const direction = options.anchor && lockedAxisDirection(options.anchor, x, y)
-        if (options.anchor && direction) {
+        const axis = options.anchor && lockedAxis(options.anchor, x, y)
+        if (options.anchor && axis) {
+          const direction = axis.direction
           const wx = b.x - a.x
           const wy = b.y - a.y
           const denominator = direction.x * wy - direction.y * wx
@@ -103,13 +119,21 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
   }
 
   if (options.anchor) {
-    const direction = lockedAxisDirection(options.anchor, x, y)
-    if (direction) {
-      const length = Math.hypot(x - options.anchor.x, y - options.anchor.y)
-      const stepped = Math.max(GRID, Math.round(length / GRID) * GRID)
+    const axis = lockedAxis(options.anchor, x, y)
+    if (axis) {
+      // The endpoint steps each component from the anchor, not the segment's
+      // length: k whole grid multiples of the integer axis step, k ≥ 1 so the
+      // endpoint never collapses onto the anchor. From an on-grid anchor that
+      // lands on a grid intersection; from an off-grid one it inherits the
+      // anchor's offset. Same formulation either way, no fallback branch.
+      const { step } = axis
+      const projection =
+        ((x - options.anchor.x) * step.x + (y - options.anchor.y) * step.y) /
+        (step.x * step.x + step.y * step.y)
+      const k = Math.max(1, Math.round(projection / GRID))
       return {
-        x: Math.round(options.anchor.x + stepped * direction.x),
-        y: Math.round(options.anchor.y + stepped * direction.y),
+        x: Math.round(options.anchor.x + k * GRID * step.x),
+        y: Math.round(options.anchor.y + k * GRID * step.y),
         kind: 'axis',
         axisFrom: { x: options.anchor.x, y: options.anchor.y },
       }
