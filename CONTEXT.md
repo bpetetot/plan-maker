@@ -155,9 +155,14 @@ zoomed out. Pure editor behavior: never part of the plan, never exported.
 _Avoid_: Hit zone, hit target, hover area
 
 **Snap**:
-The default magnetic guidance of any placement or move in the editor:
+The magnetic guidance of any placement or move in the editor:
 positions are drawn to existing points, walls, 45° axes, or the 10 cm grid —
-that ladder governs placing a point. Its rungs are of two natures: the
+that ladder governs placing a point. Snap is a state, not a permanent
+behavior: it is on by default and can be turned off for the whole editor —
+a per-device preference like the Grid or the Theme, never part of the plan,
+never exported — and Alt inverts whichever state is current for the duration
+of the gesture, so the same key reaches a Free move from Snap and a snapped
+one from Free. Its rungs are of two natures: the
 connection targets — existing Point, wall body — which decide what the placed
 Point is attached to, and the alignment targets — 45° axis, grid — which only
 decide where it sits; a Free move keeps the first and drops the second. An axis
@@ -190,16 +195,19 @@ plan.
 _Avoid_: Pivot, handle
 
 **Free move**:
-Any placement or move with Alt held: Snap's alignment targets are suspended,
-its connection targets are not — Alt filters the ladder, it never switches it
+Any placement or move made while Snap is inactive — because Snap is off, or
+because Alt inverts it while Snap is on; the two causes are indistinguishable
+in their effect. Snap's alignment targets are suspended, its connection
+targets are not — a Free move filters the ladder, it never switches it
 off. A free placement is therefore drawn to an existing Point or to a wall's
 body exactly as an ordinary one is, but never to a 45° axis nor to the grid;
 away from every connection target only the integer-centimeter rounding remains
 (Points have integer coordinates). Connecting is topology, aligning is
-geometry, and only the second is what Alt escapes: a wall drawn freely still
-joins the plan instead of landing beside it. A group move, which runs no
-ladder, keeps its own rule: Alt suspends its realignment. Toggles immediately,
-both ways, including mid-gesture.
+geometry, and only the second is what a Free move escapes: a wall drawn freely
+still joins the plan instead of landing beside it. A group move, which runs no
+ladder, keeps its own rule: a Free move suspends its realignment — so an
+off-grid group heals on its first snapped move, and never while Snap is off.
+Toggles immediately, both ways, including mid-gesture.
 _Avoid_: Free mode, no-grid mode
 
 **Grid**:

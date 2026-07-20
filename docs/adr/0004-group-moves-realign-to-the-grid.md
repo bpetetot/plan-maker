@@ -1,5 +1,11 @@
 # Group moves realign to the grid — a move fixes alignment, never inherits it
 
+> Amended by [ADR 0007](0007-snap-is-a-state-alt-inverts-it.md) (2026-07-20):
+> Snap became a persisted state rather than a permanent behavior, so the
+> progressive healing promised below only holds while Snap is on. Alt is now an
+> inversion of that state, not the sole cause of a Free move — read "non-Alt
+> move" throughout as "snapped move".
+
 The editor promises that everything lands on the 10 cm grid, and group moves
 broke that promise: the delta of a wall-body or multi-selection drag was rounded
 to grid multiples, so an element off-grid by 3 cm stayed off-grid by 3 cm

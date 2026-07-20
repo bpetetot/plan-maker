@@ -7,6 +7,7 @@ import {
   DoorClosed,
   Grid2x2,
   Grid3x3,
+  Magnet,
   MousePointer2,
   Redo2,
   Undo2,
@@ -48,6 +49,7 @@ import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import { GridLines, loadGridVisible, saveGridVisible } from './grid'
+import { loadSnapEnabled, saveSnapEnabled } from './snapPref'
 import type { RoomTextBlock } from './render'
 import { ToolPanel } from './ToolPanel'
 import {
@@ -134,6 +136,7 @@ export default function Editor() {
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [tool, setTool] = useState<Tool>('select')
   const [gridVisible, setGridVisible] = useState(loadGridVisible)
+  const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled)
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
@@ -163,7 +166,14 @@ export default function Editor() {
   const editCancelled = useRef(false)
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
-  const alt = useRef(false)
+  // Alt lives in state, not a ref: the snap toggle shows the *effective* state,
+  // so pressing and releasing the key has to re-render. Auto-repeat is absorbed
+  // by React's bail-out on an unchanged value.
+  const [altHeld, setAltHeld] = useState(false)
+  // Snap's two alignment rungs are suspended when snapping is off, and Alt
+  // inverts whichever state is current for the gesture's duration (ADR 0007).
+  const isFree = (alt: boolean) => !snapEnabled !== alt
+  const free = isFree(altHeld)
 
   // Fit after any replacement of the plan (open, startup restore, reset).
   // Runs on mount too, which frames the plan restored before the editor mounted.
@@ -205,10 +215,15 @@ export default function Editor() {
     [setPlan],
   )
 
+  const toggleSnap = useCallback(() => {
+    setSnapEnabled(!snapEnabled)
+    saveSnapEnabled(!snapEnabled)
+  }, [snapEnabled])
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (isTypingTarget(e)) return
-      alt.current = e.altKey
+      setAltHeld(e.altKey)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) redo()
@@ -230,17 +245,25 @@ export default function Editor() {
       else if (e.key === '2') switchTool('wall')
       else if (e.key === '3') switchTool('door')
       else if (e.key === '4') switchTool('window')
+      // bare S only: Ctrl/Cmd+S is the browser's Save reflex, and flipping a
+      // persisted preference under it would be silent and durable
+      else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) toggleSnap()
     }
     const up = (e: KeyboardEvent) => {
-      alt.current = e.altKey
+      setAltHeld(e.altKey)
     }
+    // Alt drives a visible affordance now, so a keyup the window never receives
+    // (Alt+Tab away) would leave the toggle lying about the effective state.
+    const clearAlt = () => setAltHeld(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
+    window.addEventListener('blur', clearAlt)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clearAlt)
     }
-  }, [chain, sel, deleteSelection])
+  }, [chain, sel, deleteSelection, toggleSnap])
 
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup()
@@ -263,7 +286,7 @@ export default function Editor() {
     const c = toPlan(e.clientX, e.clientY)
     if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current })
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free })
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
         // clicking the chain's start point closes the room
         setPlan(
@@ -350,7 +373,7 @@ export default function Editor() {
         const s = snapPoint(plan, c.x, c.y, {
           tolerance: tolerance(),
           exclude: new Set([d.id]),
-          free: alt.current,
+          free,
         })
         setPlan((p) => movePoint(p, d.id, s.x, s.y))
         setSnap(s)
@@ -361,7 +384,7 @@ export default function Editor() {
         if (d.moved) {
           // e.altKey rather than the tracked key state: it is correct even
           // when Alt was already down before the window had focus
-          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, e.altKey)
+          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, isFree(e.altKey))
           setPlan(() => translateElements(d.orig, d.refs, dx, dy))
         }
       } else if (d.kind === 'marquee') {
@@ -409,7 +432,7 @@ export default function Editor() {
     }
     if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free: alt.current }))
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }))
     } else if (tool === 'door' || tool === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
       if (near) {
@@ -798,7 +821,7 @@ export default function Editor() {
         {tool === 'wall'
           ? chain
             ? 'Click to add a wall · click the start point to close the room · Esc / double-click to stop'
-            : 'Click to start a wall chain · Alt disables snapping'
+            : 'Click to start a wall chain · S toggles snap · Alt inverts it'
           : tool === 'door' || tool === 'window'
             ? 'Hover a wall, click to place'
             : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
@@ -827,6 +850,17 @@ export default function Editor() {
             <ZoomIn size={16} aria-hidden />
           </button>
           <span className="floating-sep" />
+          {/* shows the *effective* state — Alt inverts the state it holds, and
+              a click always toggles snapping itself, never the inversion */}
+          <button
+            className={free ? 'floating-btn icon' : 'floating-btn icon active'}
+            title={snapEnabled ? 'Disable snap (S)' : 'Enable snap (S)'}
+            aria-label="Snap"
+            aria-pressed={!free}
+            onClick={toggleSnap}
+          >
+            <Magnet size={16} aria-hidden />
+          </button>
           <button
             className={gridVisible ? 'floating-btn icon active' : 'floating-btn icon'}
             title={gridVisible ? 'Hide grid' : 'Show grid'}
