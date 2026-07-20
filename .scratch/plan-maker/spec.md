@@ -117,19 +117,23 @@ Ticket: [Drawing interactions and editor layout prototype](issues/05-drawing-int
 
 - Click-to-click polyline chain with rubber-band preview and live length label.
   The ghost has square caps (the exact future body) and its label reads the
-  overall (hors-tout) extent — axis + thickness. The snap ladder steps the
-  endpoint, not that value, so the label reads a 10 cm multiple on an
-  orthogonal run and ~14.1 cm multiples on a diagonal (see §Snapping).
+  overall (hors-tout) extent — axis + thickness. The snap ladder places the
+  endpoint, not that value, so from an on-grid anchor the label reads a 10 cm
+  multiple on an orthogonal run and ~14.1 cm multiples on a diagonal; from an
+  off-grid anchor the endpoint aligns to the grid and the length absorbs the
+  anchor's offset instead (see §Snapping).
 - Clicking the chain's start point closes the room.
 - Esc or double-click ends the chain; Alt temporarily disables snapping.
 
 ### Snapping
 
 - To wall endpoints — green ring feedback.
-- 45° axis lock — dashed green guide from the anchor. The endpoint steps by
-  whole grid multiples *on each component* relative to the anchor, so a
-  diagonal keeps an exact 45° and steps by ~14.1 cm; from an on-grid anchor it
-  lands on a grid intersection, from an off-grid one it inherits the offset.
+- 45° axis lock — dashed green guide from the anchor. The endpoint lands where
+  the axis crosses the grid lines, taken absolutely (ADR 0006): the segment
+  stays exactly on its axis and at least one coordinate lands on the grid. From
+  an on-grid anchor that means grid intersections, stepping 10 cm on an
+  orthogonal run and ~14.1 cm on a diagonal; from an off-grid anchor the
+  endpoint still aligns to the grid and the length absorbs the offset.
 - 10 cm grid fallback — small green dot. The sheet shows a visible grid by
   default — dashed minor lines every 10 cm (the snap step), solid major lines every 50 cm,
   fading out when too dense on screen. A toggle next to the zoom controls

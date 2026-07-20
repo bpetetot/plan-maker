@@ -48,6 +48,15 @@ The axis ∩ wall-body intersection rule (ADR 0002) is unchanged.
 
 ## 4. Axis snapping is relative to the anchor
 
+> **Superseded by [ADR 0006](../../docs/adr/0006-axis-snapping-targets-absolute-grid-crossings.md).**
+> The endpoint no longer steps from the anchor: it lands on the grid crossings
+> the axis meets, absolutely. The on-grid case below is unchanged — the two
+> formulations agree there. What changed is the off-grid anchor: the endpoint no
+> longer inherits the offset, it aligns to the grid and the length absorbs the
+> offset instead. The reasoning below is kept as it stood; the argument it lost
+> to is that the inherited offset was *hereditary*, propagating to every wall
+> drawn from an off-grid point.
+
 **Replaces length-stepping.** The endpoint of an axis-locked segment sits at
 
 ```

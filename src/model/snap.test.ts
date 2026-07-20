@@ -35,20 +35,37 @@ describe('snapPoint', () => {
     expect(s).toMatchObject({ x: 130, y: 130, kind: 'axis' })
   })
 
-  it('carries the anchor offset on a diagonal from an off-grid anchor', () => {
+  it('lands a diagonal on a grid line crossing from an off-grid anchor', () => {
     const anchor = { x: 3, y: 7 }
     const s = snapPoint(plan, anchor.x + 137, anchor.y + 131, { tolerance: 5, anchor })
-    expect(s).toMatchObject({ x: 133, y: 137, kind: 'axis' })
-    expect(s.x - anchor.x).toBe(s.y - anchor.y)
+    // the two crossing families interleave (t ≡ 7 aligns x, t ≡ 3 aligns y);
+    // the nearest to the cursor wins — here t = 133, which aligns y
+    expect(s).toMatchObject({ x: 136, y: 140, kind: 'axis' })
+    expect(s.x - anchor.x).toBe(s.y - anchor.y) // still exactly 45°
   })
 
-  it('steps only the moving component on an orthogonal lock', () => {
+  it('lands on a real intersection when the anchor offsets are equal', () => {
+    const anchor = { x: 3, y: 3 }
+    const s = snapPoint(plan, anchor.x + 137, anchor.y + 131, { tolerance: 5, anchor })
+    // both families coincide: the diagonal does cross grid intersections
+    expect(s).toMatchObject({ x: 140, y: 140, kind: 'axis' })
+  })
+
+  it('aligns the moving component to the absolute grid on an orthogonal lock', () => {
     const anchor = { x: 3, y: 7 }
     const s = snapPoint(plan, anchor.x + 204, anchor.y + 6, { tolerance: 5, anchor })
-    expect(s).toMatchObject({ x: 203, y: 7, kind: 'axis' })
+    expect(s).toMatchObject({ x: 210, y: 7, kind: 'axis' })
   })
 
-  it('steps the same way along negative axes', () => {
+  it('crosses the same lines along negative axes', () => {
+    const anchor = { x: 503, y: 507 }
+    const diagonal = snapPoint(plan, anchor.x - 137, anchor.y - 131, { tolerance: 5, anchor })
+    expect(diagonal).toMatchObject({ x: 370, y: 374, kind: 'axis' })
+    const orthogonal = snapPoint(plan, anchor.x - 4, anchor.y - 204, { tolerance: 5, anchor })
+    expect(orthogonal).toMatchObject({ x: 503, y: 300, kind: 'axis' })
+  })
+
+  it('steps by whole grid multiples from an on-grid anchor, negative axes included', () => {
     const anchor = { x: 500, y: 500 }
     const diagonal = snapPoint(plan, anchor.x - 137, anchor.y - 131, { tolerance: 5, anchor })
     expect(diagonal).toMatchObject({ x: 370, y: 370, kind: 'axis' })
@@ -56,9 +73,12 @@ describe('snapPoint', () => {
     expect(orthogonal).toMatchObject({ x: 500, y: 300, kind: 'axis' })
   })
 
-  it('keeps a minimum of one grid step on each component', () => {
-    const s = snapPoint(plan, 5, 4, { tolerance: 5, anchor: { x: 0, y: 0 } })
-    expect(s).toMatchObject({ x: 10, y: 10, kind: 'axis' })
+  it('takes the first crossing beyond the anchor, never the anchor itself', () => {
+    const onGrid = snapPoint(plan, 5, 4, { tolerance: 5, anchor: { x: 0, y: 0 } })
+    expect(onGrid).toMatchObject({ x: 10, y: 10, kind: 'axis' })
+    const anchor = { x: 3, y: 7 }
+    const offGrid = snapPoint(plan, anchor.x + 2, anchor.y + 2, { tolerance: 5, anchor })
+    expect(offGrid).toMatchObject({ x: 6, y: 10, kind: 'axis' })
   })
 
   it('falls back to the 10 cm grid', () => {
