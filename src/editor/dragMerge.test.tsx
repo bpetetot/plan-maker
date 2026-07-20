@@ -84,4 +84,17 @@ describe('group move ending point-on-point', () => {
     expect(plan().points.e).toMatchObject({ x: 500, y: 400 })
     expect(undoDepth()).toBe(1)
   })
+
+  it('restores the exact pre-drag plan on a single undo', () => {
+    const { svg } = setup()
+    marqueeSelect(svg, { x: 450, y: 150 }, { x: 550, y: 550 })
+    const before = plan()
+    const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[1]
+    fireEvent.pointerDown(wallHit, { button: 0, ...clientAt(svg, 500, 350) })
+    fireEvent.pointerMove(svg, clientAt(svg, 500, 250))
+    fireEvent.pointerUp(svg)
+    expect(plan().points.c).toBeUndefined()
+    usePlanStore.temporal.getState().undo()
+    expect(plan()).toEqual(before)
+  })
 })

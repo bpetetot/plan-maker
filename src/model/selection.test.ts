@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { deleteElements, elementsInRect, isSelected, refKey, toggleRef, translateElements } from './selection'
+import {
+  deleteElements,
+  elementsInRect,
+  isSelected,
+  refKey,
+  referencePoint,
+  toggleRef,
+  translateElements,
+} from './selection'
 import { buildPlan } from './testHelpers'
 import type { ElementRef } from './selection'
 
@@ -295,5 +303,72 @@ describe('translateElements — placement state', () => {
     expect(next.roomLabels[ids.byDefault]).toMatchObject({ x: 250, y: 170 })
     expect(next.roomLabels[ids.byDefault].placed).toBeUndefined()
     expect(next.roomLabels[ids.custom]).toMatchObject({ x: 400, y: 90, placed: true })
+  })
+})
+
+describe('referencePoint', () => {
+  it('picks the wall endpoint nearest the grab, not always the start point', () => {
+    let ids = { wall: '', a: '', b: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      ids = { wall: b.wall(p1, p2).id, a: p1.id, b: p2.id }
+    })
+    expect(referencePoint(plan, [wallRef(ids.wall)], { x: 350, y: 20 })).toMatchObject({
+      id: ids.b,
+      x: 400,
+      y: 0,
+    })
+  })
+
+  it('searches every selected wall, whatever element the pointer went down on', () => {
+    let ids = { far: '', near: '', nearPoint: '', opening: '' }
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0)
+      const p2 = b.point(400, 0)
+      const p3 = b.point(1000, 0)
+      const p4 = b.point(1000, 400)
+      const far = b.wall(p1, p2)
+      ids = {
+        far: far.id,
+        near: b.wall(p3, p4).id,
+        nearPoint: p3.id,
+        opening: b.opening(far, 'door', 100).id,
+      }
+    })
+    const refs = [wallRef(ids.far), wallRef(ids.near), openingRef(ids.opening)]
+    expect(referencePoint(plan, refs, { x: 950, y: 30 })).toMatchObject({ id: ids.nearPoint })
+  })
+
+  it('breaks a distance tie on endpoint a, even when b has the lower id', () => {
+    let ids = { wall: '', a: '' }
+    const plan = buildPlan((b) => {
+      const end = b.point(400, 0)
+      const start = b.point(0, 0)
+      ids = { wall: b.wall(start, end).id, a: start.id }
+    })
+    // equidistant from both endpoints
+    expect(referencePoint(plan, [wallRef(ids.wall)], { x: 200, y: 100 })).toMatchObject({ id: ids.a })
+  })
+
+  it('breaks a distance tie across walls independently of the selection order', () => {
+    let walls: string[] = []
+    const plan = buildPlan((b) => {
+      walls = [b.wall(b.point(0, 0), b.point(-400, 0)).id, b.wall(b.point(0, 400), b.point(-400, 400)).id]
+    })
+    // equidistant from (0,0) and (0,400), each an `a` endpoint of its wall
+    const grab = { x: 100, y: 200 }
+    const forward = referencePoint(plan, walls.map(wallRef), grab)
+    const reversed = referencePoint(plan, [...walls].reverse().map(wallRef), grab)
+    expect(forward).toEqual(reversed)
+  })
+
+  it('returns null for a selection holding no wall point', () => {
+    let opening = ''
+    const plan = buildPlan((b) => {
+      const wall = b.wall(b.point(0, 0), b.point(400, 0))
+      opening = b.opening(wall, 'door', 100).id
+    })
+    expect(referencePoint(plan, [openingRef(opening)], { x: 100, y: 0 })).toBeNull()
   })
 })

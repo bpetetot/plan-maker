@@ -52,11 +52,23 @@ function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: 
   return { direction: { x: step.x / norm, y: step.y / norm }, step }
 }
 
-// A group move snaps its displacement as a whole — never each element
-// separately — so the group's shape stays intact.
-export function snapDelta(dx: number, dy: number, free?: boolean): { dx: number; dy: number } {
-  if (free) return { dx: Math.round(dx), dy: Math.round(dy) }
-  return { dx: Math.round(dx / GRID) * GRID, dy: Math.round(dy / GRID) * GRID }
+// A group move translates rigidly — the displacement applies to the group as a
+// whole, never to each element separately — and realigns it on the grid: the
+// delta is the one that lands the reference point (`referencePoint`, fixed at
+// pointer-down) exactly on a grid intersection, so an off-grid group heals on
+// its first ordinary move instead of carrying its offset forever. The grid is
+// the only target: a group move runs no part of the placement snap ladder.
+// Free mode (Alt) and a selection with no wall point to reference both fall
+// back to whole-centimeter rounding.
+export function realignDelta(
+  ref: Vec | null,
+  dx: number,
+  dy: number,
+  free?: boolean,
+): { dx: number; dy: number } {
+  if (free || !ref) return { dx: Math.round(dx), dy: Math.round(dy) }
+  const grid = (v: number) => Math.round(v / GRID) * GRID
+  return { dx: grid(ref.x + dx) - ref.x, dy: grid(ref.y + dy) - ref.y }
 }
 
 // Snap priority (spec §4 + ADR 0002): existing point > wall body (when enabled)

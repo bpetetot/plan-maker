@@ -38,11 +38,12 @@ import {
   elementsInRect,
   isSelected,
   refKey,
+  referencePoint,
   toggleRef,
   translateElements,
 } from '../model/selection'
 import type { Snap } from '../model/snap'
-import { snapDelta, snapPoint } from '../model/snap'
+import { realignDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
@@ -84,6 +85,9 @@ type Drag =
       // set when the drag started on an element of a multi-selection: a
       // movement below the click threshold collapses the selection to it
       clickRef?: ElementRef
+      // the point the realignment lands on the grid, fixed at pointer-down so
+      // the preview never jumps when another candidate becomes the nearest
+      refPoint: Vec | null
       moved?: boolean
     }
   // dragging an opening along its wall; below the click threshold it is a
@@ -321,7 +325,14 @@ export default function Editor() {
     }
     const c = toPlan(e.clientX, e.clientY)
     if (sel.length > 1 && isSelected(sel, ref)) {
-      startPlanDrag({ kind: 'group', refs: sel, start: c, orig: plan, clickRef: ref })
+      startPlanDrag({
+        kind: 'group',
+        refs: sel,
+        start: c,
+        orig: plan,
+        clickRef: ref,
+        refPoint: referencePoint(plan, sel, c),
+      })
     } else {
       setSel([ref])
       startPlanDrag(soloDrag(c))
@@ -350,7 +361,7 @@ export default function Editor() {
         if (d.moved) {
           // e.altKey rather than the tracked key state: it is correct even
           // when Alt was already down before the window had focus
-          const { dx, dy } = snapDelta(c.x - d.start.x, c.y - d.start.y, e.altKey)
+          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, e.altKey)
           setPlan(() => translateElements(d.orig, d.refs, dx, dy))
         }
       } else if (d.kind === 'marquee') {
@@ -622,12 +633,16 @@ export default function Editor() {
               pxPerCm={zoomScale}
               cursor="move"
               onPointerDown={(e) =>
-                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => ({
-                  kind: 'group',
-                  refs: [{ type: 'wall', id: wall.id }],
-                  start: c,
-                  orig: plan,
-                }))
+                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => {
+                  const refs: ElementRef[] = [{ type: 'wall', id: wall.id }]
+                  return {
+                    kind: 'group',
+                    refs,
+                    start: c,
+                    orig: plan,
+                    refPoint: referencePoint(plan, refs, c),
+                  }
+                })
               }
               onPointerEnter={() => setHoverWall(wall.id)}
               onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}

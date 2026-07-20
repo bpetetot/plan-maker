@@ -4,7 +4,7 @@ import { openingPlacement } from './openings'
 import { deleteOpening, deleteWall, setPoints, translateRoomLabel } from './operations'
 import type { Room } from './rooms'
 import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms'
-import type { Plan } from './types'
+import type { Plan, Point } from './types'
 
 // Multi-selection over plan elements: a selection is a list of refs to walls
 // and openings. Room labels are never selected — they are manipulated directly
@@ -67,6 +67,33 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
     else next = deleteOpening(next, ref.id)
   }
   return reconcileRoomLabels(plan, next)
+}
+
+// The point a group move realigns on the grid: the selection's wall point
+// nearest the grab, searched across every selected wall — the clicked element
+// may be an opening, which has no point of its own. Ties break deterministically
+// on endpoint `a` first then the lowest id, so the choice never depends on the
+// selection order; that order is an implementation detail, not a user-visible
+// rule. Null when the selection holds no wall point at all, in which case
+// nothing translates anyway.
+export function referencePoint(plan: Plan, refs: ElementRef[], grab: Vec): Point | null {
+  let best: { point: Point; reach: number; isStart: boolean } | null = null
+  for (const ref of refs) {
+    if (ref.type !== 'wall') continue
+    const wall = plan.walls[ref.id]
+    if (!wall) continue
+    for (const point of wallPoints(plan, wall)) {
+      // squared distance: points are whole centimeters, so ties are exact
+      const reach = (point.x - grab.x) ** 2 + (point.y - grab.y) ** 2
+      const isStart = point.id === wall.startPointId
+      const wins =
+        best === null ||
+        reach < best.reach ||
+        (reach === best.reach && (isStart !== best.isStart ? isStart : point.id < best.point.id))
+      if (wins) best = { point, reach, isStart }
+    }
+  }
+  return best?.point ?? null
 }
 
 // Group move: translate the union of the selected walls' points. Openings

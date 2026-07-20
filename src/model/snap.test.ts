@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { snapDelta, snapPoint } from './snap'
+import { realignDelta, snapPoint } from './snap'
 import { buildPlan } from './testHelpers'
 
 const plan = buildPlan((b) => {
@@ -72,13 +72,27 @@ describe('snapPoint', () => {
   })
 })
 
-describe('snapDelta', () => {
-  it('steps the displacement to the 10 cm grid by default', () => {
-    expect(snapDelta(147.2, -63.8)).toEqual({ dx: 150, dy: -60 })
+describe('realignDelta', () => {
+  it('lands the reference point on a grid intersection', () => {
+    // ref is off-grid by (3, -4): the delta absorbs the offset instead of
+    // carrying it along
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, false)).toEqual({ dx: 147, dy: -66 })
+  })
+
+  it('realigns an off-grid reference even for a near-zero displacement', () => {
+    expect(realignDelta({ x: 103, y: 96 }, 1, -1, false)).toEqual({ dx: -3, dy: 4 })
+  })
+
+  it('keeps an on-grid reference on the grid', () => {
+    expect(realignDelta({ x: 100, y: 100 }, 147.2, -63.8, false)).toEqual({ dx: 150, dy: -60 })
   })
 
   it('a free move (Alt) only rounds to integer centimeters', () => {
-    expect(snapDelta(147.2, -63.8, true)).toEqual({ dx: 147, dy: -64 })
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, true)).toEqual({ dx: 147, dy: -64 })
+  })
+
+  it('falls back to whole-centimeter rounding without a reference point', () => {
+    expect(realignDelta(null, 147.2, -63.8, false)).toEqual({ dx: 147, dy: -64 })
   })
 })
 
