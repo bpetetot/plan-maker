@@ -86,9 +86,26 @@ several labels in one room (e.g. deleting a dividing wall merges two named
 rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room name, tag
 
+**Measure**:
+A number the plan states about itself: the Dimension of each wall, the Room
+area of each detected room. Computed from the plan, never stored. Measures
+show by default and hide together, from a single toggle sitting beside the
+Grid's — a per-device preference, like the Grid and the Theme, never part of
+the plan. Hiding is global and unconditional: selecting a wall does not bring
+its Dimension back, so a hidden plan stays clean whatever is selected, and
+adjusting a Dimension's placement means showing measures again. What hides on
+screen is absent from the export too (ADR 0008) — hiding measures is how a
+clean sheet is produced to share.
+The rule that decides what counts: a measure is permanent and exported. A
+number shown only for the duration of a gesture — the live length of the wall
+being drawn, a Placement dimension — is interaction chrome, not a measure, and
+never hides. A Room name is not a number the plan states about itself: it
+never hides either.
+_Avoid_: Measurement, cote, annotation
+
 **Dimension**:
-The displayed length of a wall, measuring exactly the wall's rendered
-silhouette on the side the dimension sits on: between the mitered Face
+A Measure: the displayed length of a wall, measuring exactly the wall's
+rendered silhouette on the side the dimension sits on: between the mitered Face
 corners at junction ends, out to the body overhang at free ends. On a closed
 room, the exterior side thus reads the overall (hors-tout) extent — invariant
 once the junctions exist — and the interior side the tape-measurable room
@@ -104,8 +121,8 @@ never depends on which side of the wall it sits.
 _Avoid_: Measurement, cote
 
 **Room area**:
-The surface of a detected room in square meters, bounded by the interior
-Faces of its walls — the real floor surface, not the wall-axis loop. The
+A Measure: the surface of a detected room in square meters, bounded by the
+interior Faces of its walls — the real floor surface, not the wall-axis loop. The
 footprint of a contained island, out to its walls' exterior Faces, is not
 floor: it is excluded.
 _Avoid_: Surface, square footage
@@ -244,6 +261,8 @@ and never disappears: a chip wider than the clearance it measures simply
 overflows it. A clearance reduced to nothing shows no chip at all, and the
 other side shows its own normally.
 Pure editor feedback, like the Rail: never part of the plan, never exported.
+Not a Measure, despite the name — it belongs to a gesture, so it never follows
+the Measure toggle and shows even when measures are hidden.
 _Avoid_: Side measure, clearance, flanking dimension, Chip — the graphic is a
 chip, the concept is not
 

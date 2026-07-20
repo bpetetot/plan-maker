@@ -10,6 +10,7 @@ import {
   Magnet,
   MousePointer2,
   Redo2,
+  RulerDimensionLine,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -49,6 +50,7 @@ import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
 import { GridLines, loadGridVisible, saveGridVisible } from './grid'
+import { loadMeasuresVisible, saveMeasuresVisible } from './measurePref'
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref'
 import type { RoomTextBlock } from './render'
 import { ToolPanel } from './ToolPanel'
@@ -136,6 +138,7 @@ export default function Editor() {
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [tool, setTool] = useState<Tool>('select')
   const [gridVisible, setGridVisible] = useState(loadGridVisible)
+  const [measuresVisible, setMeasuresVisible] = useState(loadMeasuresVisible)
   const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled)
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
@@ -658,6 +661,7 @@ export default function Editor() {
         <RoomOverlay
           rooms={rooms}
           labels={overlayLabels}
+          measuresVisible={measuresVisible}
           editingKey={editing?.key}
           onLinePointerDown={onLinePointerDown}
           onLineDoubleClick={onLineDoubleClick}
@@ -705,23 +709,26 @@ export default function Editor() {
         {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
         {/* after the grab zones so the label wins the hit-test where they overlap.
             Every wall keeps its own dimension throughout: placement dimensions
-            wear a different register and no longer share its slot */}
-        {Object.values(plan.walls).map((wall) => (
-          <DimLabel
-            key={wall.id}
-            plan={plan}
-            wall={wall}
-            selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
-            onPointerDown={
-              tool === 'select'
-                ? (e) => {
-                    if (e.button !== 0 || space) return
-                    startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
-                  }
-                : undefined
-            }
-          />
-        ))}
+            wear a different register and no longer share its slot.
+            Hiding is global — selecting a wall does not bring its dimension
+            back, so a hidden plan stays clean whatever is selected. */}
+        {measuresVisible &&
+          Object.values(plan.walls).map((wall) => (
+            <DimLabel
+              key={wall.id}
+              plan={plan}
+              wall={wall}
+              selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
+              onPointerDown={
+                tool === 'select'
+                  ? (e) => {
+                      if (e.button !== 0 || space) return
+                      startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
+                    }
+                  : undefined
+              }
+            />
+          ))}
         {dimmedOpenings.map((opening) => (
           <PlacementDims key={opening.id} plan={plan} opening={opening} rooms={rooms} pxPerCm={zoomScale} />
         ))}
@@ -872,6 +879,18 @@ export default function Editor() {
             }}
           >
             <Grid3x3 size={16} aria-hidden />
+          </button>
+          <button
+            className={measuresVisible ? 'floating-btn icon active' : 'floating-btn icon'}
+            title={measuresVisible ? 'Hide measures' : 'Show measures'}
+            aria-label="Measures"
+            aria-pressed={measuresVisible}
+            onClick={() => {
+              setMeasuresVisible(!measuresVisible)
+              saveMeasuresVisible(!measuresVisible)
+            }}
+          >
+            <RulerDimensionLine size={16} aria-hidden />
           </button>
         </div>
         <div className="floating">

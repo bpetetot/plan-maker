@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import AppMenu from './AppMenu'
 import Editor from './editor/Editor'
+import { loadMeasuresVisible } from './editor/measurePref'
 import ReloadPrompt from './pwa/ReloadPrompt'
 import { emptyPlan, isPlanEmpty } from './model/types'
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave'
@@ -58,7 +59,12 @@ export default function App() {
 
   const exportPng = async () => {
     try {
-      const blob = await renderPlanPng(usePlanStore.getState().plan)
+      // the export follows the on-screen Measure toggle (ADR 0008) — the
+      // preference is a session value, so this reads what the editor is showing
+      // even when storage is unavailable
+      const blob = await renderPlanPng(usePlanStore.getState().plan, {
+        measuresVisible: loadMeasuresVisible(),
+      })
       if (!blob) {
         setNotice('Nothing to export yet — draw some walls first.')
         return

@@ -2,6 +2,7 @@
 // 10 cm (the snap step), major lines every 50 cm. Purely visual; the
 // show/hide choice is a per-device preference, like the Theme.
 import { GRID } from '../model/types'
+import { booleanPreference } from './preference'
 import type { View } from './useView'
 
 const MINOR = GRID
@@ -72,23 +73,8 @@ export function GridLines({ view, pxPerCm }: { view: View; pxPerCm: number }) {
   )
 }
 
-// Same storage discipline as the theme preference: the default stores
-// nothing, and an unavailable storage (private mode…) degrades silently.
-const STORAGE_KEY = 'plan-maker:grid'
+// Shown by default; the choice is a per-device preference (CONTEXT.md: Grid).
+const pref = booleanPreference('plan-maker:grid', 'hidden')
 
-export function loadGridVisible(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) !== 'hidden'
-  } catch {
-    return true
-  }
-}
-
-export function saveGridVisible(visible: boolean): void {
-  try {
-    if (visible) localStorage.removeItem(STORAGE_KEY)
-    else localStorage.setItem(STORAGE_KEY, 'hidden')
-  } catch {
-    // storage unavailable — the choice just won't survive a reload
-  }
-}
+export const loadGridVisible = pref.load
+export const saveGridVisible = pref.save

@@ -59,3 +59,19 @@ export function squareRoomPlan(): Plan {
     b.wall(p4, p1)
   })
 }
+
+// A closed 4×3 m room carrying a name — the scenario that tells a Measure
+// (the area) apart from the Room name beside it.
+export function namedRoomPlan(name = 'Kitchen'): Plan {
+  return buildPlan((b) => {
+    const p1 = b.point(0, 0)
+    const p2 = b.point(400, 0)
+    const p3 = b.point(400, 300)
+    const p4 = b.point(0, 300)
+    b.wall(p1, p2)
+    b.wall(p2, p3)
+    b.wall(p3, p4)
+    b.wall(p4, p1)
+    b.label(name, 200, 150)
+  })
+}

@@ -618,15 +618,19 @@ export const blockNameSlots = (block: RoomTextBlock, editingKey?: string) =>
 // unlabeled room, a label to be created). While the line named by editingKey
 // is edited the editor overlays an input on it, so its text hides but the
 // slot stays and the area keeps its offset.
+// The area line is a Measure and follows the Measure toggle; the name lines
+// are not, and always show (CONTEXT.md: Measure).
 export function RoomOverlay({
   rooms,
   labels,
+  measuresVisible,
   editingKey,
   onLinePointerDown,
   onLineDoubleClick,
 }: {
   rooms: Room[]
   labels: RoomLabel[]
+  measuresVisible: boolean
   editingKey?: string
   onLinePointerDown?: (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => void
   onLineDoubleClick?: (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => void
@@ -656,12 +660,14 @@ export function RoomOverlay({
     <g>
       {roomTextBlocks(rooms, labels).map((block) => {
         const named = blockNameSlots(block, editingKey)
+        const area = measuresVisible ? block.area : undefined
         // creating a label on an unlabeled room also reserves a name slot
         const slots = named.length > 0 ? named.length : block.key === editingKey ? 1 : 0
         const areaY = slots > 0 ? slots * BLOCK_LINE_HEIGHT : 5
-        // a block that renders nothing (nameless label whose room is gone)
-        // must not linger as an invisible drag target
-        if (named.length === 0 && block.area === undefined) return null
+        // a block that renders nothing (nameless label whose room is gone, or
+        // a bare area with measures hidden) must not linger as an invisible
+        // drag target
+        if (named.length === 0 && area === undefined) return null
         return (
           <g key={block.key} transform={`translate(${block.x},${block.y})`}>
             {named.map(
@@ -672,9 +678,9 @@ export function RoomOverlay({
                   </text>
                 ),
             )}
-            {block.area !== undefined && (
+            {area !== undefined && (
               <text y={areaY} textAnchor="middle" className="room-area">
-                {formatArea(block.area)}
+                {formatArea(area)}
               </text>
             )}
             {interactive &&
@@ -682,7 +688,7 @@ export function RoomOverlay({
                 hitRect(`hit-${label.id}`, i * BLOCK_LINE_HEIGHT, 'room-name-hit', label, block),
               )}
             {interactive &&
-              block.area !== undefined &&
+              area !== undefined &&
               hitRect('hit-area', areaY, 'room-area-hit', block.labels[0] ?? null, block)}
           </g>
         )
@@ -783,7 +789,17 @@ export function RubberWall({
 
 // The full plan as it should appear in a PNG export: walls, openings, room
 // labels/areas, dimensions — no selection, no UI chrome (spec §7).
-export function PlanScene({ plan, rooms }: { plan: Plan; rooms: Room[] }) {
+// Hidden measures are hidden from the export too (ADR 0008), so the scene
+// takes the on-screen preference rather than always printing measures.
+export function PlanScene({
+  plan,
+  rooms,
+  measuresVisible,
+}: {
+  plan: Plan
+  rooms: Room[]
+  measuresVisible: boolean
+}) {
   return (
     <>
       {Object.values(plan.walls).map((wall) => (
@@ -793,10 +809,9 @@ export function PlanScene({ plan, rooms }: { plan: Plan; rooms: Room[] }) {
       {Object.values(plan.openings).map((opening) => (
         <OpeningGlyph key={opening.id} plan={plan} opening={opening} />
       ))}
-      <RoomOverlay rooms={rooms} labels={Object.values(plan.roomLabels)} />
-      {Object.values(plan.walls).map((wall) => (
-        <DimLabel key={wall.id} plan={plan} wall={wall} />
-      ))}
+      <RoomOverlay rooms={rooms} labels={Object.values(plan.roomLabels)} measuresVisible={measuresVisible} />
+      {measuresVisible &&
+        Object.values(plan.walls).map((wall) => <DimLabel key={wall.id} plan={plan} wall={wall} />)}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPlan } from '../model/testHelpers'
+import { buildPlan, namedRoomPlan } from '../model/testHelpers'
 import { buildExportSvg, computeExportFrame } from './png'
 
 const squarePlan = () =>
@@ -46,7 +46,7 @@ describe('computeExportFrame', () => {
 
 describe('buildExportSvg', () => {
   it('renders a standalone SVG with white background, walls, and dimensions', () => {
-    const svg = buildExportSvg(squarePlan())!
+    const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
     expect(svg.startsWith('<svg')).toBe(true)
     expect(svg).toContain('width="1000"')
     expect(svg).toContain('height="800"')
@@ -61,13 +61,36 @@ describe('buildExportSvg', () => {
   })
 
   it('returns null for an empty plan', () => {
-    expect(buildExportSvg(buildPlan(() => {}))).toBeNull()
+    expect(
+      buildExportSvg(
+        buildPlan(() => {}),
+        { measuresVisible: true },
+      ),
+    ).toBeNull()
+  })
+
+  // Hidden measures are hidden from the export too (ADR 0008) — hiding them
+  // is how you get a clean sheet to share.
+  it('omits wall dimensions and room areas when measures are hidden', () => {
+    const svg = buildExportSvg(squarePlan(), { measuresVisible: false })!
+    expect(svg).not.toContain('4,10 m')
+    expect(svg).not.toContain('3,90 m')
+    expect(svg).not.toContain('11,31 m²')
+    // the plan itself is untouched
+    expect(svg).toContain('var(--wall)')
+    expect(svg).toContain('fill="#ffffff"')
+  })
+
+  it('keeps room names when measures are hidden — a name is not a measure', () => {
+    const svg = buildExportSvg(namedRoomPlan(), { measuresVisible: false })!
+    expect(svg).toContain('Kitchen')
+    expect(svg).not.toContain('11,31 m²')
   })
 
   // Theme (CONTEXT.md): exports always render light, as a document. The scene
   // paints with CSS variables, so the standalone SVG must pin their light values.
   it('always renders light, whatever theme the editor is in', () => {
-    const svg = buildExportSvg(squarePlan())!
+    const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
     expect(svg).toContain('var(--wall)')
     expect(svg).toContain('--wall: #2f2f2f')
     expect(svg).toContain('--sheet: #ffffff')

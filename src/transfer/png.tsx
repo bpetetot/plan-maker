@@ -54,7 +54,14 @@ const EXPORT_STYLE = `
   text.room-area { font: 12px system-ui, sans-serif; fill: #6b7280; }
 `
 
-export function buildExportSvg(plan: Plan): string | null {
+// What the editor shows is what the export prints, measures included: hiding
+// them is how you get a clean sheet to share (ADR 0008). The caller passes the
+// preference in — this module never reads it.
+export interface ExportOptions {
+  measuresVisible: boolean
+}
+
+export function buildExportSvg(plan: Plan, { measuresVisible }: ExportOptions): string | null {
   const frame = computeExportFrame(plan)
   if (!frame) return null
   const rooms = detectRooms(plan)
@@ -68,14 +75,14 @@ export function buildExportSvg(plan: Plan): string | null {
       <style>{EXPORT_STYLE}</style>
       {/* opaque white background (spec §7) */}
       <rect x={frame.x} y={frame.y} width={frame.widthCm} height={frame.heightCm} fill="#ffffff" />
-      <PlanScene plan={plan} rooms={rooms} />
+      <PlanScene plan={plan} rooms={rooms} measuresVisible={measuresVisible} />
     </svg>,
   )
 }
 
 // Rasterizes the standalone SVG onto a canvas and resolves with the PNG blob.
-export function renderPlanPng(plan: Plan): Promise<Blob | null> {
-  const svg = buildExportSvg(plan)
+export function renderPlanPng(plan: Plan, options: ExportOptions): Promise<Blob | null> {
+  const svg = buildExportSvg(plan, options)
   const frame = computeExportFrame(plan)
   if (!svg || !frame) return Promise.resolve(null)
   const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
