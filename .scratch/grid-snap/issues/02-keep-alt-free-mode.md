@@ -28,3 +28,8 @@ survives as the cm-precision escape hatch, as decided here, but it no longer
 suspends the *whole* ladder — the connection rungs (existing Point, wall body)
 stay live so a freely drawn wall can still join the plan's topology. Only the
 alignment rungs (45° axes, grid) are suspended.
+
+Superseded as to Alt's *role* by `.scratch/snap-mode/issues/01-snap-as-a-state.md`
+and ADR 0007 (2026-07-20): snapping became a persisted global state, and Alt is
+now an inversion of it rather than the sole cause of a Free move. What Alt does
+when it lands on Free is still exactly what this ticket and 13 decided.
