@@ -103,11 +103,13 @@ button:disabled {
   opacity: 0.4;
 }
 
+/* Measures read in a mono font — the instrument register, apart from the
+   Room label titles; mono digits are tabular by construction */
 svg text.dim {
   font:
-    9px system-ui,
-    sans-serif;
-  font-variant-numeric: tabular-nums;
+    9px 'JetBrains Mono',
+    ui-monospace,
+    monospace;
   fill: var(--dim-text);
   paint-order: stroke;
   stroke: var(--sheet);
@@ -130,9 +132,9 @@ svg text.dim-selected {
    the contrasting fill and none of .dim's sheet-coloured halo */
 svg text.placement-chip {
   font:
-    600 9px system-ui,
-    sans-serif;
-  font-variant-numeric: tabular-nums;
+    600 9px 'JetBrains Mono',
+    ui-monospace,
+    monospace;
   fill: var(--accent-contrast);
   user-select: none;
 }
@@ -166,9 +168,9 @@ svg foreignObject input.room-name-input {
 }
 svg text.room-area {
   font:
-    10.5px system-ui,
-    sans-serif;
-  font-variant-numeric: tabular-nums;
+    10.5px 'JetBrains Mono',
+    ui-monospace,
+    monospace;
   fill: var(--room-area-text);
   user-select: none;
 }

@@ -12,6 +12,8 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `npm run lint` / `npm run format` — oxlint / oxfmt
 - `npm run build` — typecheck + production build (generates the service worker); `npm run preview` serves it
 - `node scripts/generate-icons.mjs` — regenerates the PWA icons in `public/`
+- `node scripts/generate-measure-font.mjs` — regenerates the embedded
+  measure-font subset (`src/transfer/measureFont.ts`) used by the PNG export
 
 ## Structure
 

@@ -292,6 +292,11 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
+// On-screen advance width of one 9px measure-font character (JetBrains Mono:
+// 0.6 em) — every width estimate for measure text derives from it, so a font
+// swap is one edit.
+const MEASURE_CHAR_PX = 5.4
+
 const EXTENT_STROKE = 1
 
 // A tick sits at the miter corner bounding the measured extent, running
@@ -385,10 +390,10 @@ export function DimLabel({
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
-  // 9px text ≈ 5 units per character; the line breaks around it. The ticks
-  // are always drawn — that legibility is the point when a value refines at a
-  // new junction — even when no line piece has room.
-  const gapHalf = label.length * 2.5 + 4
+  // the line breaks around the text's estimated width. The ticks are always
+  // drawn — that legibility is the point when a value refines at a new
+  // junction — even when no line piece has room.
+  const gapHalf = (label.length * MEASURE_CHAR_PX) / 2 + 4
   return (
     <g>
       {value >= 1 && (
@@ -454,10 +459,10 @@ export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
   )
 }
 
-// The chip's on-screen metrics, in screen pixels: 9px text at roughly 5.2px
-// per character, plus 5px of padding on each side.
+// The chip's on-screen metrics, in screen pixels: 9px measure text plus 5px
+// of padding on each side.
 const CHIP_HEIGHT = 16
-const chipWidth = (label: string) => label.length * 5.2 + 10
+const chipWidth = (label: string) => label.length * MEASURE_CHAR_PX + 10
 
 // Placement dimensions: the pair of temporary measures flanking an opening,
 // shown while it is placed or moved and, past the release, for as long as it

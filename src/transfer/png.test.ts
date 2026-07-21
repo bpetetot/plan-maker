@@ -97,4 +97,15 @@ describe('buildExportSvg', () => {
     // the dimension extent lines paint with --rail — pinned too
     expect(svg).toContain('--rail: #cbd5e1')
   })
+
+  // Measures render in a bundled mono font. The standalone SVG is rasterized
+  // through an <img>, which loads no external resource — so the export embeds
+  // the measure-glyph subset as a data URI, or it would silently fall back
+  // and break WYSIWYG.
+  it('embeds the measure font as a data URI', () => {
+    const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
+    expect(svg).toContain('@font-face')
+    expect(svg).toContain("font-family: 'JetBrains Mono'")
+    expect(svg).toContain('data:font/woff2;base64,')
+  })
 })

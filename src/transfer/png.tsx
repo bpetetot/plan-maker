@@ -3,6 +3,7 @@ import { PlanScene } from '../editor/render'
 import { planBBox } from '../model/geometry'
 import { detectRooms } from '../model/rooms'
 import type { Plan } from '../model/types'
+import { MEASURE_FONT_DATA_URI } from './measureFont'
 
 // PNG export (spec §7): WYSIWYG, no options. Framed on the plan's bounding box
 // plus a fixed 50 cm margin, rasterized at 2 px/cm capped at 4096 px on the
@@ -47,11 +48,15 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
 // the export light whatever theme the editor is in (Theme, CONTEXT.md). Any
 // new variable PlanScene starts consuming must be pinned here too, or it would
 // fall back to black in the standalone SVG.
+// The measure font travels inside the SVG: rasterization goes through an
+// <img>, which loads no external resource — a subset woff2 data URI
+// (scripts/generate-measure-font.mjs) keeps the export WYSIWYG.
 const EXPORT_STYLE = `
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
   svg { --wall: #1e293b; --sheet: #ffffff; --rail: #cbd5e1; }
-  text.dim { font: 11px system-ui, sans-serif; font-variant-numeric: tabular-nums; fill: #64748b; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
+  text.dim { font: 11px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
   text.room-name { font: 600 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; fill: #334155; }
-  text.room-area { font: 10.5px system-ui, sans-serif; font-variant-numeric: tabular-nums; fill: #64748b; }
+  text.room-area { font: 10.5px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
 `
 
 // What the editor shows is what the export prints, measures included: hiding
