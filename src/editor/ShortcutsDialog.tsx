@@ -22,14 +22,16 @@ export default function ShortcutsDialog() {
           {HELP_SECTIONS.map(({ id, title }) => (
             <section key={id} className="help-section">
               <h3 className="panel-section-label">{title}</h3>
-              {helpRows(id).map(({ keys, label }) => (
-                <div key={`${keys}:${label}`} className="help-row">
-                  {/* one cap for keys and gestures alike — the reader is after
-                      the way to do something, not after a key */}
-                  <span className="help-key">{keys}</span>
-                  <span className="help-label">{label}</span>
-                </div>
-              ))}
+              <div className="help-list">
+                {helpRows(id).map(({ keys, label }) => (
+                  <div key={`${keys}:${label}`} className="help-row">
+                    <span className="help-label">{label}</span>
+                    {/* one badge for keys and gestures alike — the reader is
+                        after the way to do something, not after a key */}
+                    <span className="help-key">{keys}</span>
+                  </div>
+                ))}
+              </div>
             </section>
           ))}
         </div>
