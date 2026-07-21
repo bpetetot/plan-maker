@@ -77,6 +77,16 @@
   --banner-text: #f9fafb;
 }
 
+/* Stacking order of the floating chrome, named so a new layer takes a place in
+   a scale instead of outbidding the last one. A popover sits above a banner:
+   it is what the user is looking at, the banner is a message that lingers. */
+:root {
+  --z-panel: 10;
+  --z-banner: 20;
+  --z-popover: 30;
+  --z-modal: 40;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -204,11 +214,16 @@ svg text.room-area {
 .floating-btn.active .key-hint {
   color: var(--key-hint-active);
 }
-/* dropdown panel; composes with .floating for the shared chrome */
+/* dropdown; composes with .floating for the shared chrome. Position is
+   floating-ui's — it is portalled and anchored to its button, so only the
+   offsets are ours to state. */
 .menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  /* floating-ui anchors on the button, but the panel lines up with the card
+     around it: both values walk back the wrapper's 1px border + 4px padding,
+     leaving the 6px gap the two cards actually show. */
+  --anchor-gap: 11px;
+  --anchor-offset: -5px;
+  z-index: var(--z-popover);
   flex-direction: column;
   min-width: 180px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -271,6 +286,7 @@ svg text.room-area {
    (bottom 16 + ~42px controls + 16px gap); scrolls internally beyond. */
 .panel {
   position: absolute;
+  z-index: var(--z-panel);
   left: 16px;
   top: 72px;
   width: 232px;
@@ -386,7 +402,7 @@ svg text.room-area {
   border-radius: 8px;
   padding: 10px 16px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: var(--z-banner);
 }
 /* deliberately fixed colors (not themed): error red and action blue read the
    same on both themes */
