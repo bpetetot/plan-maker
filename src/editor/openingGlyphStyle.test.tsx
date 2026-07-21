@@ -56,14 +56,31 @@ describe('opening glyph line weights', () => {
     expect(arc.getAttribute('stroke-width')).toBe('1')
   })
 
-  it('draws the window glazing and jambs as thin strokes', () => {
+  it('draws the window glazing as thin strokes', () => {
     const { container } = render(
       <svg>
         <OpeningGlyph plan={planWith(win)} opening={win} />
       </svg>,
     )
     const lines = [...container.querySelectorAll('line')]
-    expect(lines).toHaveLength(4)
+    expect(lines).toHaveLength(2)
     for (const line of lines) expect(line.getAttribute('stroke-width')).toBe('1.5')
+  })
+
+  it('paints the jamb bars in the glyph register, over the wall strips', () => {
+    // the uncut wall strips under the bars guarantee registration with the
+    // faces; the bars themselves carry the glyph's tint (dark on a selected
+    // wall, accent on a selected window)
+    const { container } = render(
+      <svg>
+        <OpeningGlyph plan={planWith(win)} opening={win} />
+      </svg>,
+    )
+    const jambs = [...container.querySelectorAll('rect')]
+    expect(jambs).toHaveLength(2)
+    for (const jamb of jambs) {
+      expect(jamb.getAttribute('width')).toBe('1.5')
+      expect(jamb.getAttribute('height')).toBe('10')
+    }
   })
 })

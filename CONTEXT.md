@@ -114,7 +114,8 @@ broken dimension line and the arrowheads marking the measured extent.
 The value is computed from the plan, never stored. Its placement — where along
 the wall it sits and on which side — belongs to the plan, like any edit;
 dragging it is purely positional, and crossing sides switches between the
-interior and exterior readings. It sits at a constant distance from the Face
+interior and exterior readings; the drag travels along the Rail, so the text
+stops flush with the arrowheads and never covers them. It sits at a constant distance from the Face
 it measures, whatever the wall's thickness. Its text always reads from the
 bottom or the right of the sheet (ISO convention) — the reading direction
 never depends on which side of the wall it sits.
@@ -267,8 +268,11 @@ _Avoid_: Side measure, clearance, flanking dimension, Chip — the graphic is a
 chip, the concept is not
 
 **Rail**:
-The pair of guide lines a Dimension slides along while it is being dragged —
-one on each side of its wall. Pure editor feedback: never part of the plan,
+The invisible travel line a Dimension's text slides along while it is being
+dragged — the dimension line of the side the pointer is on, bounded by the
+arrowheads: the text can at most touch a head, never cover it, and a span too
+narrow for the text pins it to the middle. Nothing is drawn: the Rail is a
+constraint, not a graphic. Pure editor behavior: never part of the plan,
 never exported.
 _Avoid_: Guide, track
 

@@ -7,6 +7,7 @@ import type { Plan, Wall } from '../model/types'
 import {
   COLORS,
   DimLabel,
+  dimTravelBounds,
   JunctionPatches,
   labelAngle,
   OpeningGrabZone,
@@ -117,8 +118,9 @@ describe('DimLabel value', () => {
       </svg>,
     )
     expect(container.querySelector('text')!.textContent).toBe('35 cm')
-    // no line pieces: nothing sticks out past the outside heads
-    expect(container.querySelectorAll('line')).toHaveLength(0)
+    // two short line pieces survive between the head tips and the plate —
+    // inside the extent, nothing sticks out past the outside heads
+    expect(container.querySelectorAll('line')).toHaveLength(2)
     expect(container.querySelectorAll('polygon')).toHaveLength(2)
   })
 
@@ -146,6 +148,36 @@ describe('DimLabel value', () => {
     const heads = Array.from(container.querySelectorAll('polygon'))
     expect(heads[0].getAttribute('points')!.startsWith('9.5,15 ')).toBe(true)
     expect(heads[1].getAttribute('points')!.startsWith('10.5,15 ')).toBe(true)
+  })
+})
+
+describe('dimTravelBounds', () => {
+  // The Rail: the text center's travel along the wall, bounded so the plate
+  // never rides an arrowhead.
+  it('stops the plate at the base of inside heads', () => {
+    // free-standing 400 cm wall, thickness 10: silhouette -5..405, "4,10 m"
+    // → plate half-width 16.4, heads inside → margin 7 + 16.4 = 23.4
+    const { plan, wall } = planWith(0, 0, 400, 0)
+    const { min, max } = dimTravelBounds(plan, wall, -1)
+    expect(min).toBeCloseTo((-5 + 23.4) / 400, 5)
+    expect(max).toBeCloseTo((405 - 23.4) / 400, 5)
+  })
+
+  it('lets the plate reach the extent bounds when the heads sit outside', () => {
+    // 30 cm wall, thickness 10: silhouette -5..35 (40 cm), plate 28 wide —
+    // heads outside → margin is the plate half-width only
+    const { plan, wall } = planWith(0, 0, 30, 0)
+    const { min, max } = dimTravelBounds(plan, wall, -1)
+    expect(min).toBeCloseTo((-5 + 14) / 30, 5)
+    expect(max).toBeCloseTo((35 - 14) / 30, 5)
+  })
+
+  it('collapses the travel to its middle when the plate overflows the span', () => {
+    // 20 cm wall, thickness 5: silhouette -2.5..22.5 (25 cm) < 28 cm plate
+    const { plan, wall } = planWith(0, 0, 20, 0, 5)
+    const { min, max } = dimTravelBounds(plan, wall, -1)
+    expect(min).toBe(max)
+    expect(min).toBeCloseTo(0.5, 5)
   })
 })
 

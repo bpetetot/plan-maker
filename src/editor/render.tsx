@@ -30,12 +30,25 @@ export const labelAngle = (dx: number, dy: number) => {
   return angle
 }
 
+// Abutting same-colored polygons (wall bodies, junction patches) share exact
+// edges, and the browser anti-aliases each edge against the background
+// independently — the background bleeds through the shared edge as a hairline
+// seam. A half-screen-pixel self-colored stroke overlaps the neighbours just
+// enough to close it, at every zoom.
+const seamStroke = (paint: string) => ({
+  stroke: paint,
+  strokeWidth: 1,
+  vectorEffect: 'non-scaling-stroke',
+  strokeLinejoin: 'round',
+}) as const
+
 export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?: string }) {
   const outline = wallOutline(plan, wall)
   const points = outline.map((p) => `${p.x},${p.y}`).join(' ')
+  const paint = color ?? COLORS.wall
   const gaps = Object.values(plan.openings).filter((o) => o.wallId === wall.id)
   if (gaps.length === 0) {
-    return <polygon points={points} fill={color ?? COLORS.wall} pointerEvents="none" />
+    return <polygon points={points} fill={paint} {...seamStroke(paint)} pointerEvents="none" />
   }
   // Openings cut real holes in the body (mask), so whatever lies beneath —
   // the Grid — stays visible through the gap. Region: the outline's bbox,
@@ -58,20 +71,25 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
         <rect x={x} y={y} width={Math.max(...xs) - x + 2} height={Math.max(...ys) - y + 2} fill="#fff" />
         {gaps.map((o) => {
           const placement = openingPlacement(plan, o)
+          // a window's jambs are not drawn over the wall — they ARE the wall:
+          // the cut leaves a half-jamb strip of body uncut at each end, so the
+          // jamb shares the wall's polygon and can never mis-register with its
+          // faces (doors keep the full-width cut)
+          const inset = o.type === 'window' ? WINDOW_JAMB / 2 : 0
           return placement ? (
             <rect
               key={o.id}
               transform={`translate(${placement.cx},${placement.cy}) rotate(${placement.angleDeg})`}
-              x={-o.width / 2}
+              x={-o.width / 2 + inset}
               y={-wall.thickness / 2 - 1}
-              width={o.width}
+              width={o.width - 2 * inset}
               height={wall.thickness + 2}
               fill="#000"
             />
           ) : null
         })}
       </mask>
-      <polygon points={points} fill={color ?? COLORS.wall} mask={`url(#${maskId})`} />
+      <polygon points={points} fill={paint} {...seamStroke(paint)} mask={`url(#${maskId})`} />
     </g>
   )
 }
@@ -85,13 +103,18 @@ export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: E
   const selected = new Set((selection ?? []).filter((r) => r.type === 'wall').map((r) => r.id))
   return (
     <g pointerEvents="none">
-      {junctionPatches(plan).map(({ pointId, wallIds, corners }) => (
-        <polygon
-          key={pointId}
-          points={corners.map((c) => `${c.x},${c.y}`).join(' ')}
-          fill={wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall}
-        />
-      ))}
+      {junctionPatches(plan).map(({ pointId, wallIds, corners }) => {
+        const paint =
+          wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall
+        return (
+          <polygon
+            key={pointId}
+            points={corners.map((c) => `${c.x},${c.y}`).join(' ')}
+            fill={paint}
+            {...seamStroke(paint)}
+          />
+        )
+      })}
     </g>
   )
 }
@@ -137,6 +160,15 @@ export function WallGrabZone({
     />
   )
 }
+
+// Full width of a window jamb bar, centered on each end of the wall gap.
+// WallLine's mask leaves the inner half-bar of wall body uncut under each bar:
+// that strip shares the wall's polygon, so whatever sub-pixel shortfall the
+// bar's own edges have, the gap fills with wall color — never the background.
+// The glyph still paints the bars on top, in its own tint: they must stay in
+// the glyph's register (dark on a selected wall, accent on a selected window,
+// preview on a ghost), not take the wall body's.
+const WINDOW_JAMB = 1.5
 
 // Door geometry in the door's local frame (center of the wall gap, wall along
 // x) — single source shared by the visible glyph and the invisible grab zone.
@@ -196,22 +228,17 @@ export function OpeningGlyph({
         <>
           <line x1={-halfWidth} y1={-3} x2={halfWidth} y2={-3} stroke={stroke} strokeWidth={1.5} />
           <line x1={-halfWidth} y1={3} x2={halfWidth} y2={3} stroke={stroke} strokeWidth={1.5} />
-          <line
-            x1={-halfWidth}
-            y1={-thickness / 2}
-            x2={-halfWidth}
-            y2={thickness / 2}
-            stroke={stroke}
-            strokeWidth={1.5}
-          />
-          <line
-            x1={halfWidth}
-            y1={-thickness / 2}
-            x2={halfWidth}
-            y2={thickness / 2}
-            stroke={stroke}
-            strokeWidth={1.5}
-          />
+          {[-halfWidth, halfWidth].map((x) => (
+            <rect
+              key={x}
+              x={x - WINDOW_JAMB / 2}
+              y={-thickness / 2}
+              width={WINDOW_JAMB}
+              height={thickness}
+              fill={stroke}
+              {...seamStroke(stroke)}
+            />
+          ))}
         </>
       )}
     </g>
@@ -292,12 +319,64 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
-// On-screen advance width of one 8px measure-font character (JetBrains
-// Mono: 0.6 em) — every width estimate for dimension text derives from it, so
-// a font swap is one edit. Placement chips keep the 9px font, hence their own
+// Dimension text size in the editor; the PNG export renders a notch larger
+// and passes its own via PlanScene. The advance width of one measure-font
+// character derives from it (JetBrains Mono: 0.6 em), so every width estimate
+// follows the font size. Placement chips keep the 9px font, hence their own
 // constant.
-const MEASURE_CHAR_PX = 4.8
+const DIM_FONT_PX = 8
+const measureCharPx = (fontPx: number) => 0.6 * fontPx
 const CHIP_CHAR_PX = 5.4
+
+// The plate under a dimension text: a rounded sheet-coloured reserve covering
+// the whole text box, spaces included, so grid, walls and neighbouring
+// dimension lines never show through a measure.
+const PLATE_PAD_X = 2
+const PLATE_PAD_Y = 1
+const PLATE_RX = 2
+const plateHalfWidth = (label: string, fontPx: number) =>
+  (label.length * measureCharPx(fontPx)) / 2 + PLATE_PAD_X
+
+// A measure text on its plate, centered on (x, y). The plate is the measure's
+// mask — the text itself carries no halo.
+function DimText({
+  label,
+  className,
+  fontPx = DIM_FONT_PX,
+  x = 0,
+  y = 0,
+}: {
+  label: string
+  className: string
+  fontPx?: number
+  x?: number
+  y?: number
+}) {
+  const half = plateHalfWidth(label, fontPx)
+  const halfH = fontPx / 2 + PLATE_PAD_Y
+  return (
+    <>
+      <rect
+        x={x - half}
+        y={y - halfH}
+        width={2 * half}
+        height={2 * halfH}
+        rx={PLATE_RX}
+        fill="var(--sheet)"
+      />
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={fontPx}
+        className={className}
+      >
+        {label}
+      </text>
+    </>
+  )
+}
 
 const EXTENT_STROKE = 1
 
@@ -360,10 +439,31 @@ function ExtentLine({
           `${bx + uy * ARROW_HALF_WIDTH},${by - ux * ARROW_HALF_WIDTH}`,
           `${bx - uy * ARROW_HALF_WIDTH},${by + ux * ARROW_HALF_WIDTH}`,
         ].join(' ')
-        return <polygon key={i} points={points} fill={stroke} />
+        return <polygon key={i} points={points} fill={stroke} {...seamStroke(stroke)} />
       })}
     </g>
   )
+}
+
+// The Rail (CONTEXT.md): the travel of a dimension text's center along its
+// wall, as ratios of the axis length. The plate stays clear of the
+// arrowheads — flush with their bases when the heads sit inside the extent,
+// free to reach the extent bounds when a short span pushes them outside. A
+// span too narrow for the plate collapses the travel to its middle, and the
+// stored ratio must stay in [0, 1] (schema), so the bounds are intersected
+// with it last.
+export function dimTravelBounds(plan: Plan, wall: Wall, side: 1 | -1, fontPx = DIM_FONT_PX) {
+  const length = wallLength(plan, wall)
+  if (length < 1) return { min: 0.5, max: 0.5 }
+  const span = faceSpan(plan, wall, side)
+  const half = plateHalfWidth(formatLength(Math.max(0, span.to - span.from)), fontPx)
+  const inside = span.to - span.from >= 2 * ARROW_LEN + 2 * half + 8
+  const margin = inside ? ARROW_LEN + half : half
+  let min = (span.from + margin) / length
+  let max = (span.to - margin) / length
+  if (min > max) min = max = (min + max) / 2
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
+  return { min: clamp01(min), max: clamp01(max) }
 }
 
 // Automatic dimension on every wall, always visible (spec §4). It measures
@@ -378,11 +478,13 @@ export function DimLabel({
   plan,
   wall,
   selected,
+  fontPx = DIM_FONT_PX,
   onPointerDown,
 }: {
   plan: Plan
   wall: Wall
   selected?: boolean
+  fontPx?: number
   onPointerDown?: (e: React.PointerEvent) => void
 }) {
   const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall)
@@ -394,10 +496,10 @@ export function DimLabel({
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
-  // the line breaks around the text's estimated width. The arrowheads are
-  // always drawn — that legibility is the point when a value refines at a new
+  // the line breaks exactly at the plate's edges. The arrowheads are always
+  // drawn — that legibility is the point when a value refines at a new
   // junction — even when no line piece has room.
-  const gapHalf = (label.length * MEASURE_CHAR_PX) / 2 + 4
+  const gapHalf = plateHalfWidth(label, fontPx)
   return (
     <g>
       {value >= 1 && (
@@ -419,13 +521,7 @@ export function DimLabel({
         onPointerDown={onPointerDown}
       >
         {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
-        <text
-          textAnchor="middle"
-          dominantBaseline="central"
-          className={selected ? 'dim dim-selected' : 'dim'}
-        >
-          {label}
-        </text>
+        <DimText label={label} fontPx={fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
       </g>
     </g>
   )
@@ -757,9 +853,7 @@ export function RubberWall({
       />
       {length > 20 && (
         <g transform={`translate(${(from.x + to.x) / 2},${(from.y + to.y) / 2}) rotate(${angle})`}>
-          <text y={-thickness - 4} textAnchor="middle" className="dim dim-live">
-            {formatLength(length + thickness)}
-          </text>
+          <DimText label={formatLength(length + thickness)} className="dim dim-live" y={-thickness - 7} />
         </g>
       )}
     </g>
@@ -774,10 +868,12 @@ export function PlanScene({
   plan,
   rooms,
   measuresVisible,
+  dimFontPx,
 }: {
   plan: Plan
   rooms: Room[]
   measuresVisible: boolean
+  dimFontPx?: number
 }) {
   return (
     <>
@@ -790,7 +886,9 @@ export function PlanScene({
       ))}
       <RoomOverlay rooms={rooms} labels={Object.values(plan.roomLabels)} measuresVisible={measuresVisible} />
       {measuresVisible &&
-        Object.values(plan.walls).map((wall) => <DimLabel key={wall.id} plan={plan} wall={wall} />)}
+        Object.values(plan.walls).map((wall) => (
+          <DimLabel key={wall.id} plan={plan} wall={wall} fontPx={dimFontPx} />
+        ))}
     </>
   )
 }

@@ -648,24 +648,34 @@ describe('setDimPlacement', () => {
     })
   })
 
-  it('keeps one wall thickness of padding at each end of the travel', () => {
-    // 400cm wall, thickness 10 → t clamped to [0.025, 0.975]
+  it('clamps the placement to the travel the caller passes', () => {
     const plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    expect(setDimPlacement(plan, wallId, 1.4, 1).walls[wallId].dimPlacement).toEqual({
-      t: 0.975,
+    const travel = { min: 0.12, max: 0.88 }
+    expect(setDimPlacement(plan, wallId, 1.4, 1, travel).walls[wallId].dimPlacement).toEqual({
+      t: 0.88,
       side: 1,
     })
-    expect(setDimPlacement(plan, wallId, -0.2, 1).walls[wallId].dimPlacement).toEqual({
-      t: 0.025,
+    expect(setDimPlacement(plan, wallId, -0.2, 1, travel).walls[wallId].dimPlacement).toEqual({
+      t: 0.12,
       side: 1,
     })
   })
 
-  it('pins the placement to the middle of a wall too short for the padding', () => {
-    const plan = buildPlan((b) => b.wall(b.point(0, 0), b.point(15, 0)))
+  it('clamps to [0, 1] when no travel is passed', () => {
+    const plan = rectPlan()
     const wallId = Object.keys(plan.walls)[0]
-    expect(setDimPlacement(plan, wallId, 0.9, 1).walls[wallId].dimPlacement).toEqual({ t: 0.5, side: 1 })
+    expect(setDimPlacement(plan, wallId, 1.4, 1).walls[wallId].dimPlacement).toEqual({ t: 1, side: 1 })
+  })
+
+  it('pins the placement to the middle of an empty travel', () => {
+    const plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    const travel = { min: 0.6, max: 0.4 }
+    expect(setDimPlacement(plan, wallId, 0.9, 1, travel).walls[wallId].dimPlacement).toEqual({
+      t: 0.5,
+      side: 1,
+    })
   })
 
   it('is a no-op for an unknown wall', () => {

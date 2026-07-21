@@ -35,8 +35,30 @@ describe('opening gap in the wall', () => {
     const polygon = container.querySelector('polygon')!
     expect(polygon.getAttribute('mask')).toBe('url(#wall-gaps-w)')
     const hole = container.querySelector('mask#wall-gaps-w rect[fill="#000"]')!
-    expect(hole.getAttribute('width')).toBe('100')
+    // a window's cut is inset by half a jamb bar at each end: the uncut strips
+    // ARE the jambs, so they stay one polygon with the wall body
+    expect(hole.getAttribute('width')).toBe('98.5')
     expect(hole.getAttribute('height')).toBe('12') // thickness + 1 cm each side
+  })
+
+  it('cuts a door gap at full width', () => {
+    const { plan, wall } = planWithWindow()
+    plan.openings.o = {
+      id: 'o',
+      wallId: 'w',
+      type: 'door',
+      offset: 200,
+      width: 90,
+      hingeSide: 'start',
+      swing: 'in',
+    }
+    const { container } = render(
+      <svg>
+        <WallLine plan={plan} wall={wall} />
+      </svg>,
+    )
+    const hole = container.querySelector('mask#wall-gaps-w rect[fill="#000"]')!
+    expect(hole.getAttribute('width')).toBe('90')
   })
 
   it('leaves a wall without openings unmasked', () => {

@@ -59,6 +59,7 @@ import {
   blockNameSlots,
   COLORS,
   DimLabel,
+  dimTravelBounds,
   Handle,
   JunctionPatches,
   OpeningGlyph,
@@ -422,8 +423,15 @@ export default function Editor() {
           if (d.moved) {
             const length = wallLength(plan, wall)
             const { t } = projectOnWall(plan, wall, c.x, c.y)
+            const side = wallSide(plan, wall, c.x, c.y)
             setPlan((p) =>
-              setDimPlacement(p, d.id, length < 1 ? 0.5 : t / length, wallSide(plan, wall, c.x, c.y)),
+              setDimPlacement(
+                p,
+                d.id,
+                length < 1 ? 0.5 : t / length,
+                side,
+                dimTravelBounds(plan, wall, side),
+              ),
             )
           }
         }

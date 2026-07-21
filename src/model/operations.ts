@@ -365,18 +365,25 @@ export function deleteWall(plan: Plan, id: string): Plan {
   return { ...plan, points, walls, openings }
 }
 
-// The label's travel keeps one wall thickness of padding at each end, so the
-// text never crowds a corner; a wall too short for that pins it to the middle.
+// The label's travel is bounded by the caller — the editor passes the Rail
+// (the span the text's center may occupy, as ratios along the axis), derived
+// from the rendered silhouette and the arrowheads so the text never rides a
+// head. An empty travel (min > max) pins the text to the travel's middle.
 // The bound applies on write only — a stored placement that falls outside it
 // after the wall is shortened renders as stored. Ratio rounded to 3 decimals:
 // sub-centimeter on any wall a dimension shows on, without dragging float
 // noise into the persisted plan.
-export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 | -1): Plan {
+export function setDimPlacement(
+  plan: Plan,
+  wallId: string,
+  t: number,
+  side: 1 | -1,
+  travel: { min: number; max: number } = { min: 0, max: 1 },
+): Plan {
   const wall = plan.walls[wallId]
   if (!wall) return plan
-  const length = wallLength(plan, wall)
-  const pad = length > 0 ? Math.min(0.5, wall.thickness / length) : 0.5
-  const clamped = Math.max(pad, Math.min(1 - pad, t))
+  const clamped =
+    travel.min > travel.max ? (travel.min + travel.max) / 2 : Math.max(travel.min, Math.min(travel.max, t))
   const dimPlacement = { t: Math.round(clamped * 1000) / 1000, side }
   return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } }
 }
