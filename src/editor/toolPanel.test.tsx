@@ -119,26 +119,26 @@ describe('tool defaults facet', () => {
   it('shows the active tool defaults on an empty selection, nothing in Select', async () => {
     await setup()
     expect(panel()).toBeNull()
-    await key(window, '2')
+    await key('2')
     expect(panel()).toBeTruthy()
     await expect.element(page.getByText('Wall', { exact: true })).toBeInTheDocument()
     expect(presetValue()).toBe('10')
     await expect.element(page.getByLabelText('Delete')).not.toBeInTheDocument()
-    await key(window, '3')
+    await key('3')
     await expect.element(page.getByText('Door', { exact: true })).toBeInTheDocument()
     expect(presetValue()).toBe('90')
     await expect.element(page.getByText('Hinge')).toBeInTheDocument()
-    await key(window, '4')
+    await key('4')
     await expect.element(page.getByText('Window', { exact: true })).toBeInTheDocument()
     expect(presetValue()).toBe('120')
     await expect.element(page.getByText('Hinge')).not.toBeInTheDocument()
-    await key(window, '1')
+    await key('1')
     expect(panel()).toBeNull()
   })
 
   it('draws walls with the preconfigured thickness', async () => {
     const { svg } = await setup(emptyPlan())
-    await key(window, '2')
+    await key('2')
     await userEvent.selectOptions(presets(), '20')
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 0, 0) })
     await pointer(svg, 'pointerup')
@@ -151,7 +151,7 @@ describe('tool defaults facet', () => {
 
   it('places doors with the preconfigured width, hinge and swing', async () => {
     const { svg } = await setup(standalonePlan())
-    await key(window, '3')
+    await key('3')
     await userEvent.selectOptions(presets(), '80')
     await userEvent.click(page.getByText('Hinge'))
     await userEvent.click(page.getByText('Swing'))
@@ -166,7 +166,7 @@ describe('tool defaults facet', () => {
     const { svg } = await setup(doorPlan())
     await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 })
     await userEvent.selectOptions(presets(), '100')
-    await key(window, '3')
+    await key('3')
     expect(presetValue()).toBe('100')
   })
 
@@ -178,7 +178,7 @@ describe('tool defaults facet', () => {
     expect(wall.thickness).toBe(25)
     // hors-tout follows the new thickness
     expect(rowValue('Length')).toBe('4,25 m')
-    await key(window, '2')
+    await key('2')
     expect(presetValue()).toBe('25')
   })
 })
@@ -189,7 +189,7 @@ describe('tool panel visibility', () => {
     expect(panel()).toBeNull()
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 })
     expect(panel()).toBeTruthy()
-    await key(window, 'Escape')
+    await key('Escape')
     expect(panel()).toBeNull()
   })
 

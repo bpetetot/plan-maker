@@ -22,7 +22,7 @@ const pressed = () => toggle().element().getAttribute('aria-pressed')
 async function setup() {
   const { container, unmount } = await render(<Editor />)
   const svg = container.querySelector('svg')!
-  await key(window, '2') // Wall tool
+  await key('2') // Wall tool
   return { svg, unmount }
 }
 
@@ -43,8 +43,8 @@ async function drawWall(svg: SVGSVGElement, altKey = false) {
   return Object.values(plan().points).map((p) => ({ x: p.x, y: p.y }))
 }
 
-const holdAlt = () => key(window, 'Alt', { altKey: true })
-const releaseAlt = () => keyUp(window, 'Alt', { altKey: false })
+const holdAlt = () => key('Alt', { altKey: true })
+const releaseAlt = () => keyUp('Alt', { altKey: false })
 
 describe('snap toggle', () => {
   it('snaps by default, toggle pressed', async () => {
@@ -62,15 +62,15 @@ describe('snap toggle', () => {
 
   it('toggles with the S key', async () => {
     const { svg } = await setup()
-    await key(window, 's')
+    await key('s')
     expect(pressed()).toBe('false')
     expect(await drawWall(svg)).toEqual(FREE)
   })
 
   it('ignores S under a modifier — Ctrl/Cmd+S is the Save reflex', async () => {
     await setup()
-    await key(window, 's', { ctrlKey: true })
-    await key(window, 's', { metaKey: true })
+    await key('s', { ctrlKey: true })
+    await key('s', { metaKey: true })
     expect(pressed()).toBe('true')
   })
 

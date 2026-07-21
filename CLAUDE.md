@@ -42,7 +42,13 @@ idb-keyval (autosave), vite-plugin-pwa.
   - a control a user could name (button, field, visible text) → semantic
     locator (`page.getBy*`) + `userEvent`
   - a point on the canvas, the `svg`, or `window` → `container.querySelector`
-    + the `pointer()` / `mouse()` / `key()` helpers
+    + the `pointer()` / `mouse()` / `wheel()` helpers
+- `key()` / `keyUp()` take no target: a keystroke leaves from whatever holds
+  the focus and bubbles, which is what puts the guards on its path — the typing
+  guard that silences shortcuts inside a field, and the `stopPropagation` a
+  Headless UI panel applies to Escape. When a test turns on *where* the focus
+  is, assert it (`expect(document.activeElement).toBe(…)`) rather than assume
+  it — a keystroke sent from the wrong element passes for the wrong reason.
 - Never construct an event object directly — always a `src/editor/testKit.ts`
   helper (`pointer`, `mouse`, `key`, `keyUp`, `wheel`, `blur`). They carry the mandatory
   init (`pointerId: 1`, `bubbles`), and they `await` React's commit, which

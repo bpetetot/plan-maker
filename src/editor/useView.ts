@@ -161,11 +161,17 @@ export function useSpaceHeld() {
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') setHeld(false)
     }
+    // Pan is a mode, so a keyup the window never receives (Alt+Tab away while
+    // holding) would strand the editor in it — the tool would stay suspended
+    // with no key left to release.
+    const clear = () => setHeld(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
+    window.addEventListener('blur', clear)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clear)
     }
   }, [])
   return held

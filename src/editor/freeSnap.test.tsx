@@ -33,12 +33,12 @@ async function setup() {
   usePlanStore.temporal.getState().clear()
   const { container } = await render(<Editor />)
   const svg = container.querySelector('svg')!
-  await key(window, '2') // Wall tool
+  await key('2') // Wall tool
   return { svg }
 }
 
 // Alt is tracked from key events, so hold it down before the gesture.
-const holdAlt = () => key(window, 'Alt', { altKey: true })
+const holdAlt = () => key('Alt', { altKey: true })
 
 describe('drawing a wall during a free move', () => {
   it('anchors onto a wall body and splits it, while the free end stays off the grid', async () => {

@@ -2,6 +2,7 @@
 // prototype: full-bleed canvas, floating toolbar, click-to-click walls,
 // selection panel on the left, dimensions always visible.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useKeyHold } from '@tanstack/react-hotkeys'
 import {
   BrickWall,
   DoorClosed,
@@ -74,6 +75,7 @@ import {
 } from './render'
 import type { Tool, ToolDefaults } from './tools'
 import { initialToolDefaults } from './tools'
+import { useEditorHotkeys } from './useEditorHotkeys'
 import { useSpaceHeld, useView } from './useView'
 
 type Drag =
@@ -129,11 +131,6 @@ const pointSnap = (p: Plan, id: string): Snap => ({
   pointId: id,
 })
 
-const isTypingTarget = (e: KeyboardEvent) => {
-  const t = e.target as HTMLElement
-  return t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable
-}
-
 export default function Editor() {
   const svgRef = useRef<SVGSVGElement>(null)
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan } = useView(svgRef)
@@ -174,10 +171,11 @@ export default function Editor() {
   const editCancelled = useRef(false)
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
-  // Alt lives in state, not a ref: the snap toggle shows the *effective* state,
-  // so pressing and releasing the key has to re-render. Auto-repeat is absorbed
-  // by React's bail-out on an unchanged value.
-  const [altHeld, setAltHeld] = useState(false)
+  // Alt is tracked, not just sampled: the snap toggle shows the *effective*
+  // state, so pressing and releasing the key has to re-render. The tracker
+  // re-renders only on this key's own transitions, and clears itself when the
+  // window goes away — the keyup after an Alt+Tab never arrives.
+  const altHeld = useKeyHold('Alt')
   // Snap's two alignment rungs are suspended when snapping is off, and Alt
   // inverts whichever state is current for the gesture's duration (ADR 0007).
   const isFree = (alt: boolean) => !snapEnabled !== alt
@@ -228,50 +226,18 @@ export default function Editor() {
     saveSnapEnabled(!snapEnabled)
   }, [snapEnabled])
 
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (isTypingTarget(e)) return
-      setAltHeld(e.altKey)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        if (e.shiftKey) redo()
-        else undo()
-        return
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault()
-        redo()
-        return
-      }
-      if (e.key === 'Escape') {
-        if (chain) setChain(null)
-        else if (sel.length > 0) setSel([])
-        else switchTool('select')
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        deleteSelection(sel)
-      } else if (e.key === '1') switchTool('select')
-      else if (e.key === '2') switchTool('wall')
-      else if (e.key === '3') switchTool('door')
-      else if (e.key === '4') switchTool('window')
-      // bare S only: Ctrl/Cmd+S is the browser's Save reflex, and flipping a
-      // persisted preference under it would be silent and durable
-      else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) toggleSnap()
-    }
-    const up = (e: KeyboardEvent) => {
-      setAltHeld(e.altKey)
-    }
-    // Alt drives a visible affordance now, so a keyup the window never receives
-    // (Alt+Tab away) would leave the toggle lying about the effective state.
-    const clearAlt = () => setAltHeld(false)
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    window.addEventListener('blur', clearAlt)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', clearAlt)
-    }
-  }, [chain, sel, deleteSelection, toggleSnap])
+  useEditorHotkeys({
+    undo,
+    redo,
+    cancel: () => {
+      if (chain) setChain(null)
+      else if (sel.length > 0) setSel([])
+      else switchTool('select')
+    },
+    deleteSelection: () => deleteSelection(sel),
+    selectTool: switchTool,
+    toggleSnap,
+  })
 
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup()

@@ -36,17 +36,22 @@ export const pointer = (el: Element, type: string, init: PointerEventInit = {}) 
   return settle(type)
 }
 
-// Global shortcuts listen on window — a target no user could name, so the
-// keystroke is dispatched by hand too, on the same terms as pointer().
-export const key = (el: EventTarget, k: string, init: KeyboardEventInit = {}) => {
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...init }))
+// A keystroke goes to whatever holds the focus and bubbles from there — which
+// is what makes the guards on the way up reachable: the typing guard that
+// silences shortcuts inside a field, and the stopPropagation a Headless UI
+// panel applies to Escape. Dispatching straight on window would skip the whole
+// path and test a route no keystroke ever takes.
+const focused = () => document.activeElement ?? document.body
+
+export const key = (k: string, init: KeyboardEventInit = {}) => {
+  focused().dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init }))
   return settle('keydown')
 }
 
 // Releasing a held modifier — the other half of key(), for the handful of
 // shortcuts whose effect lasts only as long as the key is down.
-export const keyUp = (el: EventTarget, k: string, init: KeyboardEventInit = {}) => {
-  el.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, ...init }))
+export const keyUp = (k: string, init: KeyboardEventInit = {}) => {
+  focused().dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, cancelable: true, ...init }))
   return settle('keyup')
 }
 
