@@ -187,20 +187,22 @@ export function OpeningGlyph({
       )}
       {opening.type === 'door' ? (
         <g transform={doorMirror(opening)}>
-          <line {...doorLeaf(opening)} stroke={stroke} strokeWidth={3} />
-          <path d={doorArc(opening)} fill="none" stroke={stroke} strokeWidth={1.5} strokeDasharray="4 4" />
+          <line {...doorLeaf(opening)} stroke={stroke} strokeWidth={2} />
+          {/* solid hairline: a dashed arc would read as "above the cut plane"
+              in section convention */}
+          <path d={doorArc(opening)} fill="none" stroke={stroke} strokeWidth={1} />
         </g>
       ) : (
         <>
-          <line x1={-halfWidth} y1={-3} x2={halfWidth} y2={-3} stroke={stroke} strokeWidth={2} />
-          <line x1={-halfWidth} y1={3} x2={halfWidth} y2={3} stroke={stroke} strokeWidth={2} />
+          <line x1={-halfWidth} y1={-3} x2={halfWidth} y2={-3} stroke={stroke} strokeWidth={1.5} />
+          <line x1={-halfWidth} y1={3} x2={halfWidth} y2={3} stroke={stroke} strokeWidth={1.5} />
           <line
             x1={-halfWidth}
             y1={-thickness / 2}
             x2={-halfWidth}
             y2={thickness / 2}
             stroke={stroke}
-            strokeWidth={2}
+            strokeWidth={1.5}
           />
           <line
             x1={halfWidth}
@@ -208,7 +210,7 @@ export function OpeningGlyph({
             x2={halfWidth}
             y2={thickness / 2}
             stroke={stroke}
-            strokeWidth={2}
+            strokeWidth={1.5}
           />
         </>
       )}

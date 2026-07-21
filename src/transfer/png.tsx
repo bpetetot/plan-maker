@@ -48,10 +48,10 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
 // new variable PlanScene starts consuming must be pinned here too, or it would
 // fall back to black in the standalone SVG.
 const EXPORT_STYLE = `
-  svg { --wall: #2f2f2f; --sheet: #ffffff; --rail: #c9cdd4; }
-  text.dim { font: 11px system-ui, sans-serif; fill: #8a8a8a; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
-  text.room-name { font: 600 12px system-ui, sans-serif; fill: #374151; }
-  text.room-area { font: 12px system-ui, sans-serif; fill: #6b7280; }
+  svg { --wall: #1e293b; --sheet: #ffffff; --rail: #cbd5e1; }
+  text.dim { font: 11px system-ui, sans-serif; font-variant-numeric: tabular-nums; fill: #64748b; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
+  text.room-name { font: 600 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; fill: #334155; }
+  text.room-area { font: 10.5px system-ui, sans-serif; font-variant-numeric: tabular-nums; fill: #64748b; }
 `
 
 // What the editor shows is what the export prints, measures included: hiding

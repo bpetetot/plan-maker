@@ -4,20 +4,22 @@
 :root {
   color-scheme: light;
 
-  /* canvas */
+  /* canvas — drawing greys all come from the slate ramp, matching the blue
+     accent's temperature; interaction colors (accent, snap) are functional
+     and stay put */
   --sheet: #ffffff;
-  --wall: #2f2f2f;
+  --wall: #1e293b;
   --wall-hover: #7aa5f8;
   --accent: #2563eb;
   --accent-contrast: #fff;
   --snap: #16a34a;
-  --label: #374151;
-  --dim-text: #8a8a8a;
-  --room-area-text: #6b7280;
-  --rail: #c9cdd4;
+  --label: #334155;
+  --dim-text: #64748b;
+  --room-area-text: #64748b;
+  --rail: #cbd5e1;
   --marquee-fill: rgba(37, 99, 235, 0.08);
-  --grid-minor: rgba(100, 116, 139, 0.14);
-  --grid-major: rgba(100, 116, 139, 0.3);
+  --grid-minor: rgba(100, 116, 139, 0.12);
+  --grid-major: rgba(100, 116, 139, 0.26);
 
   /* chrome */
   --text: #222;
@@ -42,18 +44,18 @@
   color-scheme: dark;
 
   --sheet: #1e1e1e;
-  --wall: #d4d4d4;
+  --wall: #cbd5e1;
   --wall-hover: #7aa5f8;
   --accent: #60a5fa;
   --accent-contrast: #0f172a;
   --snap: #4ade80;
-  --label: #d1d5db;
-  --dim-text: #9ca3af;
-  --room-area-text: #9ca3af;
-  --rail: #4b5563;
+  --label: #cbd5e1;
+  --dim-text: #94a3b8;
+  --room-area-text: #94a3b8;
+  --rail: #475569;
   --marquee-fill: rgba(96, 165, 250, 0.12);
-  --grid-minor: rgba(148, 163, 184, 0.1);
-  --grid-major: rgba(148, 163, 184, 0.22);
+  --grid-minor: rgba(148, 163, 184, 0.09);
+  --grid-major: rgba(148, 163, 184, 0.19);
 
   --text: #e5e7eb;
   --text-muted: #9ca3af;
@@ -105,6 +107,7 @@ svg text.dim {
   font:
     9px system-ui,
     sans-serif;
+  font-variant-numeric: tabular-nums;
   fill: var(--dim-text);
   paint-order: stroke;
   stroke: var(--sheet);
@@ -129,13 +132,18 @@ svg text.placement-chip {
   font:
     600 9px system-ui,
     sans-serif;
+  font-variant-numeric: tabular-nums;
   fill: var(--accent-contrast);
   user-select: none;
 }
+/* Uppercase with slight tracking — the Room label's name is the sheet's one
+   title register, kept typographically apart from every number on the sheet */
 svg text.room-name {
   font:
     600 12px system-ui,
     sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   fill: var(--label);
   user-select: none;
 }
@@ -152,12 +160,15 @@ svg foreignObject input.room-name-input {
   font:
     600 12px system-ui,
     sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--label);
 }
 svg text.room-area {
   font:
-    12px system-ui,
+    10.5px system-ui,
     sans-serif;
+  font-variant-numeric: tabular-nums;
   fill: var(--room-area-text);
   user-select: none;
 }

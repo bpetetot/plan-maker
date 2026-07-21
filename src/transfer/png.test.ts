@@ -92,9 +92,9 @@ describe('buildExportSvg', () => {
   it('always renders light, whatever theme the editor is in', () => {
     const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
     expect(svg).toContain('var(--wall)')
-    expect(svg).toContain('--wall: #2f2f2f')
+    expect(svg).toContain('--wall: #1e293b')
     expect(svg).toContain('--sheet: #ffffff')
     // the dimension extent lines paint with --rail — pinned too
-    expect(svg).toContain('--rail: #c9cdd4')
+    expect(svg).toContain('--rail: #cbd5e1')
   })
 })
