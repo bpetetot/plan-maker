@@ -295,9 +295,9 @@ svg text.room-area {
   pointer-events: none;
   white-space: nowrap;
 }
-/* Keyboard help. The three sections flow into as many columns as fit, so the
-   short one (View) does not force a tall, half-empty layout — and the panel
-   scrolls internally rather than the page once the viewport is short. */
+/* Keyboard help. The sections flow into as many columns as fit, so four of them
+   do not stack into a column taller than any screen — and the panel scrolls
+   internally rather than the page once the viewport is short. */
 .help-dialog {
   position: fixed;
   inset: 0;
@@ -313,7 +313,7 @@ svg text.room-area {
 }
 .help-panel {
   position: relative;
-  width: min(460px, 100%);
+  width: min(780px, 100%);
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   display: flex;
@@ -336,15 +336,23 @@ svg text.room-area {
   font-size: 15px;
   font-weight: 600;
 }
+/* Multi-column rather than a two-track grid: the sections have very different
+   heights, and a grid would align their tops row by row, leaving a hole beside
+   the short one. Columns let the next section start where the last ended.
+   `320px 2` is a width *and* a cap — two columns when there is room for two,
+   one when there is not, so the narrow case needs no media query. */
 .help-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  columns: 320px 2;
+  column-gap: 18px;
 }
 .help-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* a section split across the column break would read as two sections, one of
+     them untitled; the margin replaces the gap flex used to give */
+  break-inside: avoid;
+  margin-bottom: 18px;
 }
 /* One bordered card per section; the rows are separated by a rule rather than
    by a gap, so the section reads as a single list. The radius lives on the
