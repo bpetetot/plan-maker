@@ -6,7 +6,7 @@ import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { emptyPlan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
-import Editor from './Editor'
+import { EditorWithHotkeys } from './testHarness'
 import { blur, clientAt, key, keyUp, pointer } from './testKit'
 
 beforeEach(() => {
@@ -20,7 +20,7 @@ const toggle = () => page.getByLabelText('Snap')
 const pressed = () => toggle().element().getAttribute('aria-pressed')
 
 async function setup() {
-  const { container, unmount } = await render(<Editor />)
+  const { container, unmount } = await render(<EditorWithHotkeys />)
   const svg = container.querySelector('svg')!
   await key('2') // Wall tool
   return { svg, unmount }

@@ -1,9 +1,14 @@
-// The editor's keyboard shortcuts, in one place. This is a registry rather
+// The application's keyboard shortcuts, in one place. This is a registry rather
 // than a handler: it is keyed by the *action*, so the UI asks it what key to
 // show instead of spelling the shortcut out a second time next to the button.
 // It is also what the help dialog is rendered from — each entry declares the
 // sections it is listed under, so a shortcut cannot exist undocumented
 // (ADR 0011).
+//
+// It covers the whole application, not just the editor (ADR 0012): the menu's
+// actions are shortcuts too, and a second registry beside this one would be a
+// second place a shortcut could hide from the help. That is why the hook is
+// mounted in App — the only node that sees both the menu and the editor.
 //
 // Two keyboard behaviors deliberately do *not* live here, and neither is an
 // oversight (ADR 0009): Space, whose preventDefault is what stops the focused
@@ -22,15 +27,27 @@ export type ShortcutAction =
   | 'cancel'
   | 'deleteSelection'
   | 'toggleSnap'
+  | 'toggleGrid'
+  | 'toggleMeasures'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'fit'
+  | 'zoomActual'
+  | 'toggleTheme'
+  | 'open'
+  | 'saveAs'
+  | 'exportImage'
+  | 'reset'
   | 'help'
   | `tool:${Tool}`
 
-export type HelpSection = 'tools' | 'editor' | 'view'
+export type HelpSection = 'tools' | 'editor' | 'view' | 'file'
 
 export const HELP_SECTIONS: { id: HelpSection; title: string }[] = [
   { id: 'tools', title: 'Tools' },
   { id: 'editor', title: 'Editor' },
   { id: 'view', title: 'View' },
+  { id: 'file', title: 'File' },
 ]
 
 // Where an entry is listed, and what it is said to do *there* — the value is
@@ -47,11 +64,13 @@ interface Shortcut {
   hotkey: RegisterableHotkey
   name: string
   sections: HelpLabels
-  // Overrides the formatted hint. Legitimate for exactly one reason: the key
-  // *is* a character that Shift produces, so the Shift is how you type it and
-  // not a modifier of it. `formatForDisplay` would say "Shift+?", which names
-  // a key nobody has. Any other use of this field re-opens the hand-written
-  // hints ADR 0009 removed.
+  // Overrides the formatted hint, for one reason only: the key that is *typed*
+  // is not the key that is *registered*. That happens when a character needs
+  // Shift to exist — `?` is Shift+/, so `formatForDisplay` would say "Shift+?",
+  // naming a key nobody has — and when a character shares its physical key with
+  // another, as `+` does with `=`. In both cases the registration follows the
+  // keyboard and the hint follows the user. Any other use of this field
+  // re-opens the hand-written hints ADR 0009 removed.
   display?: string
 }
 
@@ -82,6 +101,46 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
   // reflex, and flipping a persisted preference under it would be silent
   // and durable.
   toggleSnap: { hotkey: 'S', name: 'Toggle snap', sections: { editor: 'Toggle snap' } },
+  // Bare, like Snap and for the same reason: they are display toggles reached
+  // often, and no browser reflex claims a lone letter.
+  toggleGrid: { hotkey: 'G', name: 'Toggle grid', sections: { view: 'Show or hide the grid' } },
+  toggleMeasures: {
+    hotkey: 'M',
+    name: 'Toggle measures',
+    sections: { view: 'Show or hide the measures' },
+  },
+  // Registered on '=' because that is the physical key: '+' is Shift+'=' on the
+  // layouts that have it at all. The Shift variant is an alias below, so both
+  // ways of reaching it fire, and the hint says '+' because that is what the
+  // user is looking for on the keycap.
+  zoomIn: {
+    hotkey: 'Mod+=',
+    name: 'Zoom in',
+    sections: { view: 'Zoom in' },
+    display: formatForDisplay({ key: '+', mod: true }),
+  },
+  zoomOut: { hotkey: 'Mod+-', name: 'Zoom out', sections: { view: 'Zoom out' } },
+  // Not Mod+0: that key means "100%" everywhere it exists, and fitting a plan
+  // to the screen lands on whatever ratio the plan happens to need. Shift+1 is
+  // what canvas editors use for fit, and it costs the browser nothing.
+  fit: { hotkey: 'Shift+1', name: 'Fit', sections: { view: 'Fit the plan to the screen' } },
+  zoomActual: { hotkey: 'Mod+0', name: 'Zoom to 100%', sections: { view: 'Zoom to 100%' } },
+  toggleTheme: {
+    hotkey: 'Alt+Shift+D',
+    name: 'Toggle theme',
+    sections: { view: 'Switch between light and dark' },
+  },
+  open: { hotkey: 'Mod+O', name: 'Open', sections: { file: 'Open a plan' } },
+  saveAs: { hotkey: 'Mod+S', name: 'Save as', sections: { file: 'Save the plan to a file' } },
+  exportImage: {
+    hotkey: 'Mod+Shift+E',
+    name: 'Export image',
+    sections: { file: 'Export the plan as an image' },
+  },
+  // One modifier away from Backspace, which deletes the selection — a slipped
+  // thumb turns "delete this wall" into "erase everything". The confirmation is
+  // load-bearing here, not a formality, and it names what is lost.
+  reset: { hotkey: 'Mod+Backspace', name: 'Reset', sections: { file: 'Erase the plan' } },
   // `shift: true` is not a taste: the match is strict on every modifier flag,
   // and there is no layout on which `?` arrives without Shift — declared bare
   // it would never fire once. It is the object form because '?' is outside the
@@ -158,25 +217,41 @@ const ALIASES: Array<[ShortcutAction, RegisterableHotkey]> = [
   ['redo', 'Mod+Y'],
   ['deleteSelection', 'Backspace'],
   ['help', 'F1'],
+  // Mod+Shift+= is how Mod++ actually arrives: the match is strict on Shift, so
+  // the bare registration above cannot catch it. Object form because the string
+  // type excludes Shift+punctuation, which is layout-dependent in general — here
+  // the library's `code` fallback (PUNCTUATION_CODE_MAP) settles it.
+  ['zoomIn', { key: '=', mod: true, shift: true }],
+  // Deliberately no Mod+Delete for reset. Backspace is an alias of
+  // deleteSelection, but Delete is its *primary* key: putting reset one
+  // modifier from it would double the slip that erases the plan, and buy a
+  // second way to reach an action nobody needs two ways to reach.
 ]
 
-export interface EditorHotkeyActions {
-  undo: () => void
-  redo: () => void
-  /** Escape's cascade: abandon the wall chain, else drop the selection, else fall back to Select. */
-  cancel: () => void
-  deleteSelection: () => void
+type SimpleAction = Exclude<ShortcutAction, `tool:${Tool}`>
+
+/**
+ * One callback per registered action — derived from the registry rather than
+ * restated, so an action cannot be added without a caller being made to supply
+ * its behavior. The four tools share `selectTool`, which is why they are the
+ * one exclusion: they differ by argument, not by callback.
+ *
+ * `cancel` is Escape's cascade: abandon the wall chain, else drop the
+ * selection, else fall back to the Select tool.
+ */
+export type AppHotkeyActions = Record<SimpleAction, () => void> & {
   selectTool: (tool: Tool) => void
-  toggleSnap: () => void
-  help: () => void
 }
 
-const callbackFor = (actions: EditorHotkeyActions, action: ShortcutAction) =>
+const callbackFor = (actions: AppHotkeyActions, action: ShortcutAction) =>
   action.startsWith('tool:')
     ? () => actions.selectTool(action.slice('tool:'.length) as Tool)
     : actions[action as Exclude<ShortcutAction, `tool:${Tool}`>]
 
-export function useEditorHotkeys(actions: EditorHotkeyActions, { helpOpen }: { helpOpen: boolean }) {
+export function useAppHotkeys(
+  actions: AppHotkeyActions,
+  { helpOpen, resetDisabled, ready }: { helpOpen: boolean; resetDisabled: boolean; ready: boolean },
+) {
   // The help dialog is a mode, and a mode captures the keyboard: acting on a
   // plan the panel is covering would land as a surprise on close. Nothing
   // grants this for free — Headless UI's Dialog intercepts Escape and no other
@@ -185,7 +260,17 @@ export function useEditorHotkeys(actions: EditorHotkeyActions, { helpOpen }: { h
   // `cancel` *wins over* the Dialog and the panel stops closing. Muting the
   // rows is what hands Escape back. `help` alone stays live — the key that
   // opened the dialog closes it.
-  const enabled = (action: ShortcutAction) => !helpOpen || action === 'help'
+  //
+  // Reset carries a second condition, mirroring its menu item: on an empty plan
+  // there is nothing to erase, and a confirmation dialog for a no-op teaches the
+  // user to dismiss confirmations without reading them.
+  //
+  // Nothing is live before the app is ready. The hook is mounted above the
+  // early return that renders nothing while the stored plan loads, so without
+  // this the file shortcuts would answer over an empty screen — Mod+O would
+  // import a plan that the pending restore then overwrites.
+  const enabled = (action: ShortcutAction) =>
+    ready && (!helpOpen || action === 'help') && !(action === 'reset' && resetDisabled)
   const rows = SHORTCUT_ACTIONS.map((action) => ({
     hotkey: SHORTCUTS[action].hotkey,
     callback: callbackFor(actions, action),

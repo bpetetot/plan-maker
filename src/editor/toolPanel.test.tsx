@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-react'
 import { buildPlan, squareRoomPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
-import Editor from './Editor'
+import { EditorWithHotkeys } from './testHarness'
 import { clientAt, key, pointer } from './testKit'
 
 beforeEach(() => {
@@ -14,7 +14,7 @@ beforeEach(() => {
 
 async function setup(plan = squareRoomPlan()) {
   usePlanStore.setState({ plan })
-  const { container } = await render(<Editor />)
+  const { container } = await render(<EditorWithHotkeys />)
   const svg = container.querySelector('svg')!
   return { svg }
 }

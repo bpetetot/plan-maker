@@ -3,6 +3,7 @@ import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import AppMenu, { type AppMenuProps } from './AppMenu'
 import { mouse, pointer } from './editor/testKit'
+import { useThemePreference } from './theme/useThemePreference'
 
 // The browser has a real matchMedia, reporting whatever the machine running
 // the suite prefers; pin it so the system option has a known answer.
@@ -17,23 +18,37 @@ const stubMatchMedia = (systemDark: boolean) => {
 }
 
 const noop = () => {}
-const renderMenu = (props: Partial<AppMenuProps> = {}) =>
-  render(
+
+// The theme preference is App's now — the shortcut and these three buttons set
+// one value, so one owner holds it (ADR 0012). The menu is passed it. This
+// harness plays that owner, which keeps the assertions below about what a user
+// sees when they pick a theme, rather than about where the state sits.
+function MenuWithTheme(props: Partial<AppMenuProps>) {
+  const [themePreference, setThemePreference] = useThemePreference()
+  return (
     <AppMenu
       onOpen={noop}
       onSaveAs={noop}
       onExportImage={noop}
       onReset={noop}
       resetDisabled={false}
+      themePreference={themePreference}
+      setThemePreference={setThemePreference}
       {...props}
-    />,
+    />
   )
+}
+
+const renderMenu = (props: Partial<AppMenuProps> = {}) => render(<MenuWithTheme {...props} />)
 
 const openMenu = () => userEvent.click(page.getByTitle('Menu'))
 const themeOption = (title: string) => page.getByTitle(title)
-// Located by their label rather than their role: the role is exactly what the
-// move to a Popover changes, and this contract is meant to outlive it.
-const action = (name: string) => page.getByText(name, { exact: true })
+// By accessible name, which is the label alone: each item now also carries its
+// shortcut, and that hint is aria-hidden precisely so the name a user would say
+// stays the name the item answers to. `button` is not the role the ARIA menu
+// pattern would impose — it is what these are, and what the move to a Popover
+// was made to keep.
+const action = (name: string) => page.getByRole('button', { name, exact: true })
 
 // Dismissing by clicking away lands on the page background, not on anything a
 // user could name — dispatched by hand, as a full press/release so it reads as

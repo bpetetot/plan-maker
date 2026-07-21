@@ -4,9 +4,13 @@ import { render } from 'vitest-browser-react'
 import { usePlanStore } from '../store/planStore'
 import { emptyPlan } from '../model/types'
 import Editor from './Editor'
+import { reloadPreferences } from './preferences'
 
 beforeEach(() => {
   localStorage.clear()
+  // the preference is session state now, so an empty storage is only half of a
+  // fresh device — this is the other half
+  reloadPreferences()
   usePlanStore.setState({ plan: emptyPlan() })
   usePlanStore.temporal.getState().clear()
 })
@@ -44,6 +48,9 @@ describe('grid visibility toggle', () => {
     await userEvent.click(toggle())
     await first.unmount()
 
+    // a reload, not just a remount: the point is that the choice came back from
+    // storage, which a surviving session value would hide
+    reloadPreferences()
     const second = await render(<Editor />)
     expect(gridOnSheet(second.container)).toBeNull()
   })

@@ -8,7 +8,7 @@ import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
-import Editor from './Editor'
+import { EditorWithHotkeys } from './testHarness'
 import { clientAt, key, mouse, pointer } from './testKit'
 
 // A closed square room (100,100)-(500,500); centroid at (300,300).
@@ -40,7 +40,7 @@ const wallCount = () => Object.keys(plan().walls).length
 const nameInput = () => page.getByRole('textbox')
 
 async function setup() {
-  const { container, unmount } = await render(<Editor />)
+  const { container, unmount } = await render(<EditorWithHotkeys />)
   return { container, svg: container.querySelector('svg')!, unmount }
 }
 

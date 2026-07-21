@@ -1,7 +1,7 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05
 // prototype: full-bleed canvas, floating toolbar, click-to-click walls,
 // selection panel on the left, dimensions always visible.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useKeyHold } from '@tanstack/react-hotkeys'
 import {
   BrickWall,
@@ -50,8 +50,8 @@ import { realignDelta, snapPoint } from '../model/snap'
 import type { Opening, Plan, RoomLabel } from '../model/types'
 import { WALL_THICKNESS } from '../model/types'
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
-import { GridLines, loadGridVisible, saveGridVisible } from './grid'
-import { loadMeasuresVisible, saveMeasuresVisible } from './measurePref'
+import { GridLines } from './grid'
+import { toggleGrid, toggleMeasures, usePreferences } from './preferences'
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref'
 import type { RoomTextBlock } from './render'
 import { ToolPanel } from './ToolPanel'
@@ -75,8 +75,7 @@ import {
 } from './render'
 import type { Tool, ToolDefaults } from './tools'
 import { initialToolDefaults } from './tools'
-import { toggleHelp, useHelpDialog } from './helpStore'
-import { keyHint, useEditorHotkeys } from './useEditorHotkeys'
+import { keyHint } from './useAppHotkeys'
 import { useSpaceHeld, useView } from './useView'
 
 type Drag =
@@ -132,7 +131,48 @@ const pointSnap = (p: Plan, id: string): Snap => ({
   pointId: id,
 })
 
-export default function Editor() {
+/**
+ * What the editor can be told to do from outside it.
+ *
+ * The shortcut registry sits in App (ADR 0012), but these commands read state
+ * that has no reason to leave the editor — the wall chain mid-draw, the current
+ * selection, the camera and the `<svg>` it is measured against. Lifting that
+ * state to App to make a keystroke reach it would move the editor's insides
+ * into its parent. A ref is read at call time, so no callback here can go stale.
+ */
+export interface EditorCommands {
+  cancel: () => void
+  deleteSelection: () => void
+  selectTool: (tool: Tool) => void
+  toggleSnap: () => void
+  zoomIn: () => void
+  zoomOut: () => void
+  fit: () => void
+  /** Back to 100% — the ratio the zoom indicator shows, not a scale of 1. */
+  zoomActual: () => void
+}
+
+/**
+ * The registry actions the editor owns, bound to a mounted one.
+ *
+ * Shared so that whoever mounts the registry — App, or a test harness — reaches
+ * the editor the same way. Each call goes through `ref.current` at the moment
+ * the key is pressed, so an unmounted editor simply does nothing.
+ */
+export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => ({
+  cancel: () => ref.current?.cancel(),
+  deleteSelection: () => ref.current?.deleteSelection(),
+  selectTool: (tool: Tool) => ref.current?.selectTool(tool),
+  toggleSnap: () => ref.current?.toggleSnap(),
+  zoomIn: () => ref.current?.zoomIn(),
+  zoomOut: () => ref.current?.zoomOut(),
+  fit: () => ref.current?.fit(),
+  zoomActual: () => ref.current?.zoomActual(),
+})
+
+// `ref` is renamed on the way in: the editor's own handlers use `ref` for an
+// ElementRef, the plan's notion, and that word was here first.
+export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan } = useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
@@ -141,8 +181,8 @@ export default function Editor() {
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
   const [tool, setTool] = useState<Tool>('select')
-  const [gridVisible, setGridVisible] = useState(loadGridVisible)
-  const [measuresVisible, setMeasuresVisible] = useState(loadMeasuresVisible)
+  const gridVisible = usePreferences((s) => s.grid)
+  const measuresVisible = usePreferences((s) => s.measures)
   const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled)
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
@@ -227,24 +267,27 @@ export default function Editor() {
     saveSnapEnabled(!snapEnabled)
   }, [snapEnabled])
 
-  const helpOpen = useHelpDialog((s) => s.open)
-
-  useEditorHotkeys(
-    {
-      undo,
-      redo,
-      cancel: () => {
-        if (chain) setChain(null)
-        else if (sel.length > 0) setSel([])
-        else switchTool('select')
-      },
-      deleteSelection: () => deleteSelection(sel),
-      selectTool: switchTool,
-      toggleSnap,
-      help: toggleHelp,
+  // No dependency list: the handle is rebuilt every render, so every command
+  // closes over the state of the render that installed it. The alternative —
+  // one list naming chain, sel, tool, snapEnabled and the camera — would go
+  // stale the first time someone forgot to extend it.
+  useImperativeHandle(commands, () => ({
+    cancel: () => {
+      if (chain) setChain(null)
+      else if (sel.length > 0) setSel([])
+      else switchTool('select')
     },
-    { helpOpen },
-  )
+    deleteSelection: () => deleteSelection(sel),
+    selectTool: switchTool,
+    toggleSnap,
+    zoomIn: () => zoomCenter(1 / 1.25),
+    zoomOut: () => zoomCenter(1.25),
+    fit: () => fitPlan(plan),
+    // zoomCenter divides the scale by its factor, and zoomRatio *is* the
+    // current scale over the 100% reference — so the ratio is the factor that
+    // lands exactly on 100%.
+    zoomActual: () => zoomCenter(zoomRatio),
+  }))
 
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup()
@@ -846,18 +889,22 @@ export default function Editor() {
         <div className="floating">
           <button
             className="floating-btn icon"
-            title="Zoom out"
+            title={`Zoom out (${keyHint('zoomOut')})`}
             aria-label="Zoom out"
             onClick={() => zoomCenter(1.25)}
           >
             <ZoomOut size={16} aria-hidden />
           </button>
-          <button className="floating-btn" title="Fit to plan" onClick={() => fitPlan(plan)}>
+          <button
+            className="floating-btn"
+            title={`Fit to plan (${keyHint('fit')})`}
+            onClick={() => fitPlan(plan)}
+          >
             {Math.round(zoomRatio * 100)}%
           </button>
           <button
             className="floating-btn icon"
-            title="Zoom in"
+            title={`Zoom in (${keyHint('zoomIn')})`}
             aria-label="Zoom in"
             onClick={() => zoomCenter(1 / 1.25)}
           >
@@ -877,25 +924,19 @@ export default function Editor() {
           </button>
           <button
             className={gridVisible ? 'floating-btn icon active' : 'floating-btn icon'}
-            title={gridVisible ? 'Hide grid' : 'Show grid'}
+            title={`${gridVisible ? 'Hide' : 'Show'} grid (${keyHint('toggleGrid')})`}
             aria-label="Grid"
             aria-pressed={gridVisible}
-            onClick={() => {
-              setGridVisible(!gridVisible)
-              saveGridVisible(!gridVisible)
-            }}
+            onClick={toggleGrid}
           >
             <Grid3x3 size={16} aria-hidden />
           </button>
           <button
             className={measuresVisible ? 'floating-btn icon active' : 'floating-btn icon'}
-            title={measuresVisible ? 'Hide measures' : 'Show measures'}
+            title={`${measuresVisible ? 'Hide' : 'Show'} measures (${keyHint('toggleMeasures')})`}
             aria-label="Measures"
             aria-pressed={measuresVisible}
-            onClick={() => {
-              setMeasuresVisible(!measuresVisible)
-              saveMeasuresVisible(!measuresVisible)
-            }}
+            onClick={toggleMeasures}
           >
             <RulerDimensionLine size={16} aria-hidden />
           </button>

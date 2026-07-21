@@ -225,7 +225,9 @@ svg text.room-area {
   --anchor-offset: -5px;
   z-index: var(--z-popover);
   flex-direction: column;
-  min-width: 180px;
+  /* wide enough that the shortcut column clears the longest label rather than
+     crowding it; the panel still grows past this if a label needs it */
+  min-width: 220px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 .menu-item {
@@ -263,6 +265,18 @@ svg text.room-area {
 .menu-row-group {
   display: flex;
   gap: 2px;
+}
+/* The shortcut beside a menu entry. A plain annotation, not a key badge like
+   the help dialog's: in a menu the shortcut is a note on an action, and nine
+   boxed badges down one column would outweigh the labels they belong to.
+   `margin-left: auto` is what makes the column — free space collects to its
+   left, so the hints line up on the right edge whatever the label's length. */
+.menu-hint {
+  margin-left: auto;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
 }
 /* bare shortcut digit in the corner of a mode button (Excalidraw-style) */
 .key-hint {

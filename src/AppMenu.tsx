@@ -12,8 +12,9 @@ import {
   Sun,
 } from 'lucide-react'
 import { openHelp } from './editor/helpStore'
+import { keyHint } from './editor/useAppHotkeys'
+import type { ShortcutAction } from './editor/useAppHotkeys'
 import type { ThemePreference } from './theme/theme'
-import { useThemePreference } from './theme/useThemePreference'
 
 const THEME_OPTIONS: { value: ThemePreference; title: string; Icon: typeof Monitor }[] = [
   { value: 'system', title: 'System theme', Icon: Monitor },
@@ -27,14 +28,37 @@ export interface AppMenuProps {
   onExportImage: () => void
   onReset: () => void
   resetDisabled: boolean
+  themePreference: ThemePreference
+  setThemePreference: (preference: ThemePreference) => void
 }
+
+// The shortcut as a menu annotation rather than a key badge: the help dialog is
+// a catalogue of keys, where the badge is the subject, but here the key is a
+// footnote to an action the user came for. Same source, two roles — this reads
+// from the same registry the help does, so a rebinding shows up in both.
+//
+// Hidden from assistive technology, which is why the items keep "Open" and
+// "Reset" as their accessible names. The hint is glyphs — "⌘ ⇧ E" — and a
+// screen reader has no good reading for those; the help dialog carries the
+// same information in a form built to be read.
+const Hint = ({ action }: { action: ShortcutAction }) => (
+  <span className="menu-hint" aria-hidden>
+    {keyHint(action)}
+  </span>
+)
 
 // A Popover rather than a Menu: the ARIA menu pattern puts a roving tabindex on
 // its items, which would take the theme row's buttons out of the keyboard's
 // reach. This dropdown mixes actions with a setting, so it is not a menu.
-export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, resetDisabled }: AppMenuProps) {
-  const [themePreference, setThemePreference] = useThemePreference()
-
+export default function AppMenu({
+  onOpen,
+  onSaveAs,
+  onExportImage,
+  onReset,
+  resetDisabled,
+  themePreference,
+  setThemePreference,
+}: AppMenuProps) {
   return (
     <Popover>
       <div className="floating" style={{ position: 'fixed', top: 16, left: 16 }}>
@@ -52,21 +76,28 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
             <>
               <button className="menu-item" onClick={run(onOpen)}>
                 <FolderOpen size={16} aria-hidden /> Open
+                <Hint action="open" />
               </button>
               <button className="menu-item" onClick={run(onSaveAs)}>
                 <Save size={16} aria-hidden /> Save as…
+                <Hint action="saveAs" />
               </button>
               <button className="menu-item" onClick={run(onExportImage)}>
                 <ImageDown size={16} aria-hidden /> Export image…
+                <Hint action="exportImage" />
               </button>
               <div className="menu-sep" />
               <button className="menu-item" onClick={run(openHelp)}>
                 <CircleQuestionMark size={16} aria-hidden /> Help
+                <Hint action="help" />
               </button>
               <div className="menu-sep" />
               {/* picking a theme keeps the panel open — it's a setting, not an action */}
               <div className="menu-row">
                 <span>Theme</span>
+                {/* the hint sits before the group, not after: it describes the
+                    row's action, and none of the three buttons in particular */}
+                <Hint action="toggleTheme" />
                 <div className="menu-row-group" role="group" aria-label="Theme">
                   {THEME_OPTIONS.map(({ value, title, Icon }) => (
                     <button
@@ -85,6 +116,7 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
               <div className="menu-sep" />
               <button className="menu-item danger-item" disabled={resetDisabled} onClick={run(onReset)}>
                 <Eraser size={16} aria-hidden /> Reset
+                <Hint action="reset" />
               </button>
             </>
           )

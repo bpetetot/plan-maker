@@ -12,6 +12,19 @@ export function resolveTheme(preference: ThemePreference, systemDark: boolean): 
   return preference
 }
 
+/**
+ * The preference that flips what is currently on screen.
+ *
+ * Resolving before inverting is what makes the shortcut honest: the preference
+ * has three values but only two appearances, so cycling through all three would
+ * spend one press in three changing nothing visible (from 'dark' to 'system' on
+ * a dark system). Toggling the *resolved* theme always shows a change. It costs
+ * 'system' its keyboard access — that is a set-once choice, and the menu keeps it.
+ */
+export function toggledTheme(preference: ThemePreference, systemDark: boolean): ThemePreference {
+  return resolveTheme(preference, systemDark) === 'dark' ? 'light' : 'dark'
+}
+
 export function loadThemePreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)

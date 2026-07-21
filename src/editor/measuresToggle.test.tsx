@@ -7,12 +7,14 @@ import { buildPlan, namedRoomPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
 import Editor from './Editor'
-import { loadMeasuresVisible, saveMeasuresVisible } from './measurePref'
+import { measuresVisible, reloadPreferences } from './preferences'
 import { clientAt, pointer } from './testKit'
 
 beforeEach(() => {
   localStorage.clear()
-  saveMeasuresVisible(true)
+  // the preference is session state now, so an empty storage is only half of a
+  // fresh device — this is the other half
+  reloadPreferences()
   usePlanStore.setState({ plan: emptyPlan(), planEpoch: 0 })
   usePlanStore.temporal.getState().clear()
 })
@@ -116,6 +118,9 @@ describe('measure visibility toggle', () => {
     expect(localStorage.getItem('plan-maker:measures')).toBe('hidden')
     await cleanup()
 
+    // a reload, not just a remount: the point is that the choice came back from
+    // storage, which a surviving session value would hide
+    reloadPreferences()
     const { svg } = await setup()
     expect(dims(svg)).toHaveLength(0)
     expect(areas(svg)).toHaveLength(0)
@@ -139,7 +144,7 @@ describe('measure visibility toggle', () => {
     try {
       await userEvent.click(toggle())
       expect(dims(svg)).toHaveLength(0)
-      expect(loadMeasuresVisible()).toBe(false)
+      expect(measuresVisible()).toBe(false)
     } finally {
       Storage.prototype.setItem = setItem
     }

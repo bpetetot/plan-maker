@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
-import Editor from './Editor'
+import { EditorWithHotkeys } from './testHarness'
 import { clientAt, key, pointer } from './testKit'
 
 beforeEach(() => {
@@ -31,7 +31,7 @@ const plan = () => usePlanStore.getState().plan
 async function setup() {
   usePlanStore.setState({ plan: hostPlan(), planEpoch: 0 })
   usePlanStore.temporal.getState().clear()
-  const { container } = await render(<Editor />)
+  const { container } = await render(<EditorWithHotkeys />)
   const svg = container.querySelector('svg')!
   await key('2') // Wall tool
   return { svg }
@@ -81,7 +81,7 @@ describe('dragging a point during a free move', () => {
       planEpoch: 0,
     })
     usePlanStore.temporal.getState().clear()
-    const { container } = await render(<Editor />)
+    const { container } = await render(<EditorWithHotkeys />)
     const svg = container.querySelector('svg')!
 
     // select w2 to reveal its point handles, then drag d onto b with Alt held

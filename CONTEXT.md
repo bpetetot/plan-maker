@@ -289,6 +289,18 @@ gesture: it is what every placement, move and widening lands on, and a wall
 whose Rail is narrower than the opening refuses it outright.
 _Avoid_: Guide, track
 
+**Preference**:
+A per-device choice about how the editor looks or behaves, as opposed to
+anything the plan says: the visibility of the Grid and of Measures, Snap, the
+Theme. Never part of the plan — never saved with it, never exported, never
+carried to another device. Held for the session and remembered in local
+storage, which only makes it outlive a reload: the value the editor reads is
+the session's, so a device whose storage refuses the write still honors the
+choice until the tab closes. A preference left at its default stores nothing,
+so a device that never touched a toggle keeps following the default rather
+than freezing today's value.
+_Avoid_: Setting, option, config, parameter
+
 **Theme**:
 The editor's light or dark appearance, covering both the UI chrome and the
 sheet. Chosen per device — follows the system by default, with a manual

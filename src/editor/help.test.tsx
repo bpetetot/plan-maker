@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import AppMenu from '../AppMenu'
-import Editor from './Editor'
+import { EditorWithHotkeys } from './testHarness'
 import ShortcutsDialog from './ShortcutsDialog'
 import { closeHelp } from './helpStore'
 import { key } from './testKit'
-import { SHORTCUT_ACTIONS, keyHint } from './useEditorHotkeys'
+import { SHORTCUT_ACTIONS, keyHint } from './useAppHotkeys'
 
 // The store outlives the component tree, so a test that leaves the dialog open
 // leaks into the next one.
@@ -26,7 +26,7 @@ const noop = () => {}
 const setupEditor = () =>
   render(
     <>
-      <Editor />
+      <EditorWithHotkeys />
       <ShortcutsDialog />
     </>,
   )
@@ -57,12 +57,21 @@ describe('opening the help dialog', () => {
   it('opens from the burger menu', async () => {
     const { unmount } = await render(
       <>
-        <AppMenu onOpen={noop} onSaveAs={noop} onExportImage={noop} onReset={noop} resetDisabled={false} />
+        <AppMenu
+          onOpen={noop}
+          onSaveAs={noop}
+          onExportImage={noop}
+          onReset={noop}
+          resetDisabled={false}
+          themePreference="system"
+          setThemePreference={noop}
+        />
         <ShortcutsDialog />
       </>,
     )
     await userEvent.click(page.getByTitle('Menu'))
-    await userEvent.click(page.getByText('Help', { exact: true }))
+    // by accessible name: the item's text now carries its shortcut too
+    await userEvent.click(page.getByRole('button', { name: 'Help', exact: true }))
     await expect.element(dialog()).toBeInTheDocument()
     await unmount()
   })

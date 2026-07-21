@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { applyResolvedTheme, loadThemePreference, resolveTheme, saveThemePreference } from './theme'
+import {
+  applyResolvedTheme,
+  loadThemePreference,
+  resolveTheme,
+  saveThemePreference,
+  toggledTheme,
+} from './theme'
 
 beforeEach(() => {
   localStorage.clear()
@@ -14,6 +20,31 @@ describe('resolveTheme', () => {
   it('ignores the system when the preference is explicit', () => {
     expect(resolveTheme('light', true)).toBe('light')
     expect(resolveTheme('dark', false)).toBe('dark')
+  })
+})
+
+describe('toggledTheme', () => {
+  it('flips an explicit preference', () => {
+    expect(toggledTheme('light', false)).toBe('dark')
+    expect(toggledTheme('dark', true)).toBe('light')
+  })
+
+  // The point of resolving first: from 'system' the only honest opposite is the
+  // opposite of what is *on screen*. Returning 'light' while the system is
+  // already light would be a keystroke that changes nothing.
+  it('leaves system for the opposite of what the system resolves to', () => {
+    expect(toggledTheme('system', true)).toBe('light')
+    expect(toggledTheme('system', false)).toBe('dark')
+  })
+
+  it('always changes the resolved theme, whatever the starting point', () => {
+    for (const preference of ['system', 'light', 'dark'] as const) {
+      for (const systemDark of [true, false]) {
+        const before = resolveTheme(preference, systemDark)
+        const after = resolveTheme(toggledTheme(preference, systemDark), systemDark)
+        expect(after).not.toBe(before)
+      }
+    }
   })
 })
 

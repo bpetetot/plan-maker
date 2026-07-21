@@ -1,14 +1,18 @@
 import { X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AppMenu from './AppMenu'
-import Editor from './editor/Editor'
+import type { EditorCommands } from './editor/Editor'
+import Editor, { editorCommands } from './editor/Editor'
 import ShortcutsDialog from './editor/ShortcutsDialog'
-import { loadMeasuresVisible } from './editor/measurePref'
+import { toggleHelp, useHelpDialog } from './editor/helpStore'
+import { measuresVisible, toggleGrid, toggleMeasures } from './editor/preferences'
+import { useAppHotkeys } from './editor/useAppHotkeys'
 import ReloadPrompt from './pwa/ReloadPrompt'
 import { emptyPlan, isPlanEmpty } from './model/types'
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave'
 import { loadPlan } from './persistence/storage'
-import { replacePlan, usePlanStore } from './store/planStore'
+import { redo, replacePlan, undo, usePlanStore } from './store/planStore'
+import { useThemePreference } from './theme/useThemePreference'
 import { transferFileName } from './transfer/json'
 import { renderPlanPng } from './transfer/png'
 import { downloadBlob, exportPlanJson, importPlanJson } from './transfer/transferActions'
@@ -19,6 +23,11 @@ export default function App() {
   const [boot, setBoot] = useState<BootState>('loading')
   const [readOnly, setReadOnly] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const editor = useRef<EditorCommands>(null)
+  // Owned here, not in the menu: the shortcut and the menu's three buttons set
+  // the same preference, and two `useThemePreference` calls would be two states
+  // writing the same key — the buttons would stop reflecting the keystroke.
+  const [themePreference, setThemePreference, toggleTheme] = useThemePreference()
 
   useEffect(() => {
     let stopAutosave: (() => void) | undefined
@@ -50,11 +59,13 @@ export default function App() {
   }, [])
 
   const planIsEmpty = usePlanStore((s) => isPlanEmpty(s.plan))
-
-  if (boot === 'loading') return null
+  const helpOpen = useHelpDialog((s) => s.open)
 
   const resetPlan = () => {
-    if (!window.confirm('Reset the plan? It will be lost.')) return
+    // Load-bearing, not a formality: Mod+Backspace is one modifier away from the
+    // Backspace that deletes the selection, so this dialog is what stands
+    // between a slipped thumb and the whole plan.
+    if (!window.confirm('Reset the plan? Every wall, opening and room name will be lost.')) return
     replacePlan(emptyPlan())
   }
 
@@ -64,7 +75,7 @@ export default function App() {
       // preference is a session value, so this reads what the editor is showing
       // even when storage is unavailable
       const blob = await renderPlanPng(usePlanStore.getState().plan, {
-        measuresVisible: loadMeasuresVisible(),
+        measuresVisible: measuresVisible(),
       })
       if (!blob) {
         setNotice('Nothing to export yet — draw some walls first.')
@@ -76,15 +87,42 @@ export default function App() {
     }
   }
 
+  const openPlan = () => importPlanJson(setNotice)
+  const savePlanAs = () => exportPlanJson(usePlanStore.getState().plan)
+
+  // The whole application's shortcuts, mounted at the only node that sees both
+  // the menu and the editor (ADR 0012). The editor's own commands are reached
+  // through its ref, so its state never has to come up here.
+  useAppHotkeys(
+    {
+      undo,
+      redo,
+      ...editorCommands(editor),
+      toggleGrid,
+      toggleMeasures,
+      toggleTheme,
+      open: openPlan,
+      saveAs: savePlanAs,
+      exportImage: exportPng,
+      reset: resetPlan,
+      help: toggleHelp,
+    },
+    { helpOpen, resetDisabled: planIsEmpty, ready: boot === 'ready' },
+  )
+
+  if (boot === 'loading') return null
+
   return (
     <>
-      <Editor />
+      <Editor ref={editor} />
       <AppMenu
-        onOpen={() => importPlanJson(setNotice)}
-        onSaveAs={() => exportPlanJson(usePlanStore.getState().plan)}
+        onOpen={openPlan}
+        onSaveAs={savePlanAs}
         onExportImage={exportPng}
         onReset={resetPlan}
         resetDisabled={planIsEmpty}
+        themePreference={themePreference}
+        setThemePreference={setThemePreference}
       />
       <ShortcutsDialog />
       {readOnly && (
