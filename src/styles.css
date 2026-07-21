@@ -19,7 +19,6 @@
   --dim-line: #93c9c3;
   --dim-text: #1d7d74;
   --room-area-text: #64748b;
-  --rail: #cbd5e1;
   --marquee-fill: rgba(37, 99, 235, 0.08);
   --grid-minor: rgba(100, 116, 139, 0.12);
   --grid-major: rgba(100, 116, 139, 0.26);
@@ -56,7 +55,6 @@
   --dim-line: #4d7d78;
   --dim-text: #7fc4bc;
   --room-area-text: #94a3b8;
-  --rail: #475569;
   --marquee-fill: rgba(96, 165, 250, 0.12);
   --grid-minor: rgba(148, 163, 184, 0.09);
   --grid-major: rgba(148, 163, 184, 0.19);
@@ -142,14 +140,12 @@ svg text.placement-chip {
   fill: var(--accent-contrast);
   user-select: none;
 }
-/* Uppercase with slight tracking — the Room label's name is the sheet's one
-   title register, kept typographically apart from every number on the sheet */
+/* Semi-bold, as typed — the Room label's name is the sheet's one title
+   register, kept typographically apart from every number on the sheet */
 svg text.room-name {
   font:
-    600 12px system-ui,
+    600 11px system-ui,
     sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   fill: var(--label);
   user-select: none;
 }
@@ -164,15 +160,13 @@ svg foreignObject input.room-name-input {
   background: transparent;
   text-align: center;
   font:
-    600 12px system-ui,
+    600 11px system-ui,
     sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--label);
 }
 svg text.room-area {
   font:
-    10.5px 'JetBrains Mono',
+    9px 'JetBrains Mono',
     ui-monospace,
     monospace;
   fill: var(--room-area-text);

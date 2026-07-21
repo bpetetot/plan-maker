@@ -59,7 +59,6 @@ import {
   blockNameSlots,
   COLORS,
   DimLabel,
-  DimRails,
   Handle,
   JunctionPatches,
   OpeningGlyph,
@@ -153,7 +152,6 @@ export default function Editor() {
     null,
   )
   // wall whose dimension is being dragged past the click threshold — drives the rails
-  const [railWallId, setRailWallId] = useState<string | null>(null)
   // opening being solo-dragged — drives its placement dimensions
   const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null)
   // Inline room-name editing over a text block (Excalidraw-style). The plan is
@@ -420,7 +418,6 @@ export default function Editor() {
         if (wall) {
           if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
             d.moved = true
-            setRailWallId(d.id)
           }
           if (d.moved) {
             const length = wallLength(plan, wall)
@@ -483,7 +480,6 @@ export default function Editor() {
     // selection — the label is a handle, not an element
     if (d.kind === 'dim') {
       if (!d.moved) setSel([{ type: 'wall', id: d.id }])
-      setRailWallId(null)
     }
     if (d.kind === 'point') setSnap(null)
     if (d.kind === 'opening') setMovingOpeningId(null)
@@ -706,7 +702,6 @@ export default function Editor() {
               }
             />
           ))}
-        {railWallId && plan.walls[railWallId] && <DimRails plan={plan} wall={plan.walls[railWallId]} />}
         {/* after the grab zones so the label wins the hit-test where they overlap.
             Every wall keeps its own dimension throughout: placement dimensions
             wear a different register and no longer share its slot.
@@ -773,7 +768,7 @@ export default function Editor() {
         {/* inline room-name editing, directly on the sheet (Excalidraw-style);
             sized to sit on the block's name line, above the area */}
         {editing && (
-          <foreignObject x={editing.x - 100} y={editing.y - 14} width={200} height={18}>
+          <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input
               className="room-name-input"
               defaultValue={editing.initial}

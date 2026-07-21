@@ -304,15 +304,13 @@ const EXTENT_STROKE = 1
 // the head's size. All in plan units, like the extent line itself.
 const ARROW_LEN = 7
 const ARROW_HALF_WIDTH = 2.2
-// how far the leader lines run past an outside head
-const ARROW_LEADER = 4
 
 // The broken dimension line DimLabel draws: a piece on each side of the text
 // gap (only where it has room) and an ISO arrowhead at each end of the
 // measured extent. When the span has room for the heads and the text, the
 // heads sit inside it pointing outward; on a shorter span they move outside,
-// pointing inward at each other, each carried by a short leader line — the
-// ISO convention when space runs out.
+// pointing inward at each other as bare triangles — the ISO convention when
+// space runs out, minus the leader tails past the heads.
 function ExtentLine({
   at,
   ux,
@@ -348,8 +346,6 @@ function ExtentLine({
     <g pointerEvents="none">
       {g1 - start > 2 && seg('a', start, g1)}
       {end - g2 > 2 && seg('b', g2, end)}
-      {!inside && seg('leader-a', from - ARROW_LEN - ARROW_LEADER, from)}
-      {!inside && seg('leader-b', to, to + ARROW_LEN + ARROW_LEADER)}
       {[
         { t: from, dir: inside ? 1 : -1 },
         { t: to, dir: inside ? -1 : 1 },
@@ -429,38 +425,6 @@ export function DimLabel({
           {label}
         </text>
       </g>
-    </g>
-  )
-}
-
-// Rails: the two lines the dimension text is centered on while dragged, shown
-// on the dragged wall only, from drag threshold to pointer release. They span
-// the label's actual travel — one wall thickness of padding at each end, the
-// same bound setDimPlacement enforces. Editor feedback — deliberately absent
-// from PlanScene (never printed).
-export function DimRails({ plan, wall }: { plan: Plan; wall: Wall }) {
-  const [a, b] = wallPoints(plan, wall)
-  const length = wallLength(plan, wall)
-  const pad = wall.thickness
-  if (length <= 2 * pad) return null
-  const ux = (b.x - a.x) / length
-  const uy = (b.y - a.y) / length
-  const off = dimLineOffset(wall)
-  return (
-    <g pointerEvents="none">
-      {[1, -1].map((side) => (
-        <line
-          key={side}
-          x1={a.x + ux * pad - uy * side * off}
-          y1={a.y + uy * pad + ux * side * off}
-          x2={b.x - ux * pad - uy * side * off}
-          y2={b.y - uy * pad + ux * side * off}
-          stroke="var(--rail)"
-          strokeWidth={1}
-          strokeDasharray="4 4"
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
     </g>
   )
 }
@@ -617,7 +581,7 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
 
 // Vertical pitch of a block's text lines; the editor positions its inline
 // name input on the same grid.
-export const BLOCK_LINE_HEIGHT = 14
+export const BLOCK_LINE_HEIGHT = 13
 
 // The labels of a block with a visible name slot: named, or being edited in
 // place (the input overlays the slot, so the layout must keep reserving it).
@@ -660,9 +624,9 @@ export function RoomOverlay({
       key={key}
       className={className}
       x={-50}
-      y={y - 12}
+      y={y - 10}
       width={100}
-      height={16}
+      height={13}
       fill="transparent"
       style={{ cursor: 'move' }}
       onPointerDown={onLinePointerDown ? (e) => onLinePointerDown(block, label, e) : undefined}

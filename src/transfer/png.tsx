@@ -55,8 +55,8 @@ const EXPORT_STYLE = `
   @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
   svg { --wall: #1e293b; --sheet: #ffffff; --dim-line: #93c9c3; }
   text.dim { font: 11px 'JetBrains Mono', ui-monospace, monospace; fill: #1d7d74; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; stroke-linecap: round; }
-  text.room-name { font: 600 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; fill: #334155; }
-  text.room-area { font: 10.5px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
+  text.room-name { font: 600 11px system-ui, sans-serif; fill: #334155; }
+  text.room-area { font: 9px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
 `
 
 // What the editor shows is what the export prints, measures included: hiding

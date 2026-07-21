@@ -106,7 +106,7 @@ describe('DimLabel value', () => {
     expect(heads[1].getAttribute('points')!.startsWith('405,-15 ')).toBe(true)
   })
 
-  it('moves the arrowheads outside a short extent, onto leader lines', () => {
+  it('moves the arrowheads outside a short extent, as bare triangles', () => {
     // a 25 cm wall: the text gap swallows the whole line, so the heads move
     // outside the extent, pointing inward at each other — marking the
     // measured extent is the point when a value refines
@@ -117,15 +117,15 @@ describe('DimLabel value', () => {
       </svg>,
     )
     expect(container.querySelector('text')!.textContent).toBe('35 cm')
-    // the two leader lines carrying the outside heads
-    expect(container.querySelectorAll('line')).toHaveLength(2)
+    // no line pieces: nothing sticks out past the outside heads
+    expect(container.querySelectorAll('line')).toHaveLength(0)
     expect(container.querySelectorAll('polygon')).toHaveLength(2)
   })
 
   it('pins the arrow tips to the span ends, however small the span', () => {
     // a 20 cm wall between two 19 cm walls: measured 9.5→10.5 on the inner
-    // side, a 1 cm span — the tips stay exactly on its ends, the heads and
-    // leaders simply overhang outside.
+    // side, a 1 cm span — the tips stay exactly on its ends, the heads
+    // simply overhang outside.
     let wallId = ''
     const plan = buildPlan((b) => {
       const l = b.point(0, 0)
