@@ -174,7 +174,8 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
 // ElementRef, the plan's notion, and that word was here first.
 export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan } = useView(svgRef)
+  const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
+    useView(svgRef)
   const plan = usePlanStore((s) => s.plan)
   const setPlan = usePlanStore((s) => s.setPlan)
   const planEpoch = usePlanStore((s) => s.planEpoch)
@@ -891,6 +892,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             className="floating-btn icon"
             title={`Zoom out (${keyHint('zoomOut')})`}
             aria-label="Zoom out"
+            disabled={!canZoomOut}
             onClick={() => zoomCenter(1.25)}
           >
             <ZoomOut size={16} aria-hidden />
@@ -906,6 +908,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             className="floating-btn icon"
             title={`Zoom in (${keyHint('zoomIn')})`}
             aria-label="Zoom in"
+            disabled={!canZoomIn}
             onClick={() => zoomCenter(1 / 1.25)}
           >
             <ZoomIn size={16} aria-hidden />

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { planBBox } from '../model/geometry'
 import type { Plan } from '../model/types'
@@ -23,6 +23,25 @@ interface Camera {
   scale: number
 }
 
+// Zoom bounds, as ratios of the reference framing — the same quantity the
+// indicator shows (glossary: Zoom), so a bound is reached exactly when the
+// button reads 10% or 3000%. Fit is deliberately exempt (ADR 0013).
+const ZOOM_MIN = 0.1
+const ZOOM_MAX = 30
+
+// Comparing a clamped scale back against its own bound is a float round-trip:
+// ZOOM_MIN * ref / ref need not be exactly ZOOM_MIN. Every bound test goes
+// through these two, so the clamp and the greyed-out state cannot disagree.
+const atOrBelowFloor = (scale: number, ref: number) => scale <= ZOOM_MIN * ref * (1 + 1e-9)
+const atOrAboveCeiling = (scale: number, ref: number) => scale >= ZOOM_MAX * ref * (1 - 1e-9)
+
+// A bound stops a step, it never pushes one: starting outside the range (Fit
+// framed a huge plan at 7%) a zoom in still moves by its own factor to 8.75%
+// instead of snapping to 10%. So each side of the clamp yields to `from`
+// whenever `from` is already past it.
+const clampScale = (scale: number, ref: number, from: number) =>
+  Math.min(Math.max(scale, Math.min(ZOOM_MIN * ref, from)), Math.max(ZOOM_MAX * ref, from))
+
 // The "meet" scale framing `rect` on a w×h screen (screen px per plan cm).
 const frameScale = (rect: View, w: number, h: number) => Math.min(w / rect.w, h / rect.h)
 
@@ -45,6 +64,15 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
   // Zoom reference (glossary: Zoom). Captured, not derived from the live
   // window size, so a resize changes neither the view nor the percentage.
   const [refScale, setRefScale] = useState(1)
+  // The wheel listener subscribes once, so the clamp inside it cannot read
+  // `refScale` from the closure — a Fit would leave it stale and the wheel
+  // would enforce the bounds of a framing two loads old. The ref is the value
+  // the clamp reads; the state is the value the render reads.
+  const refScaleRef = useRef(1)
+  const setReference = (scale: number) => {
+    refScaleRef.current = scale
+    setRefScale(scale)
+  }
 
   const toPlan = (clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -61,7 +89,10 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     const r = svgRef.current?.getBoundingClientRect()
     if (!r) return
     setCamera((c) => {
-      const scale = c.scale / factor
+      // clamped first: the anchor math has to run on the scale that will be
+      // committed, or the last step of a run drags the plan under the cursor
+      const scale = clampScale(c.scale / factor, refScaleRef.current, c.scale)
+      if (scale === c.scale) return c
       const px = clientX - r.left
       const py = clientY - r.top
       // the plan point under the cursor stays under the cursor
@@ -88,10 +119,14 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     const target = box
       ? { x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin }
       : DEFAULT_FRAME
+    // No clamp here: Fit's promise is that the whole plan is framed, and it
+    // outranks the zoom bounds (ADR 0013). A plan wider than ten default
+    // framings lands below 10%, with Zoom out greyed out — still true, since
+    // from there the view cannot go further out.
     setCamera(frameCamera(target, w, h))
     // unmeasurable screen: frameCamera fell back to scale 1, keep 100% coherent
     const ref = frameScale(DEFAULT_FRAME, w, h)
-    setRefScale(ref > 0 ? ref : 1)
+    setReference(ref > 0 ? ref : 1)
   }
 
   // On-screen size of the SVG, tracked as state so the viewBox and the zoom
@@ -128,6 +163,8 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
 
   const zoomScale = camera.scale
   const zoomRatio = camera.scale / refScale
+  const canZoomOut = !atOrBelowFloor(camera.scale, refScale)
+  const canZoomIn = !atOrAboveCeiling(camera.scale, refScale)
 
   useEffect(() => {
     const svg = svgRef.current
@@ -142,7 +179,18 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { view, toPlan, pxPerCm, zoomScale, zoomRatio, zoomCenter, panByPx, fitPlan }
+  return {
+    view,
+    toPlan,
+    pxPerCm,
+    zoomScale,
+    zoomRatio,
+    canZoomIn,
+    canZoomOut,
+    zoomCenter,
+    panByPx,
+    fitPlan,
+  }
 }
 
 export function useSpaceHeld() {

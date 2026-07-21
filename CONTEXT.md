@@ -321,6 +321,9 @@ How far the view is zoomed in or out, expressed relative to the default
 framing: 100% is the scale the default framing had in the window as of the
 last load or Fit. Resizing the window never pans or zooms the view — it only
 reveals or hides plan, the top-left corner staying put — so neither the plan
-on screen nor the Zoom changes. Never a paper scale or a physical size. Pure
-editor state: never part of the plan, never exported.
+on screen nor the Zoom changes. Bounded to 10%–3000%: a step that would
+overshoot stops on the bound instead, and the control that would cross it is
+greyed out. Fit is exempt — it may frame a plan outside the range (ADR 0013).
+Never a paper scale or a physical size. Pure editor state: never part of the
+plan, never exported.
 _Avoid_: Zoom level, scale, magnification
