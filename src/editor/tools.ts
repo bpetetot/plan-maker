@@ -1,15 +1,15 @@
-import type { Cm } from '../model/types'
-import { DOOR_WIDTH, WALL_THICKNESS, WINDOW_WIDTH } from '../model/types'
+import type { Cm } from '../model/types';
+import { DOOR_WIDTH, WALL_THICKNESS, WINDOW_WIDTH } from '../model/types';
 
-export type Tool = 'select' | 'wall' | 'door' | 'window'
+export type Tool = 'select' | 'wall' | 'door' | 'window';
 
 // CONTEXT.md: Tool defaults. Session-only editor state, never part of the plan.
 export interface ToolDefaults {
-  wallThickness: Cm
-  doorWidth: Cm
-  windowWidth: Cm
-  doorHinge: 'start' | 'end'
-  doorSwing: 'in' | 'out'
+  wallThickness: Cm;
+  doorWidth: Cm;
+  windowWidth: Cm;
+  doorHinge: 'start' | 'end';
+  doorSwing: 'in' | 'out';
 }
 
 export const initialToolDefaults = (): ToolDefaults => ({
@@ -18,4 +18,4 @@ export const initialToolDefaults = (): ToolDefaults => ({
   windowWidth: WINDOW_WIDTH,
   doorHinge: 'start',
   doorSwing: 'in',
-})
+});

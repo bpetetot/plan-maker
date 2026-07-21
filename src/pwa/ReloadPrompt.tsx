@@ -1,29 +1,29 @@
-import { X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
+import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
-const HOUR_MS = 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000;
 
 // Spec §6: prompt, not auto-reload — auto would drop undo history and selection.
 export default function ReloadPrompt() {
-  const updateInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const updateInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
-      if (registration) updateInterval.current = setInterval(() => registration.update(), HOUR_MS)
+      if (registration) updateInterval.current = setInterval(() => registration.update(), HOUR_MS);
     },
-  })
+  });
 
   useEffect(
     () => () => {
-      if (updateInterval.current !== null) clearInterval(updateInterval.current)
+      if (updateInterval.current !== null) clearInterval(updateInterval.current);
     },
     [],
-  )
+  );
 
-  if (!needRefresh) return null
+  if (!needRefresh) return null;
 
   return (
     <div className="banner">
@@ -35,5 +35,5 @@ export default function ReloadPrompt() {
         <X size={16} aria-hidden />
       </button>
     </div>
-  )
+  );
 }

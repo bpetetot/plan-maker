@@ -1,31 +1,31 @@
 // CONTEXT.md: Tool panel. Selection values derived on render, never stored —
 // the panel cannot disagree with the canvas, drags included.
-import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-import { formatLength } from '../model/format'
-import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations'
-import type { Room } from '../model/rooms'
-import { wallMeasures } from '../model/rooms'
-import type { ElementRef } from '../model/selection'
-import type { Plan, Wall } from '../model/types'
-import { OPENING_WIDTHS, WALL_THICKNESSES } from '../model/types'
-import type { Tool, ToolDefaults } from './tools'
+import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { formatLength } from '../model/format';
+import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
+import type { Room } from '../model/rooms';
+import { wallMeasures } from '../model/rooms';
+import type { ElementRef } from '../model/selection';
+import type { Plan, Wall } from '../model/types';
+import { OPENING_WIDTHS, WALL_THICKNESSES } from '../model/types';
+import type { Tool, ToolDefaults } from './tools';
 
 const ELEMENT_META: Record<'wall' | 'door' | 'window', [LucideIcon, string]> = {
   wall: [BrickWall, 'Wall'],
   door: [DoorClosed, 'Door'],
   window: [Grid2x2, 'Window'],
-}
+};
 
 interface ToolPanelProps {
-  plan: Plan
-  rooms: Room[]
-  sel: ElementRef[]
-  tool: Tool
-  defaults: ToolDefaults
-  setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void
-  setPlan: (updater: (plan: Plan) => Plan) => void
-  onDelete: () => void
+  plan: Plan;
+  rooms: Room[];
+  sel: ElementRef[];
+  tool: Tool;
+  defaults: ToolDefaults;
+  setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void;
+  setPlan: (updater: (plan: Plan) => Plan) => void;
+  onDelete: () => void;
 }
 
 export function ToolPanel({
@@ -39,17 +39,17 @@ export function ToolPanel({
   onDelete,
 }: ToolPanelProps) {
   if (sel.length === 0) {
-    if (tool === 'select') return null
-    return <ToolDefaultsFacet tool={tool} defaults={defaults} setDefaults={setDefaults} />
+    if (tool === 'select') return null;
+    return <ToolDefaultsFacet tool={tool} defaults={defaults} setDefaults={setDefaults} />;
   }
-  const only = sel.length === 1 ? sel[0] : null
-  const wall = only?.type === 'wall' ? (plan.walls[only.id] ?? null) : null
-  const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null
-  if (only && !wall && !opening) return null
+  const only = sel.length === 1 ? sel[0] : null;
+  const wall = only?.type === 'wall' ? (plan.walls[only.id] ?? null) : null;
+  const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null;
+  if (only && !wall && !opening) return null;
 
   const [Icon, title]: [LucideIcon, string] = !only
     ? [Layers, `${sel.length} elements`]
-    : ELEMENT_META[wall ? 'wall' : opening!.type]
+    : ELEMENT_META[wall ? 'wall' : opening!.type];
 
   return (
     <div className="panel">
@@ -65,9 +65,9 @@ export function ToolPanel({
               presets={WALL_THICKNESSES}
               value={wall.thickness}
               onChange={(thickness) => {
-                setPlan((p) => setWallThickness(p, wall.id, thickness))
+                setPlan((p) => setWallThickness(p, wall.id, thickness));
                 // sticky measure (CONTEXT.md: Tool defaults) — last used wins
-                setDefaults((d) => ({ ...d, wallThickness: thickness }))
+                setDefaults((d) => ({ ...d, wallThickness: thickness }));
               }}
             />
           </div>
@@ -80,11 +80,11 @@ export function ToolPanel({
             presets={OPENING_WIDTHS}
             value={opening.width}
             onChange={(width) => {
-              setPlan((p) => setOpeningWidth(p, opening.id, width))
+              setPlan((p) => setOpeningWidth(p, opening.id, width));
               // sticky measure (CONTEXT.md: Tool defaults) — last used wins
               setDefaults((d) =>
                 opening.type === 'door' ? { ...d, doorWidth: width } : { ...d, windowWidth: width },
-              )
+              );
             }}
           />
         </section>
@@ -100,7 +100,7 @@ export function ToolPanel({
         Delete
       </button>
     </div>
-  )
+  );
 }
 
 // CONTEXT.md: Tool defaults. No Delete — no element yet.
@@ -109,12 +109,12 @@ function ToolDefaultsFacet({
   defaults,
   setDefaults,
 }: {
-  tool: Exclude<Tool, 'select'>
-  defaults: ToolDefaults
-  setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void
+  tool: Exclude<Tool, 'select'>;
+  defaults: ToolDefaults;
+  setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void;
 }) {
-  const [Icon, title] = ELEMENT_META[tool]
-  const widthKey = tool === 'door' ? 'doorWidth' : 'windowWidth'
+  const [Icon, title] = ELEMENT_META[tool];
+  const widthKey = tool === 'door' ? 'doorWidth' : 'windowWidth';
   return (
     <div className="panel">
       <PanelHeader Icon={Icon} title={title} />
@@ -144,7 +144,7 @@ function ToolDefaultsFacet({
         />
       )}
     </div>
-  )
+  );
 }
 
 function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
@@ -155,7 +155,7 @@ function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
       </span>
       <span className="panel-title">{title}</span>
     </div>
-  )
+  );
 }
 
 // An imported value outside the presets is kept as an extra option, not
@@ -166,12 +166,12 @@ function PresetSelect({
   onChange,
   inline,
 }: {
-  presets: number[]
-  value: number
-  onChange: (value: number) => void
-  inline?: boolean
+  presets: number[];
+  value: number;
+  onChange: (value: number) => void;
+  inline?: boolean;
 }) {
-  const values = presets.includes(value) ? presets : [...presets, value].sort((a, b) => a - b)
+  const values = presets.includes(value) ? presets : [...presets, value].sort((a, b) => a - b);
   return (
     <select
       className={inline ? 'panel-select inline' : 'panel-select'}
@@ -184,7 +184,7 @@ function PresetSelect({
         </option>
       ))}
     </select>
-  )
+  );
 }
 
 function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () => void }) {
@@ -200,20 +200,20 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
         </button>
       </div>
     </section>
-  )
+  );
 }
 
 // Spec §2: oriented Interior/Exterior when the wall borders exactly one room,
 // hors-tout Length otherwise.
 function WallRows({ plan, rooms, wall }: { plan: Plan; rooms: Room[]; wall: Wall }) {
-  const m = wallMeasures(plan, rooms, wall)
+  const m = wallMeasures(plan, rooms, wall);
   const rows =
     m.kind === 'oriented'
       ? ([
           ['Interior', m.interior],
           ['Exterior', m.exterior],
         ] as const)
-      : ([['Length', m.length]] as const)
+      : ([['Length', m.length]] as const);
   return (
     <>
       {rows.map(([label, value]) => (
@@ -223,5 +223,5 @@ function WallRows({ plan, rooms, wall }: { plan: Plan; rooms: Room[]; wall: Wall
         </div>
       ))}
     </>
-  )
+  );
 }

@@ -1,12 +1,12 @@
 // Rendered from the shortcut registry (ADR 0011): layout only.
 // Shortcuts are added in useAppHotkeys, never here.
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
-import { X } from 'lucide-react'
-import { closeHelp, useHelpDialog } from './helpStore'
-import { HELP_SECTIONS, helpRows } from './useAppHotkeys'
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
+import { X } from 'lucide-react';
+import { closeHelp, useHelpDialog } from './helpStore';
+import { HELP_SECTIONS, helpRows } from './useAppHotkeys';
 
 export default function ShortcutsDialog() {
-  const open = useHelpDialog((s) => s.open)
+  const open = useHelpDialog((s) => s.open);
   return (
     <Dialog open={open} onClose={closeHelp} className="help-dialog">
       <div className="help-backdrop" aria-hidden />
@@ -41,5 +41,5 @@ export default function ShortcutsDialog() {
         </div>
       </DialogPanel>
     </Dialog>
-  )
+  );
 }

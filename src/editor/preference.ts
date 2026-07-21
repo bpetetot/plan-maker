@@ -7,18 +7,18 @@ export function booleanPreference(
   return {
     load() {
       try {
-        return localStorage.getItem(key) !== offSentinel
+        return localStorage.getItem(key) !== offSentinel;
       } catch {
-        return true
+        return true;
       }
     },
     save(on) {
       try {
-        if (on) localStorage.removeItem(key)
-        else localStorage.setItem(key, offSentinel)
+        if (on) localStorage.removeItem(key);
+        else localStorage.setItem(key, offSentinel);
       } catch {
         // localStorage can throw (private mode, quota) — degrade silently
       }
     },
-  }
+  };
 }

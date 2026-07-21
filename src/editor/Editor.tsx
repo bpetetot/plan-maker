@@ -1,6 +1,6 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05 prototype.
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { useKeyHold } from '@tanstack/react-hotkeys'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { useKeyHold } from '@tanstack/react-hotkeys';
 import {
   BrickWall,
   DoorClosed,
@@ -13,10 +13,10 @@ import {
   Undo2,
   ZoomIn,
   ZoomOut,
-} from 'lucide-react'
-import { useStore } from 'zustand'
-import type { Vec } from '../model/geometry'
-import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry'
+} from 'lucide-react';
+import { useStore } from 'zustand';
+import type { Vec } from '../model/geometry';
+import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry';
 import {
   addRoomLabel,
   clampOpeningOffset,
@@ -30,10 +30,10 @@ import {
   planarize,
   renameRoomLabel,
   setDimPlacement,
-} from '../model/operations'
-import type { Room } from '../model/rooms'
-import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms'
-import type { ElementRef } from '../model/selection'
+} from '../model/operations';
+import type { Room } from '../model/rooms';
+import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms';
+import type { ElementRef } from '../model/selection';
 import {
   deleteElements,
   elementsInRect,
@@ -42,17 +42,17 @@ import {
   referencePoint,
   toggleRef,
   translateElements,
-} from '../model/selection'
-import type { Snap } from '../model/snap'
-import { realignDelta, snapPoint } from '../model/snap'
-import type { Opening, Plan, RoomLabel } from '../model/types'
-import { WALL_THICKNESS } from '../model/types'
-import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore'
-import { GridLines } from './grid'
-import { toggleGrid, toggleMeasures, usePreferences } from './preferences'
-import { loadSnapEnabled, saveSnapEnabled } from './snapPref'
-import type { RoomTextBlock } from './render'
-import { ToolPanel } from './ToolPanel'
+} from '../model/selection';
+import type { Snap } from '../model/snap';
+import { realignDelta, snapPoint } from '../model/snap';
+import type { Opening, Plan, RoomLabel } from '../model/types';
+import { WALL_THICKNESS } from '../model/types';
+import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
+import { GridLines } from './grid';
+import { toggleGrid, toggleMeasures, usePreferences } from './preferences';
+import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
+import type { RoomTextBlock } from './render';
+import { ToolPanel } from './ToolPanel';
 import {
   BLOCK_LINE_HEIGHT,
   blockNameSlots,
@@ -70,11 +70,11 @@ import {
   SnapMarker,
   WallGrabZone,
   WallLine,
-} from './render'
-import type { Tool, ToolDefaults } from './tools'
-import { initialToolDefaults } from './tools'
-import { keyHint } from './useAppHotkeys'
-import { useSpaceHeld, useView } from './useView'
+} from './render';
+import type { Tool, ToolDefaults } from './tools';
+import { initialToolDefaults } from './tools';
+import { keyHint } from './useAppHotkeys';
+import { useSpaceHeld, useView } from './useView';
 
 type Drag =
   | { kind: 'pan'; x: number; y: number }
@@ -82,15 +82,15 @@ type Drag =
   // never on intermediate states.
   | { kind: 'point'; id: string; orig: Plan }
   | {
-      kind: 'group'
-      refs: ElementRef[]
-      start: Vec
-      orig: Plan
-      clickRef?: ElementRef
+      kind: 'group';
+      refs: ElementRef[];
+      start: Vec;
+      orig: Plan;
+      clickRef?: ElementRef;
       // Fixed at pointer-down, not recomputed: the preview would jump when
       // another candidate became the nearest.
-      refPoint: Vec | null
-      moved?: boolean
+      refPoint: Vec | null;
+      moved?: boolean;
     }
   // `grabDelta` keeps the grab point under the cursor (CONTEXT.md: Grab zone).
   | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
@@ -103,30 +103,30 @@ type Drag =
   | { kind: 'dim'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // `b` is mutated on the ref, not held in state: pointer-up would read a
   // stale React value.
-  | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
+  | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec };
 
 // Screen px; below this a drag is a plain click.
-const CLICK_PX = 4
+const CLICK_PX = 4;
 
 const pointSnap = (p: Plan, id: string): Snap => ({
   x: p.points[id].x,
   y: p.points[id].y,
   kind: 'point',
   pointId: id,
-})
+});
 
 /** Registry lives in App (ADR 0012); lifting this state there instead would
  *  move the editor's insides into its parent. Read through a ref, never stale. */
 export interface EditorCommands {
-  cancel: () => void
-  deleteSelection: () => void
-  selectTool: (tool: Tool) => void
-  toggleSnap: () => void
-  zoomIn: () => void
-  zoomOut: () => void
-  fit: () => void
+  cancel: () => void;
+  deleteSelection: () => void;
+  selectTool: (tool: Tool) => void;
+  toggleSnap: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  fit: () => void;
   /** Back to 100% — the ratio the zoom indicator shows, not a scale of 1. */
-  zoomActual: () => void
+  zoomActual: () => void;
 }
 
 /** Shared so App and test harnesses reach the editor the same way. */
@@ -139,103 +139,103 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
   zoomOut: () => ref.current?.zoomOut(),
   fit: () => ref.current?.fit(),
   zoomActual: () => ref.current?.zoomActual(),
-})
+});
 
 export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
-  const svgRef = useRef<SVGSVGElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null);
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
-    useView(svgRef)
-  const plan = usePlanStore((s) => s.plan)
-  const setPlan = usePlanStore((s) => s.setPlan)
-  const planEpoch = usePlanStore((s) => s.planEpoch)
-  const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0)
-  const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0)
-  const [tool, setTool] = useState<Tool>('select')
-  const gridVisible = usePreferences((s) => s.grid)
-  const measuresVisible = usePreferences((s) => s.measures)
-  const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled)
-  const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
-  const [sel, setSel] = useState<ElementRef[]>([])
-  const [hoverWall, setHoverWall] = useState<string | null>(null)
+    useView(svgRef);
+  const plan = usePlanStore((s) => s.plan);
+  const setPlan = usePlanStore((s) => s.setPlan);
+  const planEpoch = usePlanStore((s) => s.planEpoch);
+  const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0);
+  const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0);
+  const [tool, setTool] = useState<Tool>('select');
+  const gridVisible = usePreferences((s) => s.grid);
+  const measuresVisible = usePreferences((s) => s.measures);
+  const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled);
+  const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults);
+  const [sel, setSel] = useState<ElementRef[]>([]);
+  const [hoverWall, setHoverWall] = useState<string | null>(null);
   // First click held as a pending snap, not committed: aborting the chain
   // (Esc, tool switch, double-click) must not mutate the plan.
-  const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null)
-  const [snap, setSnap] = useState<Snap | null>(null)
-  const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null)
+  const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null);
+  const [snap, setSnap] = useState<Snap | null>(null);
+  const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null);
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
     null,
-  )
-  const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null)
+  );
+  const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null);
   // Plan touched on commit only, not per keystroke: one undo entry.
   // labelId null until the room has a label — created on non-empty commit.
   const [editing, setEditing] = useState<{
-    key: string
-    labelId: string | null
-    x: number
-    y: number
-    initial: string
-  } | null>(null)
-  const editCancelled = useRef(false)
-  const space = useSpaceHeld()
-  const drag = useRef<Drag | null>(null)
+    key: string;
+    labelId: string | null;
+    x: number;
+    y: number;
+    initial: string;
+  } | null>(null);
+  const editCancelled = useRef(false);
+  const space = useSpaceHeld();
+  const drag = useRef<Drag | null>(null);
   // Tracked, not sampled: the snap toggle shows the *effective* state, so Alt
   // transitions must re-render. The keyup after an Alt+Tab never arrives.
-  const altHeld = useKeyHold('Alt')
+  const altHeld = useKeyHold('Alt');
   // Alt inverts the current snap state for the gesture (ADR 0007).
-  const isFree = (alt: boolean) => !snapEnabled !== alt
-  const free = isFree(altHeld)
+  const isFree = (alt: boolean) => !snapEnabled !== alt;
+  const free = isFree(altHeld);
 
   // Fit on any plan replacement (open, restore, reset); mount included, which
   // frames a plan restored before the editor mounted.
   useEffect(() => {
-    fitPlan(usePlanStore.getState().plan)
+    fitPlan(usePlanStore.getState().plan);
     // fitPlan is recreated every render but only reads the svg ref; epoch is the trigger
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [planEpoch])
+  }, [planEpoch]);
 
-  const rooms = useMemo(() => detectRooms(plan), [plan])
-  const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan])
+  const rooms = useMemo(() => detectRooms(plan), [plan]);
+  const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan]);
   // The plan reconciles labels only at gesture end; the display previews it
   // live, so a default-placement block tracks its room's anchor mid-drag.
-  const dragNow = drag.current
-  const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null
+  const dragNow = drag.current;
+  const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null;
   const overlayLabels = useMemo(
     () => Object.values((wallDrag ? reconcileRoomLabels(wallDrag.orig, plan) : plan).roomLabels),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [wallDrag, plan],
-  )
+  );
 
-  const tolerance = () => 14 / pxPerCm()
+  const tolerance = () => 14 / pxPerCm();
 
   const switchTool = (next: Tool) => {
-    setTool(next)
-    setChain(null)
-    setSnap(null)
-    setOpenPreview(null)
-    if (next !== 'select') setSel([])
-  }
+    setTool(next);
+    setChain(null);
+    setSnap(null);
+    setOpenPreview(null);
+    if (next !== 'select') setSel([]);
+  };
 
   const deleteSelection = useCallback(
     (selection: ElementRef[]) => {
-      if (selection.length === 0) return
-      setPlan((p) => deleteElements(p, selection))
-      setSel([])
+      if (selection.length === 0) return;
+      setPlan((p) => deleteElements(p, selection));
+      setSel([]);
     },
     [setPlan],
-  )
+  );
 
   const toggleSnap = useCallback(() => {
-    setSnapEnabled(!snapEnabled)
-    saveSnapEnabled(!snapEnabled)
-  }, [snapEnabled])
+    setSnapEnabled(!snapEnabled);
+    saveSnapEnabled(!snapEnabled);
+  }, [snapEnabled]);
 
   // No dependency list: a list naming chain, sel, tool, snapEnabled and the
   // camera goes stale the first time someone forgets to extend it.
   useImperativeHandle(commands, () => ({
     cancel: () => {
-      if (chain) setChain(null)
-      else if (sel.length > 0) setSel([])
-      else switchTool('select')
+      if (chain) setChain(null);
+      else if (sel.length > 0) setSel([]);
+      else switchTool('select');
     },
     deleteSelection: () => deleteSelection(sel),
     selectTool: switchTool,
@@ -246,53 +246,53 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // zoomCenter divides by its factor and zoomRatio is scale over the 100%
     // reference, so the ratio is the factor landing exactly on 100%.
     zoomActual: () => zoomCenter(zoomRatio),
-  }))
+  }));
 
   const startPlanDrag = (d: Drag) => {
-    beginHistoryGroup()
-    drag.current = d
-  }
+    beginHistoryGroup();
+    drag.current = d;
+  };
 
   const onSvgPointerDown = (e: React.PointerEvent) => {
-    const svg = svgRef.current!
+    const svg = svgRef.current!;
     if (drag.current) {
-      svg.setPointerCapture(e.pointerId)
-      return
+      svg.setPointerCapture(e.pointerId);
+      return;
     }
     if (space || e.button === 1) {
-      drag.current = { kind: 'pan', x: e.clientX, y: e.clientY }
-      svg.setPointerCapture(e.pointerId)
-      return
+      drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
+      svg.setPointerCapture(e.pointerId);
+      return;
     }
-    if (e.button !== 0) return
-    const c = toPlan(e.clientX, e.clientY)
+    if (e.button !== 0) return;
+    const c = toPlan(e.clientX, e.clientY);
     if (tool === 'wall') {
-      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free })
+      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free });
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
         setPlan(
           (p) =>
             commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start), defaults.wallThickness)[0],
-        )
-        setChain(null)
-        setSnap(null)
-        return
+        );
+        setChain(null);
+        setSnap(null);
+        return;
       }
       if (chain) {
         // One setPlan per drawn wall: pending start and wall land in a single
         // history entry (ADR 0002).
-        const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last)
-        const [withStart, startId] = commitPoint(plan, startSnap)
+        const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last);
+        const [withStart, startId] = commitPoint(plan, startSnap);
         const [next, pointId] = commitWall(
           withStart,
           pointSnap(withStart, startId),
           s,
           defaults.wallThickness,
-        )
-        setPlan(() => next)
-        setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId })
+        );
+        setPlan(() => next);
+        setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId });
       } else {
-        setChain({ pending: s })
+        setChain({ pending: s });
       }
     } else if ((tool === 'door' || tool === 'window') && openPreview) {
       // Tool stays active, but the new opening is selected so its panel shows.
@@ -300,27 +300,27 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         width: tool === 'door' ? defaults.doorWidth : defaults.windowWidth,
         hingeSide: defaults.doorHinge,
         swing: defaults.doorSwing,
-      })
-      setPlan(() => next)
-      setSel(id ? [{ type: 'opening', id }] : [])
+      });
+      setPlan(() => next);
+      setSel(id ? [{ type: 'opening', id }] : []);
     } else if (tool === 'select') {
-      drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c }
-      setMarquee({ a: c, b: c })
-      svg.setPointerCapture(e.pointerId)
+      drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
+      setMarquee({ a: c, b: c });
+      svg.setPointerCapture(e.pointerId);
     } else {
-      setSel([])
+      setSel([]);
     }
-  }
+  };
 
   const onElementPointerDown = (ref: ElementRef, e: React.PointerEvent, soloDrag: (c: Vec) => Drag) => {
-    if (e.button !== 0 || space) return
+    if (e.button !== 0 || space) return;
     if (e.shiftKey) {
       // Or the svg handler starts a marquee on top of this toggle.
-      e.stopPropagation()
-      setSel((s) => toggleRef(s, ref))
-      return
+      e.stopPropagation();
+      setSel((s) => toggleRef(s, ref));
+      return;
     }
-    const c = toPlan(e.clientX, e.clientY)
+    const c = toPlan(e.clientX, e.clientY);
     if (sel.length > 1 && isSelected(sel, ref)) {
       startPlanDrag({
         kind: 'group',
@@ -329,76 +329,76 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         orig: plan,
         clickRef: ref,
         refPoint: referencePoint(plan, sel, c),
-      })
+      });
     } else {
-      setSel([ref])
-      startPlanDrag(soloDrag(c))
+      setSel([ref]);
+      startPlanDrag(soloDrag(c));
     }
-  }
+  };
 
   const onSvgPointerMove = (e: React.PointerEvent) => {
-    const c = toPlan(e.clientX, e.clientY)
-    const d = drag.current
+    const c = toPlan(e.clientX, e.clientY);
+    const d = drag.current;
     if (d) {
       if (d.kind === 'pan') {
-        panByPx(e.clientX - d.x, e.clientY - d.y)
-        drag.current = { kind: 'pan', x: e.clientX, y: e.clientY }
+        panByPx(e.clientX - d.x, e.clientY - d.y);
+        drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
       } else if (d.kind === 'point') {
         const s = snapPoint(plan, c.x, c.y, {
           tolerance: tolerance(),
           exclude: new Set([d.id]),
           free,
-        })
-        setPlan((p) => movePoint(p, d.id, s.x, s.y))
-        setSnap(s)
+        });
+        setPlan((p) => movePoint(p, d.id, s.x, s.y));
+        setSnap(s);
       } else if (d.kind === 'group') {
         if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-          d.moved = true
+          d.moved = true;
         }
         if (d.moved) {
           // e.altKey, not the tracked state: correct even when Alt went down
           // before the window had focus.
-          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, isFree(e.altKey))
-          setPlan(() => translateElements(d.orig, d.refs, dx, dy))
+          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, isFree(e.altKey));
+          setPlan(() => translateElements(d.orig, d.refs, dx, dy));
         }
       } else if (d.kind === 'marquee') {
-        d.b = c
-        setMarquee({ a: d.a, b: c })
+        d.b = c;
+        setMarquee({ a: d.a, b: c });
       } else if (d.kind === 'opening') {
-        const opening = plan.openings[d.id]
+        const opening = plan.openings[d.id];
         if (opening) {
           if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-            d.moved = true
-            setMovingOpeningId(d.id)
+            d.moved = true;
+            setMovingOpeningId(d.id);
           }
           if (d.moved) {
-            const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y)
-            setPlan((p) => moveOpening(p, d.id, t + d.grabDelta))
+            const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y);
+            setPlan((p) => moveOpening(p, d.id, t + d.grabDelta));
           }
         }
       } else if (d.kind === 'label') {
-        const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }
-        const t = d.room ? clampToRoom(target, d.room) : target
-        setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y))
+        const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y };
+        const t = d.room ? clampToRoom(target, d.room) : target;
+        setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y));
       } else if (d.kind === 'newLabel') {
-        const t = clampToRoom({ x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }, d.room)
+        const t = clampToRoom({ x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }, d.room);
         if (d.id) {
-          setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y))
+          setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y));
         } else if (Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-          const [next, id] = addRoomLabel(plan, '', t.x, t.y)
-          setPlan(() => next)
-          d.id = id
+          const [next, id] = addRoomLabel(plan, '', t.x, t.y);
+          setPlan(() => next);
+          d.id = id;
         }
       } else if (d.kind === 'dim') {
-        const wall = plan.walls[d.id]
+        const wall = plan.walls[d.id];
         if (wall) {
           if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-            d.moved = true
+            d.moved = true;
           }
           if (d.moved) {
-            const length = wallLength(plan, wall)
-            const { t } = projectOnWall(plan, wall, c.x, c.y)
-            const side = wallSide(plan, wall, c.x, c.y)
+            const length = wallLength(plan, wall);
+            const { t } = projectOnWall(plan, wall, c.x, c.y);
+            const side = wallSide(plan, wall, c.x, c.y);
             setPlan((p) =>
               setDimPlacement(
                 p,
@@ -407,84 +407,84 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                 side,
                 dimTravelBounds(plan, wall, side),
               ),
-            )
+            );
           }
         }
       }
-      return
+      return;
     }
     if (tool === 'wall') {
-      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }))
+      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
     } else if (tool === 'door' || tool === 'window') {
-      const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS)
+      const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS);
       if (near) {
-        const width = tool === 'door' ? defaults.doorWidth : defaults.windowWidth
-        const offset = clampOpeningOffset(plan, near.wall, near.t, width)
-        setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset })
-      } else setOpenPreview(null)
+        const width = tool === 'door' ? defaults.doorWidth : defaults.windowWidth;
+        const offset = clampOpeningOffset(plan, near.wall, near.t, width);
+        setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset });
+      } else setOpenPreview(null);
     }
-  }
+  };
 
   const onSvgContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault()
-    if (drag.current) return
+    e.preventDefault();
+    if (drag.current) return;
     if (chain) {
-      setChain(null)
-      setSnap(null)
+      setChain(null);
+      setSnap(null);
     } else if (tool !== 'select') {
-      switchTool('select')
+      switchTool('select');
     }
-  }
+  };
 
   const onSvgPointerUp = () => {
-    const d = drag.current
-    if (!d) return
-    drag.current = null
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
     if (d.kind === 'marquee') {
-      const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm()
-      const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm()
+      const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm();
+      const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm();
       if (wPx < CLICK_PX && hPx < CLICK_PX) {
-        setSel(d.additive ? d.prev : [])
+        setSel(d.additive ? d.prev : []);
       } else {
-        const captured = elementsInRect(plan, d.a, d.b)
-        setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured)
+        const captured = elementsInRect(plan, d.a, d.b);
+        setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured);
       }
-      setMarquee(null)
-      return
+      setMarquee(null);
+      return;
     }
-    if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef])
+    if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef]);
     // The dim label is a handle, not an element: only a click selects its wall.
     if (d.kind === 'dim') {
-      if (!d.moved) setSel([{ type: 'wall', id: d.id }])
+      if (!d.moved) setSel([{ type: 'wall', id: d.id }]);
     }
-    if (d.kind === 'point') setSnap(null)
-    if (d.kind === 'opening') setMovingOpeningId(null)
+    if (d.kind === 'point') setSnap(null);
+    if (d.kind === 'opening') setMovingOpeningId(null);
     // Merge (ADR 0003), split (ADR 0002) and reconcile (CONTEXT.md: Room
     // label) once at gesture end, inside the same history group.
     if (d.kind === 'point' || d.kind === 'group') {
       setPlan((p) => {
-        const moving = new Set<string>()
-        if (d.kind === 'point') moving.add(d.id)
+        const moving = new Set<string>();
+        if (d.kind === 'point') moving.add(d.id);
         else
           for (const ref of d.refs) {
-            const wall = ref.type === 'wall' ? p.walls[ref.id] : undefined
+            const wall = ref.type === 'wall' ? p.walls[ref.id] : undefined;
             if (wall) {
-              moving.add(wall.startPointId)
-              moving.add(wall.endPointId)
+              moving.add(wall.startPointId);
+              moving.add(wall.endPointId);
             }
           }
-        return reconcileRoomLabels(d.orig, planarize(mergeCoincidentPoints(p, moving)))
-      })
+        return reconcileRoomLabels(d.orig, planarize(mergeCoincidentPoints(p, moving)));
+      });
     }
-    if (d.kind !== 'pan') endHistoryGroup()
-  }
+    if (d.kind !== 'pan') endHistoryGroup();
+  };
 
-  const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel])
-  const only = sel.length === 1 ? sel[0] : null
-  const selWall = only?.type === 'wall' ? plan.walls[only.id] : null
+  const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
+  const only = sel.length === 1 ? sel[0] : null;
+  const selWall = only?.type === 'wall' ? plan.walls[only.id] : null;
 
-  const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair'
+  const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
   const ghostOpening: Opening | null =
     openPreview && (tool === 'door' || tool === 'window')
       ? tool === 'door'
@@ -504,98 +504,99 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             offset: openPreview.offset,
             width: defaults.windowWidth,
           }
-      : null
+      : null;
 
-  const placementOpening = ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null)
+  const placementOpening =
+    ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null);
 
   // Gesture plus selection, no cardinality threshold; a selected wall stays
   // silent for the openings it carries.
   const dimmedOpenings = useMemo(() => {
-    const byId = new Map<string, Opening>()
-    if (placementOpening) byId.set(placementOpening.id, placementOpening)
+    const byId = new Map<string, Opening>();
+    if (placementOpening) byId.set(placementOpening.id, placementOpening);
     for (const ref of sel) {
-      if (ref.type !== 'opening') continue
-      const o = plan.openings[ref.id]
-      if (o) byId.set(o.id, o)
+      if (ref.type !== 'opening') continue;
+      const o = plan.openings[ref.id];
+      if (o) byId.set(o.id, o);
     }
-    return [...byId.values()]
-  }, [placementOpening, sel, plan.openings])
+    return [...byId.values()];
+  }, [placementOpening, sel, plan.openings]);
 
   // Room labels are never selected (CONTEXT.md: Selection): a line is dragged
   // and double-click-edited directly.
   const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
-    if (tool !== 'select' || e.button !== 0 || space) return
+    if (tool !== 'select' || e.button !== 0 || space) return;
     if (label) {
-      const c = toPlan(e.clientX, e.clientY)
+      const c = toPlan(e.clientX, e.clientY);
       startPlanDrag({
         kind: 'label',
         id: label.id,
         room: block.room ?? null,
         grabDelta: { x: block.x - c.x, y: block.y - c.y },
-      })
+      });
     } else if (block.room) {
-      const c = toPlan(e.clientX, e.clientY)
+      const c = toPlan(e.clientX, e.clientY);
       startPlanDrag({
         kind: 'newLabel',
         start: c,
         room: block.room,
         grabDelta: { x: block.x - c.x, y: block.y - c.y },
-      })
+      });
     }
-  }
+  };
 
   const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
     // The input overlays the label's own slot in a stacked block; creation
     // targets the top slot.
-    const named = blockNameSlots(block, label?.id)
+    const named = blockNameSlots(block, label?.id);
     const line = label
       ? Math.max(
           0,
           named.findIndex((l) => l.id === label.id),
         )
-      : 0
+      : 0;
     setEditing({
       key: label?.id ?? block.key,
       labelId: label?.id ?? null,
       x: block.x,
       y: block.y + line * BLOCK_LINE_HEIGHT,
       initial: label?.name ?? '',
-    })
-  }
+    });
+  };
 
   // Commit path shared by Enter, Escape and clicking away — all end in a blur.
   const finishEditing = (value: string) => {
-    const ed = editing
-    setEditing(null)
-    if (!ed) return
+    const ed = editing;
+    setEditing(null);
+    if (!ed) return;
     if (editCancelled.current) {
-      editCancelled.current = false
-      return
+      editCancelled.current = false;
+      return;
     }
-    const name = value.trim()
-    if (name === ed.initial) return
-    if (ed.labelId) setPlan((p) => renameRoomLabel(p, ed.labelId!, name))
-    else if (name) setPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0])
-  }
+    const name = value.trim();
+    if (name === ed.initial) return;
+    if (ed.labelId) setPlan((p) => renameRoomLabel(p, ed.labelId!, name));
+    else if (name) setPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0]);
+  };
 
   const onLineDoubleClick = (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => {
-    if (tool !== 'select') return
-    e.stopPropagation()
-    startEditing(block, label)
-  }
+    if (tool !== 'select') return;
+    e.stopPropagation();
+    startEditing(block, label);
+  };
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
     if (tool === 'wall') {
-      setChain(null)
-      setSnap(null)
-      return
+      setChain(null);
+      setSnap(null);
+      return;
     }
-    if (tool !== 'select') return
-    const c = toPlan(e.clientX, e.clientY)
-    const room = roomAt(rooms, c.x, c.y)
-    const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined
-    if (block) startEditing(block, block.labels[0] ?? null)
-  }
+    if (tool !== 'select') return;
+    const c = toPlan(e.clientX, e.clientY);
+    const room = roomAt(rooms, c.x, c.y);
+    const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
+    if (block) startEditing(block, block.labels[0] ?? null);
+  };
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
@@ -652,14 +653,14 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               cursor="move"
               onPointerDown={(e) =>
                 onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => {
-                  const refs: ElementRef[] = [{ type: 'wall', id: wall.id }]
+                  const refs: ElementRef[] = [{ type: 'wall', id: wall.id }];
                   return {
                     kind: 'group',
                     refs,
                     start: c,
                     orig: plan,
                     refPoint: referencePoint(plan, refs, c),
-                  }
+                  };
                 })
               }
               onPointerEnter={() => setHoverWall(wall.id)}
@@ -695,15 +696,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               onPointerDown={
                 tool === 'select'
                   ? (e) => {
-                      if (e.button !== 0 || space) return
-                      const c = toPlan(e.clientX, e.clientY)
-                      const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall)
+                      if (e.button !== 0 || space) return;
+                      const c = toPlan(e.clientX, e.clientY);
+                      const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall);
                       startPlanDrag({
                         kind: 'dim',
                         id: wall.id,
                         start: c,
                         grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t,
-                      })
+                      });
                     }
                   : undefined
               }
@@ -719,10 +720,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               x={p.x}
               y={p.y}
               onPointerDown={(e) => {
-                if (e.button !== 0) return
-                e.stopPropagation()
-                startPlanDrag({ kind: 'point', id: p.id, orig: plan })
-                svgRef.current!.setPointerCapture(e.pointerId)
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                startPlanDrag({ kind: 'point', id: p.id, orig: plan });
+                svgRef.current!.setPointerCapture(e.pointerId);
               }}
             />
           ))}
@@ -759,10 +760,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               onFocus={(e) => e.target.select()}
               onPointerDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Enter') e.currentTarget.blur();
                 else if (e.key === 'Escape') {
-                  editCancelled.current = true
-                  e.currentTarget.blur()
+                  editCancelled.current = true;
+                  e.currentTarget.blur();
                 }
               }}
               onBlur={(e) => finishEditing(e.currentTarget.value)}
@@ -903,5 +904,5 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         onDelete={() => deleteSelection(sel)}
       />
     </div>
-  )
+  );
 }

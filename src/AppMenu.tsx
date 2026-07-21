@@ -1,4 +1,4 @@
-import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import {
   CircleQuestionMark,
   Eraser,
@@ -9,26 +9,26 @@ import {
   Moon,
   Save,
   Sun,
-} from 'lucide-react'
-import { openHelp } from './editor/helpStore'
-import { keyHint } from './editor/useAppHotkeys'
-import type { ShortcutAction } from './editor/useAppHotkeys'
-import type { ThemePreference } from './theme/theme'
+} from 'lucide-react';
+import { openHelp } from './editor/helpStore';
+import { keyHint } from './editor/useAppHotkeys';
+import type { ShortcutAction } from './editor/useAppHotkeys';
+import type { ThemePreference } from './theme/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; title: string; Icon: typeof Monitor }[] = [
   { value: 'system', title: 'System theme', Icon: Monitor },
   { value: 'light', title: 'Light theme', Icon: Sun },
   { value: 'dark', title: 'Dark theme', Icon: Moon },
-]
+];
 
 export interface AppMenuProps {
-  onOpen: () => void
-  onSaveAs: () => void
-  onExportImage: () => void
-  onReset: () => void
-  resetDisabled: boolean
-  themePreference: ThemePreference
-  setThemePreference: (preference: ThemePreference) => void
+  onOpen: () => void;
+  onSaveAs: () => void;
+  onExportImage: () => void;
+  onReset: () => void;
+  resetDisabled: boolean;
+  themePreference: ThemePreference;
+  setThemePreference: (preference: ThemePreference) => void;
 }
 
 // aria-hidden: the hint is glyphs ("⌘ ⇧ E"), unreadable aloud.
@@ -36,7 +36,7 @@ const Hint = ({ action }: { action: ShortcutAction }) => (
   <span className="menu-hint" aria-hidden>
     {keyHint(action)}
   </span>
-)
+);
 
 // Popover, not Menu: a menu's roving tabindex would strand the theme buttons.
 export default function AppMenu({
@@ -58,9 +58,9 @@ export default function AppMenu({
       <PopoverPanel anchor="bottom start" className="floating menu">
         {({ close }) => {
           const run = (action: () => void) => () => {
-            close()
-            action()
-          }
+            close();
+            action();
+          };
           return (
             <>
               <button className="menu-item" onClick={run(onOpen)}>
@@ -105,9 +105,9 @@ export default function AppMenu({
                 <Hint action="reset" />
               </button>
             </>
-          )
+          );
         }}
       </PopoverPanel>
     </Popover>
-  )
+  );
 }

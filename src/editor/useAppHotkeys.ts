@@ -1,8 +1,8 @@
 // Registry keyed by action, application-wide: the UI and the help dialog both read
 // it, so no shortcut can exist undocumented (ADR 0011, ADR 0012; gestures: ADR 0009).
-import { formatForDisplay, useHotkeys } from '@tanstack/react-hotkeys'
-import type { RegisterableHotkey } from '@tanstack/react-hotkeys'
-import type { Tool } from './tools'
+import { formatForDisplay, useHotkeys } from '@tanstack/react-hotkeys';
+import type { RegisterableHotkey } from '@tanstack/react-hotkeys';
+import type { Tool } from './tools';
 
 export type ShortcutAction =
   | 'undo'
@@ -22,9 +22,9 @@ export type ShortcutAction =
   | 'exportImage'
   | 'reset'
   | 'help'
-  | `tool:${Tool}`
+  | `tool:${Tool}`;
 
-export type HelpSection = 'tools' | 'editor' | 'view' | 'file'
+export type HelpSection = 'tools' | 'editor' | 'view' | 'file';
 
 // Explicit split, not the browser's height balancing: the column break would
 // otherwise move with the row counts.
@@ -33,18 +33,18 @@ export const HELP_SECTIONS: { id: HelpSection; title: string; startsColumn?: boo
   { id: 'view', title: 'View' },
   { id: 'tools', title: 'Tools', startsColumn: true },
   { id: 'editor', title: 'Editor' },
-]
+];
 
 // At least one section: an entry with none would be a shortcut the help cannot show.
-type AtLeastOne<T> = { [K in keyof T]: Required<Pick<T, K>> & Partial<Omit<T, K>> }[keyof T]
-type HelpLabels = AtLeastOne<Record<HelpSection, string>>
+type AtLeastOne<T> = { [K in keyof T]: Required<Pick<T, K>> & Partial<Omit<T, K>> }[keyof T];
+type HelpLabels = AtLeastOne<Record<HelpSection, string>>;
 
 interface Shortcut {
-  hotkey: RegisterableHotkey
-  name: string
-  sections: HelpLabels
+  hotkey: RegisterableHotkey;
+  name: string;
+  sections: HelpLabels;
   // Only when the typed key is not the registered one: `?` is Shift+/, `+` is Shift+=.
-  display?: string
+  display?: string;
 }
 
 const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
@@ -108,9 +108,9 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
     display: '?',
   },
   reset: { hotkey: 'Mod+Backspace', name: 'Reset', sections: { file: 'Erase the plan' } },
-}
+};
 
-export const SHORTCUT_ACTIONS = Object.keys(SHORTCUTS) as ShortcutAction[]
+export const SHORTCUT_ACTIONS = Object.keys(SHORTCUTS) as ShortcutAction[];
 
 // Interaction vocabulary with no key to register (ADR 0009). `after` places a
 // gesture beside a shortcut instead of in the tail.
@@ -123,47 +123,47 @@ const GESTURES: { gesture: string; sections: HelpLabels; after?: ShortcutAction 
   { gesture: 'Scroll', sections: { view: 'Zoom in and out' }, after: 'zoomOut' },
   { gesture: 'Space + drag', sections: { view: 'Pan the view' } },
   { gesture: 'Middle-click + drag', sections: { view: 'Pan the view' } },
-]
+];
 
 export const keyHint = (action: ShortcutAction) =>
-  SHORTCUTS[action].display ?? formatForDisplay(SHORTCUTS[action].hotkey)
+  SHORTCUTS[action].display ?? formatForDisplay(SHORTCUTS[action].hotkey);
 
 export interface HelpRow {
-  keys: string[]
-  label: string
+  keys: string[];
+  label: string;
 }
 
 /** Same label in the same section merges into one row: Escape and right-click
  *  both leave a tool. */
 export const helpRows = (section: HelpSection): HelpRow[] => {
-  const rows: HelpRow[] = []
-  const byLabel = new Map<string, HelpRow>()
+  const rows: HelpRow[] = [];
+  const byLabel = new Map<string, HelpRow>();
   const add = (key: string, label: string) => {
-    const row = byLabel.get(label)
-    if (row) return void row.keys.push(key)
-    const fresh = { keys: [key], label }
-    byLabel.set(label, fresh)
-    rows.push(fresh)
-  }
-  const placed = new Set<string>()
+    const row = byLabel.get(label);
+    if (row) return void row.keys.push(key);
+    const fresh = { keys: [key], label };
+    byLabel.set(label, fresh);
+    rows.push(fresh);
+  };
+  const placed = new Set<string>();
   for (const action of SHORTCUT_ACTIONS) {
-    const label = SHORTCUTS[action].sections[section]
-    if (!label) continue
-    add(keyHint(action), label)
+    const label = SHORTCUTS[action].sections[section];
+    if (!label) continue;
+    add(keyHint(action), label);
     for (const g of GESTURES) {
-      const anchored = g.sections[section]
+      const anchored = g.sections[section];
       if (anchored && g.after === action) {
-        add(g.gesture, anchored)
-        placed.add(g.gesture)
+        add(g.gesture, anchored);
+        placed.add(g.gesture);
       }
     }
   }
   for (const { gesture, sections } of GESTURES) {
-    const label = sections[section]
-    if (label && !placed.has(gesture)) add(gesture, label)
+    const label = sections[section];
+    if (label && !placed.has(gesture)) add(gesture, label);
   }
-  return rows
-}
+  return rows;
+};
 
 // Never displayed: a button shows one key, the primary above.
 const ALIASES: Array<[ShortcutAction, RegisterableHotkey]> = [
@@ -175,20 +175,20 @@ const ALIASES: Array<[ShortcutAction, RegisterableHotkey]> = [
   ['zoomIn', { key: '=', mod: true, shift: true }],
   // No Mod+Delete for reset: Delete is deleteSelection's primary key, one slip
   // from erasing the plan.
-]
+];
 
-type SimpleAction = Exclude<ShortcutAction, `tool:${Tool}`>
+type SimpleAction = Exclude<ShortcutAction, `tool:${Tool}`>;
 
 /** Derived from the registry, not restated: no action ships without a callback.
  *  Tools are the one exclusion — they differ by argument, not by callback. */
 export type AppHotkeyActions = Record<SimpleAction, () => void> & {
-  selectTool: (tool: Tool) => void
-}
+  selectTool: (tool: Tool) => void;
+};
 
 const callbackFor = (actions: AppHotkeyActions, action: ShortcutAction) =>
   action.startsWith('tool:')
     ? () => actions.selectTool(action.slice('tool:'.length) as Tool)
-    : actions[action as Exclude<ShortcutAction, `tool:${Tool}`>]
+    : actions[action as Exclude<ShortcutAction, `tool:${Tool}`>];
 
 export function useAppHotkeys(
   actions: AppHotkeyActions,
@@ -197,21 +197,21 @@ export function useAppHotkeys(
   // Muting is what hands Escape back: the library stops propagation on a match, so
   // a live `cancel` would keep the Dialog open. Before `ready`, restore is pending.
   const enabled = (action: ShortcutAction) =>
-    ready && (!helpOpen || action === 'help') && !(action === 'reset' && resetDisabled)
+    ready && (!helpOpen || action === 'help') && !(action === 'reset' && resetDisabled);
   const rows = SHORTCUT_ACTIONS.map((action) => ({
     hotkey: SHORTCUTS[action].hotkey,
     callback: callbackFor(actions, action),
     options: { enabled: enabled(action), meta: { name: SHORTCUTS[action].name } },
-  }))
+  }));
   const aliases = ALIASES.map(([action, hotkey]) => ({
     hotkey,
     callback: callbackFor(actions, action),
     options: { enabled: enabled(action), meta: { name: SHORTCUTS[action].name } },
-  }))
+  }));
   useHotkeys(
     [...rows, ...aliases],
     // Overrides the default, which lets Mod combos and Escape through in a field:
     // in the room-name field Mod+Z is the browser's undo and Escape is the field's.
     { ignoreInputs: true },
-  )
+  );
 }
