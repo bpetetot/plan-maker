@@ -19,8 +19,8 @@ export default function ShortcutsDialog() {
           </button>
         </div>
         <div className="help-sections">
-          {HELP_SECTIONS.map(({ id, title }) => (
-            <section key={id} className="help-section">
+          {HELP_SECTIONS.map(({ id, title, startsColumn }) => (
+            <section key={id} className={startsColumn ? 'help-section starts-column' : 'help-section'}>
               <h3 className="panel-section-label">{title}</h3>
               <div className="help-list">
                 {helpRows(id).map(({ keys, label }) => (

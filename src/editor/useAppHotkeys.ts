@@ -43,11 +43,16 @@ export type ShortcutAction =
 
 export type HelpSection = 'tools' | 'editor' | 'view' | 'file'
 
-export const HELP_SECTIONS: { id: HelpSection; title: string }[] = [
-  { id: 'tools', title: 'Tools' },
-  { id: 'editor', title: 'Editor' },
-  { id: 'view', title: 'View' },
+// Reading order, and the column split with it: File and View — what you do to
+// the document and to the sheet — then Tools and Editor, what you do to the
+// plan. `startsColumn` is where the second column begins; leaving the split to
+// the browser's height balancing would put it wherever the row counts happen to
+// land, which is not a decision worth re-taking every time a shortcut is added.
+export const HELP_SECTIONS: { id: HelpSection; title: string; startsColumn?: boolean }[] = [
   { id: 'file', title: 'File' },
+  { id: 'view', title: 'View' },
+  { id: 'tools', title: 'Tools', startsColumn: true },
+  { id: 'editor', title: 'Editor' },
 ]
 
 // Where an entry is listed, and what it is said to do *there* — the value is
@@ -119,12 +124,15 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
     sections: { view: 'Zoom in' },
     display: formatForDisplay({ key: '+', mod: true }),
   },
+  // Declaration order is the help's order, and the zoom entries are written to
+  // be read as one run: in, out, the scroll that does both (anchored to
+  // zoomOut), then the two absolute framings.
   zoomOut: { hotkey: 'Mod+-', name: 'Zoom out', sections: { view: 'Zoom out' } },
+  zoomActual: { hotkey: 'Mod+0', name: 'Zoom to 100%', sections: { view: 'Zoom to 100%' } },
   // Not Mod+0: that key means "100%" everywhere it exists, and fitting a plan
   // to the screen lands on whatever ratio the plan happens to need. Shift+1 is
   // what canvas editors use for fit, and it costs the browser nothing.
   fit: { hotkey: 'Shift+1', name: 'Fit', sections: { view: 'Fit the plan to the screen' } },
-  zoomActual: { hotkey: 'Mod+0', name: 'Zoom to 100%', sections: { view: 'Zoom to 100%' } },
   toggleTheme: {
     hotkey: 'Alt+Shift+D',
     name: 'Toggle theme',
@@ -137,20 +145,24 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
     name: 'Export image',
     sections: { file: 'Export the plan as an image' },
   },
-  // One modifier away from Backspace, which deletes the selection — a slipped
-  // thumb turns "delete this wall" into "erase everything". The confirmation is
-  // load-bearing here, not a formality, and it names what is lost.
-  reset: { hotkey: 'Mod+Backspace', name: 'Reset', sections: { file: 'Erase the plan' } },
   // `shift: true` is not a taste: the match is strict on every modifier flag,
   // and there is no layout on which `?` arrives without Shift — declared bare
   // it would never fire once. It is the object form because '?' is outside the
   // library's key union.
+  //
+  // Listed under File, beside the other things reached from the burger menu
+  // rather than from the sheet — which is also where the menu puts it.
   help: {
     hotkey: { key: '?', shift: true },
     name: 'Help',
-    sections: { editor: 'Help' },
+    sections: { file: 'Help' },
     display: '?',
   },
+  // One modifier away from Backspace, which deletes the selection — a slipped
+  // thumb turns "delete this wall" into "erase everything". The confirmation is
+  // load-bearing here, not a formality, and it names what is lost. Last in its
+  // section, as it is last in the menu.
+  reset: { hotkey: 'Mod+Backspace', name: 'Reset', sections: { file: 'Erase the plan' } },
 }
 
 export const SHORTCUT_ACTIONS = Object.keys(SHORTCUTS) as ShortcutAction[]
@@ -159,13 +171,18 @@ export const SHORTCUT_ACTIONS = Object.keys(SHORTCUTS) as ShortcutAction[]
 // gestures, and the modifiers ADR 0009 keeps out of the registry. They are
 // listed beside the shortcuts because a reader is looking for the way to do
 // something, not for a key — the key/gesture split is ours, not theirs.
-const GESTURES: { gesture: string; sections: HelpLabels }[] = [
+// `after` places a gesture with the keys it belongs among, instead of down in
+// the gesture tail. Scroll zooms, and reading it three rows below the two zoom
+// keys makes it look like a different subject. Left unset — the usual case —
+// the gesture keeps the tail, where a gesture that answers nothing above it
+// belongs.
+const GESTURES: { gesture: string; sections: HelpLabels; after?: ShortcutAction }[] = [
   { gesture: 'Right-click', sections: { tools: 'Back to the Select tool', editor: 'End the wall chain' } },
   { gesture: 'Drag a box', sections: { editor: 'Select everything it covers' } },
   { gesture: 'Shift + click', sections: { editor: 'Add to the selection' } },
   { gesture: 'Double-click', sections: { editor: 'Name a room, or end the wall chain' } },
   { gesture: 'Alt', sections: { editor: 'Invert snap while held' } },
-  { gesture: 'Scroll', sections: { view: 'Zoom in and out' } },
+  { gesture: 'Scroll', sections: { view: 'Zoom in and out' }, after: 'zoomOut' },
   { gesture: 'Space + drag', sections: { view: 'Pan the view' } },
   { gesture: 'Middle-click + drag', sections: { view: 'Pan the view' } },
 ]
@@ -200,13 +217,24 @@ export const helpRows = (section: HelpSection): HelpRow[] => {
     byLabel.set(label, fresh)
     rows.push(fresh)
   }
+  const placed = new Set<string>()
   for (const action of SHORTCUT_ACTIONS) {
     const label = SHORTCUTS[action].sections[section]
-    if (label) add(keyHint(action), label)
+    if (!label) continue
+    add(keyHint(action), label)
+    for (const g of GESTURES) {
+      const anchored = g.sections[section]
+      if (anchored && g.after === action) {
+        add(g.gesture, anchored)
+        placed.add(g.gesture)
+      }
+    }
   }
+  // Whatever was not anchored — or whose anchor this section does not list, so
+  // there was nothing to sit beside.
   for (const { gesture, sections } of GESTURES) {
     const label = sections[section]
-    if (label) add(gesture, label)
+    if (label && !placed.has(gesture)) add(gesture, label)
   }
   return rows
 }

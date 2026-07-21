@@ -338,12 +338,9 @@ svg text.room-area {
 }
 /* Multi-column rather than a two-track grid: the sections have very different
    heights, and a grid would align their tops row by row, leaving a hole beside
-   the short one. Columns let the next section start where the last ended.
-   `320px 2` is a width *and* a cap — two columns when there is room for two,
-   one when there is not, so the narrow case needs no media query. */
+   the short one. Columns let the next section start where the last ended. */
 .help-sections {
-  columns: 320px 2;
-  column-gap: 18px;
+  columns: 1;
 }
 .help-section {
   display: flex;
@@ -353,6 +350,19 @@ svg text.room-area {
      them untitled; the margin replaces the gap flex used to give */
   break-inside: avoid;
   margin-bottom: 18px;
+}
+/* Two columns only once the panel is wide enough to hold them, and the forced
+   break lives in here with them: outside a two-column context there is no
+   column to break to, and browsers disagree on what that means. The one column
+   below this width keeps the same reading order. */
+@media (min-width: 760px) {
+  .help-sections {
+    columns: 2;
+    column-gap: 18px;
+  }
+  .help-section.starts-column {
+    break-before: column;
+  }
 }
 /* One bordered card per section; the rows are separated by a rule rather than
    by a gap, so the section reads as a single list. The radius lives on the
