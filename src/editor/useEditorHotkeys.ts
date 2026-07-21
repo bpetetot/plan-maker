@@ -108,6 +108,7 @@ const GESTURES: { gesture: string; sections: HelpLabels }[] = [
   { gesture: 'Alt', sections: { editor: 'Invert snap while held' } },
   { gesture: 'Scroll', sections: { view: 'Zoom in and out' } },
   { gesture: 'Space + drag', sections: { view: 'Pan the view' } },
+  { gesture: 'Middle-click + drag', sections: { view: 'Pan the view' } },
 ]
 
 /** The key to print next to an action, in this platform's notation. */
