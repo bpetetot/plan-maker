@@ -88,8 +88,8 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
   // library's key union.
   help: {
     hotkey: { key: '?', shift: true },
-    name: 'Keyboard shortcuts',
-    sections: { editor: 'Keyboard shortcuts' },
+    name: 'Help',
+    sections: { editor: 'Help' },
     display: '?',
   },
 }

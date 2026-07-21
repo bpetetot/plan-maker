@@ -13,7 +13,7 @@ export default function ShortcutsDialog() {
       <div className="help-backdrop" aria-hidden />
       <DialogPanel className="help-panel">
         <div className="help-header">
-          <DialogTitle className="help-title">Keyboard shortcuts</DialogTitle>
+          <DialogTitle className="help-title">Help</DialogTitle>
           <button className="floating-btn icon" title="Close" aria-label="Close" onClick={closeHelp}>
             <X size={16} aria-hidden />
           </button>

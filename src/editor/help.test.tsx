@@ -62,7 +62,7 @@ describe('opening the help dialog', () => {
       </>,
     )
     await userEvent.click(page.getByTitle('Menu'))
-    await userEvent.click(page.getByText('Keyboard shortcuts', { exact: true }))
+    await userEvent.click(page.getByText('Help', { exact: true }))
     await expect.element(dialog()).toBeInTheDocument()
     await unmount()
   })
