@@ -363,22 +363,43 @@ verte, le tout commité.
   405 tests verts, **~3,9 s** (~4,9 s après `09`) ; typecheck, lint et format
   propres ; rien n'est commité.
 
+- [11 — Fermeture : supprimer le shim, jsdom, et vérifier la CI](issues/11-fermeture.md)
+  — **La destination est atteinte à un fait près, et ce fait n'est pas une
+  inconnue technique : c'est un identifiant manquant.** Tout est supprimé
+  (`testHelpers.ts`, `STILL_JSDOM`, les trois docblocks, jsdom et les deux
+  `@testing-library` de `package.json`), les deux renommages `.ts` → `.tsx`
+  sont verts sans une ligne de plus, et **trois commits sont posés**. Suite
+  finale : **36 fichiers, 405 tests, ~3,96 s** — et surtout **`environment
+  1ms`**, la preuve chiffrée qu'aucun jsdom n'est plus monté (9,4 s au départ).
+  Les quatre portes passent en local, mais **la CI n'a jamais tourné** : le
+  remote est en SSH que le proxy du sandbox n'authentifie pas, l'HTTPS rend
+  `could not read Username` — **aucun token GitHub en secret du sandbox**
+  (`sbx secret set $(hostname) github -t "$(gh auth token)"` côté hôte). Et
+  le workflow ne se déclenche que sur `pull_request` ou push vers
+  `main`/`production` : **pousser la branche seule ne lancerait rien**, il
+  faut une PR. Deux découvertes, toutes deux en marge : **la CI était déjà
+  rouge avant cette carte** — le `render.tsx` de `HEAD` n'est pas conforme à
+  `oxfmt` 0.59 (vérifié isolément, version identique avant/après), correctif
+  ramassé par un lot et **sorti dans son propre commit** pour ne pas faire
+  passer un bug CI préexistant pour un effet de bord des tests ; et **`jsdom`
+  survit dans le lockfile en peer optionnel de `vitest` lui-même**, où le
+  régénérer à zéro ne l'enlève pas et retire au passage des entrées
+  multi-plateformes (`@emnapi/*`, `@napi-rs`) — 2122 lignes de diff contre 416
+  pour le `npm uninstall` chirurgical, qui est celui retenu. **Spike
+  supprimé**, et pas parce qu'il fait doublon : vivant dans `.scratch/`, hors
+  de tout `include`, **aucun runner ne le lançait** — en faire un vrai canari
+  demanderait de le promouvoir dans `src/`, soit de la couverture nouvelle,
+  hors périmètre. Ordre des commits contraint : `useView` **après** la
+  migration, le retrait du repli `window.resize` cassant `resizeView.test`
+  tant que ce fichier pilote encore par événement window.
+
 ## Not yet specified
 
-**Le brouillard est vide.** `10` a refermé le dernier patch — le confort en
-watch est bon (rerun à 325 ms contre 1,08 s à froid) et ne devient pas un
-ticket. Il ne reste que `11`, dont le contenu est écrit depuis `05` : la
-destination est à une seule session de distance.
-
-**Legs des lots à `11`**, tous vérifiés sur cinq fichiers chacun : tout
-dispatch manuel passe par un helper de `testKit.ts` et doit être **attendu**
-(`await`) — c'est ce qui remplace l'`act()` que `fireEvent` fournissait en
-douce ; `unmount()` / `cleanup()` sont **asynchrones** (un seul oubli casse
-tout le fichier, loin de sa cause) ; `page.getByText` **matche des
-sous-chaînes**. S'y ajoute le legs de `10` : le **viewport est un état
-partagé du navigateur**, un fichier qui le change doit le restaurer.
-`STILL_JSDOM` est **vide** — `11` n'a plus qu'à supprimer la const et ses deux
-références.
+**Le brouillard est vide, et la carte est close à une vérification près.**
+Il ne reste aucune décision : le seul reliquat est **la CI, à voir verte** —
+pas un ticket, une action bloquée sur un secret sandbox à poser côté hôte,
+puis une PR à ouvrir (le workflow ignore les pushes de branche). Mesurer à
+cette occasion le job à froid et à chaud, le cache Playwright faisant ~337 Mo.
 
 ## Out of scope
 
