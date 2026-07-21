@@ -112,15 +112,9 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     // paints the new size and its viewBox in the same frame; an async commit
     // paints one frame with the old viewBox — "meet" recenters it, which reads
     // as jitter while the window edge is dragged.
-    const syncMeasure = () => flushSync(measure)
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(syncMeasure)
-      ro.observe(svg)
-      return () => ro.disconnect()
-    }
-    // jsdom has no ResizeObserver; tests drive resizes through window events
-    window.addEventListener('resize', syncMeasure)
-    return () => window.removeEventListener('resize', syncMeasure)
+    const ro = new ResizeObserver(() => flushSync(measure))
+    ro.observe(svg)
+    return () => ro.disconnect()
     // svgRef is stable; the ref is filled by the time effects run
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
