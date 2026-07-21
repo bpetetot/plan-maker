@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import AppMenu from './AppMenu'
 import Editor from './editor/Editor'
+import ShortcutsDialog from './editor/ShortcutsDialog'
 import { loadMeasuresVisible } from './editor/measurePref'
 import ReloadPrompt from './pwa/ReloadPrompt'
 import { emptyPlan, isPlanEmpty } from './model/types'
@@ -85,6 +86,7 @@ export default function App() {
         onReset={resetPlan}
         resetDisabled={planIsEmpty}
       />
+      <ShortcutsDialog />
       {readOnly && (
         <div className="banner">The plan is already open in another tab — changes here are not saved.</div>
       )}

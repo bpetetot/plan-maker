@@ -1,6 +1,7 @@
 // Floating burger menu (top-left) with the app-level file actions.
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
-import { Eraser, FolderOpen, ImageDown, Menu, Monitor, Moon, Save, Sun } from 'lucide-react'
+import { Eraser, FolderOpen, ImageDown, Keyboard, Menu, Monitor, Moon, Save, Sun } from 'lucide-react'
+import { openHelp } from './editor/helpStore'
 import type { ThemePreference } from './theme/theme'
 import { useThemePreference } from './theme/useThemePreference'
 
@@ -47,6 +48,10 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
               </button>
               <button className="menu-item" onClick={run(onExportImage)}>
                 <ImageDown size={16} aria-hidden /> Export image…
+              </button>
+              <div className="menu-sep" />
+              <button className="menu-item" onClick={run(openHelp)}>
+                <Keyboard size={16} aria-hidden /> Keyboard shortcuts
               </button>
               <div className="menu-sep" />
               {/* picking a theme keeps the panel open — it's a setting, not an action */}

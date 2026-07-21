@@ -75,6 +75,7 @@ import {
 } from './render'
 import type { Tool, ToolDefaults } from './tools'
 import { initialToolDefaults } from './tools'
+import { toggleHelp, useHelpDialog } from './helpStore'
 import { keyHint, useEditorHotkeys } from './useEditorHotkeys'
 import { useSpaceHeld, useView } from './useView'
 
@@ -226,18 +227,24 @@ export default function Editor() {
     saveSnapEnabled(!snapEnabled)
   }, [snapEnabled])
 
-  useEditorHotkeys({
-    undo,
-    redo,
-    cancel: () => {
-      if (chain) setChain(null)
-      else if (sel.length > 0) setSel([])
-      else switchTool('select')
+  const helpOpen = useHelpDialog((s) => s.open)
+
+  useEditorHotkeys(
+    {
+      undo,
+      redo,
+      cancel: () => {
+        if (chain) setChain(null)
+        else if (sel.length > 0) setSel([])
+        else switchTool('select')
+      },
+      deleteSelection: () => deleteSelection(sel),
+      selectTool: switchTool,
+      toggleSnap,
+      help: toggleHelp,
     },
-    deleteSelection: () => deleteSelection(sel),
-    selectTool: switchTool,
-    toggleSnap,
-  })
+    { helpOpen },
+  )
 
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup()
