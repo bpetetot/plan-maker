@@ -75,7 +75,7 @@ import {
 } from './render'
 import type { Tool, ToolDefaults } from './tools'
 import { initialToolDefaults } from './tools'
-import { useEditorHotkeys } from './useEditorHotkeys'
+import { keyHint, useEditorHotkeys } from './useEditorHotkeys'
 import { useSpaceHeld, useView } from './useView'
 
 type Drag =
@@ -800,22 +800,22 @@ export default function Editor() {
       >
         {(
           [
-            ['select', 'Select', '1', MousePointer2],
-            ['wall', 'Wall', '2', BrickWall],
-            ['door', 'Door', '3', DoorClosed],
-            ['window', 'Window', '4', Grid2x2],
+            ['select', 'Select', MousePointer2],
+            ['wall', 'Wall', BrickWall],
+            ['door', 'Door', DoorClosed],
+            ['window', 'Window', Grid2x2],
           ] as const
-        ).map(([m, label, key, Icon]) => (
+        ).map(([m, label, Icon]) => (
           <button
             key={m}
             className={tool === m ? 'floating-btn icon active' : 'floating-btn icon'}
-            title={`${label} (${key})`}
+            title={`${label} (${keyHint(`tool:${m}`)})`}
             aria-label={label}
             aria-pressed={tool === m}
             onClick={() => switchTool(m)}
           >
             <Icon size={16} aria-hidden />
-            <span className="key-hint">{key}</span>
+            <span className="key-hint">{keyHint(`tool:${m}`)}</span>
           </button>
         ))}
       </div>
@@ -827,8 +827,8 @@ export default function Editor() {
       >
         {tool === 'wall'
           ? chain
-            ? 'Click to add a wall · click the start point to close the room · Esc / double-click to stop'
-            : 'Click to start a wall chain · S toggles snap · Alt inverts it'
+            ? `Click to add a wall · click the start point to close the room · ${keyHint('cancel')} / double-click to stop`
+            : `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
           : tool === 'door' || tool === 'window'
             ? 'Hover a wall, click to place'
             : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
@@ -861,7 +861,7 @@ export default function Editor() {
               a click always toggles snapping itself, never the inversion */}
           <button
             className={free ? 'floating-btn icon' : 'floating-btn icon active'}
-            title={snapEnabled ? 'Disable snap (S)' : 'Enable snap (S)'}
+            title={`${snapEnabled ? 'Disable' : 'Enable'} snap (${keyHint('toggleSnap')})`}
             aria-label="Snap"
             aria-pressed={!free}
             onClick={toggleSnap}
@@ -896,7 +896,7 @@ export default function Editor() {
         <div className="floating">
           <button
             className="floating-btn icon"
-            title="Undo (Ctrl+Z)"
+            title={`Undo (${keyHint('undo')})`}
             aria-label="Undo"
             disabled={!canUndo}
             onClick={() => undo()}
@@ -905,7 +905,7 @@ export default function Editor() {
           </button>
           <button
             className="floating-btn icon"
-            title="Redo (Ctrl+Shift+Z)"
+            title={`Redo (${keyHint('redo')})`}
             aria-label="Redo"
             disabled={!canRedo}
             onClick={() => redo()}

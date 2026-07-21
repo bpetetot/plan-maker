@@ -94,6 +94,34 @@ describe('tool shortcuts', () => {
   })
 })
 
+// The point of the registry is that the key a button advertises and the key
+// that works are the same fact. Pressing what is on screen is the only
+// assertion that catches them drifting apart — comparing the label to the
+// registry would just be the registry compared to itself.
+describe('the advertised key is the working key', () => {
+  it('activates each tool by pressing the hint printed on its button', async () => {
+    const { container, unmount } = await setup()
+    for (const label of ['Wall', 'Door', 'Window', 'Select']) {
+      const button = container.querySelector(`button[aria-label="${label}"]`)!
+      const hint = button.querySelector('.key-hint')!.textContent!
+      await key(hint)
+      expect(button.getAttribute('aria-pressed')).toBe('true')
+    }
+    await unmount()
+  })
+
+  it('toggles snap by pressing the key named in the toggle title', async () => {
+    const { container, unmount } = await setup()
+    const snap = container.querySelector('button[aria-label="Snap"]')!
+    // title reads "Disable snap (S)" — the parenthesised key is the contract
+    const hint = snap.getAttribute('title')!.match(/\(([^)]+)\)/)![1]
+    expect(snap.getAttribute('aria-pressed')).toBe('true')
+    await key(hint)
+    expect(snap.getAttribute('aria-pressed')).toBe('false')
+    await unmount()
+  })
+})
+
 describe('the typing guard', () => {
   it('leaves the plan alone when Mod+Z is pressed while naming a room', async () => {
     const { svg, unmount } = await setup()

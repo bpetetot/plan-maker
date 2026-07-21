@@ -82,6 +82,14 @@ Three things stayed behind, and none is an oversight:
   test ending mid-hold leaks into the next one, so the browser setup dispatches
   a `blur` after each test — the tracker's own release path rather than a reach
   into its internals.
+- **The UI reads the registry instead of restating it.** The registry is keyed
+  by *action* (`tool:wall`, `toggleSnap`, `undo`), and `keyHint(action)` returns
+  the key in the visitor's own notation — so a Mac reader sees `⌘ Z` where a
+  Linux reader sees `Ctrl+Z`, which the hand-written `title="Undo (Ctrl+Z)"`
+  could never do. Where an action has a second binding for muscle memory
+  (`Mod+Y`, `Backspace`) only the primary is ever displayed: a button shows one
+  key. The prose hints that name Space, Shift or Alt stay written out — those
+  are deliberately not registry entries, so there is nothing to look up.
 - **Strict modifier matching narrows more than the Ctrl/Cmd exclusion it was
   chosen for.** All four flags must match exactly, so `Shift+S` no longer
   toggles Snap (the old code lowercased the key and only excluded Ctrl/Cmd/Alt),
