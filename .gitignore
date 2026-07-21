@@ -5,3 +5,6 @@ dev-dist/
 # Vitest browser mode writes these next to the failing test, on failure only
 __screenshots__/
 .vitest-attachments/
+
+# Local issue tracker (docs/agents/issue-tracker.md) — never committed
+.scratch/

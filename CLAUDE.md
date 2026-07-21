@@ -1,6 +1,6 @@
 # Plan Maker
 
-A PWA to draw simple 2D floor plans, per `.scratch/plan-maker/spec.md`. Stack:
+A PWA to draw simple 2D floor plans, per `CONTEXT.md`. Stack:
 React + TypeScript + Vite, plain SVG rendering, zustand + zundo (undo/redo),
 idb-keyval (autosave), vite-plugin-pwa.
 

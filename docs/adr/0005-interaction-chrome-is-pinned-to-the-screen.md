@@ -57,5 +57,4 @@ This settles two questions that had been argued case by case:
   near-abutting openings can have their chips overlap. Accepted, and preferred
   to any of the alternatives above.
 - The Grab zone entry in `CONTEXT.md` already stated this rule for one case; it
-  is now the general one. Full rationale for the placement dimension case in
-  `.scratch/placement-dims-ux/issues/06-pixel-floor.md`.
+  is now the general one.

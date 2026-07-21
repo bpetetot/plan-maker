@@ -2,6 +2,8 @@
 
 Issues and specs (you may know a spec as a PRD) for this repo live as markdown files in `.scratch/`.
 
+`.scratch/` is gitignored — never commit it. The tracker is local to this worktree and machine: a fresh clone starts empty, and maps do not travel between branches. Durable knowledge belongs in `CONTEXT.md` and `docs/adr/`, not here.
+
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`
