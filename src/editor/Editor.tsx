@@ -95,20 +95,26 @@ type Drag =
       moved?: boolean
     }
   // dragging an opening along its wall; below the click threshold it is a
-  // plain click — the placement dimensions only show once it becomes a move
-  | { kind: 'opening'; id: string; start: Vec; moved?: boolean }
+  // plain click — the placement dimensions only show once it becomes a move.
+  // `grabDelta` keeps the grab point under the cursor for the whole gesture
+  // (CONTEXT.md: Grab zone): center offset minus the cursor's projection at
+  // pointer-down, applied to every subsequent projection
+  | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // dragging a room's text block. `room` is the room containing the block at
   // drag start: the block can never leave it (the drag clamps to its region).
   // null is defensive — an orphan label cannot arise from plan operations
-  // (CONTEXT.md: Room label) — and lets such a label move freely.
-  | { kind: 'label'; id: string; room: Room | null }
+  // (CONTEXT.md: Room label) — and lets such a label move freely. Same
+  // grab-point rule: rendered block position minus the cursor.
+  | { kind: 'label'; id: string; room: Room | null; grabDelta: Vec }
   // dragging the text block of a room that has no label yet: the nameless
   // label is only created once the pointer crosses the click threshold, so a
-  // plain click never touches the plan
-  | { kind: 'newLabel'; start: Vec; room: Room; id?: string }
+  // plain click never touches the plan. Same grab-point rule, from the
+  // block's rendered position (the room anchor)
+  | { kind: 'newLabel'; start: Vec; room: Room; grabDelta: Vec; id?: string }
   // dragging a wall's dimension label; a movement below the click threshold
-  // resolves to "select the wall" on pointer up
-  | { kind: 'dim'; id: string; start: Vec; moved?: boolean }
+  // resolves to "select the wall" on pointer up. Same grab-point rule: the
+  // text's position along the axis (cm) minus the cursor's projection
+  | { kind: 'dim'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // the live rect lives on the drag ref (b is mutated on move) so pointer-up
   // never reads a stale React state; the marquee state only drives rendering
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
@@ -399,14 +405,17 @@ export default function Editor() {
             d.moved = true
             setMovingOpeningId(d.id)
           }
-          const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y)
-          setPlan((p) => moveOpening(p, d.id, t))
+          if (d.moved) {
+            const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y)
+            setPlan((p) => moveOpening(p, d.id, t + d.grabDelta))
+          }
         }
       } else if (d.kind === 'label') {
-        const t = d.room ? clampToRoom(c, d.room) : c
+        const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }
+        const t = d.room ? clampToRoom(target, d.room) : target
         setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y))
       } else if (d.kind === 'newLabel') {
-        const t = clampToRoom(c, d.room)
+        const t = clampToRoom({ x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }, d.room)
         if (d.id) {
           setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y))
         } else if (Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
@@ -428,7 +437,7 @@ export default function Editor() {
               setDimPlacement(
                 p,
                 d.id,
-                length < 1 ? 0.5 : t / length,
+                length < 1 ? 0.5 : (t + d.grabDelta) / length,
                 side,
                 dimTravelBounds(plan, wall, side),
               ),
@@ -564,9 +573,23 @@ export default function Editor() {
   // creates the label.
   const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
     if (tool !== 'select' || e.button !== 0 || space) return
-    if (label) startPlanDrag({ kind: 'label', id: label.id, room: block.room ?? null })
-    else if (block.room)
-      startPlanDrag({ kind: 'newLabel', start: toPlan(e.clientX, e.clientY), room: block.room })
+    if (label) {
+      const c = toPlan(e.clientX, e.clientY)
+      startPlanDrag({
+        kind: 'label',
+        id: label.id,
+        room: block.room ?? null,
+        grabDelta: { x: block.x - c.x, y: block.y - c.y },
+      })
+    } else if (block.room) {
+      const c = toPlan(e.clientX, e.clientY)
+      startPlanDrag({
+        kind: 'newLabel',
+        start: c,
+        room: block.room,
+        grabDelta: { x: block.x - c.x, y: block.y - c.y },
+      })
+    }
   }
 
   const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
@@ -706,6 +729,7 @@ export default function Editor() {
                   kind: 'opening',
                   id: opening.id,
                   start: c,
+                  grabDelta: opening.offset - projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
                 }))
               }
             />
@@ -726,7 +750,14 @@ export default function Editor() {
                 tool === 'select'
                   ? (e) => {
                       if (e.button !== 0 || space) return
-                      startPlanDrag({ kind: 'dim', id: wall.id, start: toPlan(e.clientX, e.clientY) })
+                      const c = toPlan(e.clientX, e.clientY)
+                      const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall)
+                      startPlanDrag({
+                        kind: 'dim',
+                        id: wall.id,
+                        start: c,
+                        grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t,
+                      })
                     }
                   : undefined
               }
