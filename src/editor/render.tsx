@@ -292,10 +292,12 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
-// On-screen advance width of one 9px measure-font character (JetBrains Mono:
-// 0.6 em) — every width estimate for measure text derives from it, so a font
-// swap is one edit.
-const MEASURE_CHAR_PX = 5.4
+// On-screen advance width of one 8px measure-font character (JetBrains
+// Mono: 0.6 em) — every width estimate for dimension text derives from it, so
+// a font swap is one edit. Placement chips keep the 9px font, hence their own
+// constant.
+const MEASURE_CHAR_PX = 4.8
+const CHIP_CHAR_PX = 5.4
 
 const EXTENT_STROKE = 1
 
@@ -432,7 +434,7 @@ export function DimLabel({
 // The chip's on-screen metrics, in screen pixels: 9px measure text plus 5px
 // of padding on each side.
 const CHIP_HEIGHT = 16
-const chipWidth = (label: string) => label.length * MEASURE_CHAR_PX + 10
+const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10
 
 // Placement dimensions: the pair of temporary measures flanking an opening,
 // shown while it is placed or moved and, past the release, for as long as it

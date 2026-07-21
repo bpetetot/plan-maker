@@ -109,7 +109,7 @@ button:disabled {
    Room label titles; mono digits are tabular by construction */
 svg text.dim {
   font:
-    9px 'JetBrains Mono',
+    8px 'JetBrains Mono',
     ui-monospace,
     monospace;
   fill: var(--dim-text);
