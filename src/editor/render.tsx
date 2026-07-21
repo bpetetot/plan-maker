@@ -35,12 +35,13 @@ export const labelAngle = (dx: number, dy: number) => {
 // independently — the background bleeds through the shared edge as a hairline
 // seam. A half-screen-pixel self-colored stroke overlaps the neighbours just
 // enough to close it, at every zoom.
-const seamStroke = (paint: string) => ({
-  stroke: paint,
-  strokeWidth: 1,
-  vectorEffect: 'non-scaling-stroke',
-  strokeLinejoin: 'round',
-}) as const
+const seamStroke = (paint: string) =>
+  ({
+    stroke: paint,
+    strokeWidth: 1,
+    vectorEffect: 'non-scaling-stroke',
+    strokeLinejoin: 'round',
+  }) as const
 
 export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?: string }) {
   const outline = wallOutline(plan, wall)
@@ -104,8 +105,7 @@ export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: E
   return (
     <g pointerEvents="none">
       {junctionPatches(plan).map(({ pointId, wallIds, corners }) => {
-        const paint =
-          wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall
+        const paint = wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall
         return (
           <polygon
             key={pointId}
