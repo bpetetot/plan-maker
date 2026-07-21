@@ -94,8 +94,8 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('var(--wall)')
     expect(svg).toContain('--wall: #1e293b')
     expect(svg).toContain('--sheet: #ffffff')
-    // the dimension extent lines paint with --rail — pinned too
-    expect(svg).toContain('--rail: #cbd5e1')
+    // the dimension extent lines and arrowheads paint with --dim-line — pinned too
+    expect(svg).toContain('--dim-line: #93c9c3')
   })
 
   // Measures render in a bundled mono font. The standalone SVG is rasterized

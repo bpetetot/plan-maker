@@ -110,7 +110,7 @@ corners at junction ends, out to the body overhang at free ends. On a closed
 room, the exterior side thus reads the overall (hors-tout) extent — invariant
 once the junctions exist — and the interior side the tape-measurable room
 span; a value may refine when a new junction forms, made legible by the
-broken dimension line and perpendicular ticks marking the measured extent.
+broken dimension line and the arrowheads marking the measured extent.
 The value is computed from the plan, never stored. Its placement — where along
 the wall it sits and on which side — belongs to the plan, like any edit;
 dragging it is purely positional, and crossing sides switches between the

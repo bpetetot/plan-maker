@@ -299,18 +299,20 @@ const MEASURE_CHAR_PX = 5.4
 
 const EXTENT_STROKE = 1
 
-// A tick sits at the miter corner bounding the measured extent, running
-// parallel to the wall that bounds it. Its stroke being centred on the corner,
-// half of it would bite into that wall, so the drawn extent stops half a
-// stroke short at each end: the tick then sits flush against the wall face —
-// no bite, no gap. Half a stroke and not a chosen distance, so it stays flush
-// whatever EXTENT_STROKE becomes, and in plan units like the stroke itself, so
-// it holds at every zoom. The value stays exact — only the line recedes.
-const EXTENT_INSET = EXTENT_STROKE / 2
+// ISO arrowheads bound the measured extent: a filled triangle at each end,
+// its tip exactly on the extent boundary — the value stays exact whatever
+// the head's size. All in plan units, like the extent line itself.
+const ARROW_LEN = 7
+const ARROW_HALF_WIDTH = 2.2
+// how far the leader lines run past an outside head
+const ARROW_LEADER = 4
 
-// The broken dimension line DimLabel draws: a piece on
-// each side of the text gap (only where it has room) and a perpendicular tick
-// at each end of the measured extent, held back by EXTENT_INSET.
+// The broken dimension line DimLabel draws: a piece on each side of the text
+// gap (only where it has room) and an ISO arrowhead at each end of the
+// measured extent. When the span has room for the heads and the text, the
+// heads sit inside it pointing outward; on a shorter span they move outside,
+// pointing inward at each other, each carried by a short leader line — the
+// ISO convention when space runs out.
 function ExtentLine({
   at,
   ux,
@@ -319,7 +321,7 @@ function ExtentLine({
   to,
   gapFrom,
   gapTo,
-  stroke = 'var(--rail)',
+  stroke = 'var(--dim-line)',
 }: {
   at: (t: number) => { x: number; y: number }
   ux: number
@@ -330,34 +332,38 @@ function ExtentLine({
   gapTo: number
   stroke?: string
 }) {
-  // never eat more than a quarter of the span at each end, so a segment too
-  // short to absorb the inset degrades instead of folding onto itself
-  const inset = Math.min(EXTENT_INSET, (to - from) / 4)
-  const start = from + inset
-  const end = to - inset
-  const p1 = at(start)
-  const p2 = at(end)
-  const g1 = at(Math.max(start, Math.min(gapFrom, end)))
-  const g2 = at(Math.min(end, Math.max(gapTo, start)))
+  const gapWidth = Math.max(0, Math.min(gapTo, to) - Math.max(gapFrom, from))
+  const inside = to - from >= 2 * ARROW_LEN + gapWidth + 8
+  // line pieces stop at the arrow bases when the heads sit inside the extent
+  const start = inside ? from + ARROW_LEN : from
+  const end = inside ? to - ARROW_LEN : to
+  const g1 = Math.max(start, Math.min(gapFrom, end))
+  const g2 = Math.min(end, Math.max(gapTo, start))
+  const seg = (key: string, t1: number, t2: number) => {
+    const p = at(t1)
+    const q = at(t2)
+    return <line key={key} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={stroke} strokeWidth={EXTENT_STROKE} />
+  }
   return (
     <g pointerEvents="none">
-      {gapFrom - start > 2 && (
-        <line x1={p1.x} y1={p1.y} x2={g1.x} y2={g1.y} stroke={stroke} strokeWidth={EXTENT_STROKE} />
-      )}
-      {end - gapTo > 2 && (
-        <line x1={g2.x} y1={g2.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={EXTENT_STROKE} />
-      )}
-      {[p1, p2].map((p, i) => (
-        <line
-          key={i}
-          x1={p.x + uy * 4}
-          y1={p.y - ux * 4}
-          x2={p.x - uy * 4}
-          y2={p.y + ux * 4}
-          stroke={stroke}
-          strokeWidth={EXTENT_STROKE}
-        />
-      ))}
+      {g1 - start > 2 && seg('a', start, g1)}
+      {end - g2 > 2 && seg('b', g2, end)}
+      {!inside && seg('leader-a', from - ARROW_LEN - ARROW_LEADER, from)}
+      {!inside && seg('leader-b', to, to + ARROW_LEN + ARROW_LEADER)}
+      {[
+        { t: from, dir: inside ? 1 : -1 },
+        { t: to, dir: inside ? -1 : 1 },
+      ].map(({ t, dir }, i) => {
+        const tip = at(t)
+        const bx = tip.x + ux * ARROW_LEN * dir
+        const by = tip.y + uy * ARROW_LEN * dir
+        const points = [
+          `${tip.x},${tip.y}`,
+          `${bx + uy * ARROW_HALF_WIDTH},${by - ux * ARROW_HALF_WIDTH}`,
+          `${bx - uy * ARROW_HALF_WIDTH},${by + ux * ARROW_HALF_WIDTH}`,
+        ].join(' ')
+        return <polygon key={i} points={points} fill={stroke} />
+      })}
     </g>
   )
 }
@@ -365,7 +371,7 @@ function ExtentLine({
 // Automatic dimension on every wall, always visible (spec §4). It measures
 // exactly the wall's rendered silhouette on the side it sits on — the mitered
 // Face corners at junction ends, the body overhang at free ends — drawn as a
-// broken dimension line with perpendicular ticks at the measured extent. The
+// broken dimension line with ISO arrowheads at the measured extent. The
 // text sits at wall.dimPlacement when set (ratio along the axis, side across
 // it), else at the midpoint, above the reading line (upper side for
 // horizontal walls, left side for vertical ones). With onPointerDown it
@@ -390,8 +396,8 @@ export function DimLabel({
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
-  // the line breaks around the text's estimated width. The ticks are always
-  // drawn — that legibility is the point when a value refines at a new
+  // the line breaks around the text's estimated width. The arrowheads are
+  // always drawn — that legibility is the point when a value refines at a new
   // junction — even when no line piece has room.
   const gapHalf = (label.length * MEASURE_CHAR_PX) / 2 + 4
   return (

@@ -90,26 +90,26 @@ describe('DimLabel value', () => {
     expect(renderDim(plan, bottom).text.textContent).toBe('3,90 m')
   })
 
-  it('marks the measured extent: a broken line with a tick at each end', () => {
+  it('marks the measured extent: a broken line with an arrowhead at each end', () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { container } = render(
       <svg>
         <DimLabel plan={plan} wall={wall} />
       </svg>,
     )
-    // 2 line pieces around the text + 2 perpendicular ticks
-    const lines = Array.from(container.querySelectorAll('line'))
-    expect(lines).toHaveLength(4)
-    // the silhouette ends sit at x = -5 and 405; the drawn extent stops half a
-    // stroke short of each, so a tick sits flush against a bounding wall face
-    const xs = lines.flatMap((l) => [l.getAttribute('x1'), l.getAttribute('x2')])
-    expect(xs).toContain('-4.5')
-    expect(xs).toContain('404.5')
+    // 2 line pieces around the text + 2 arrowheads inside the extent
+    expect(container.querySelectorAll('line')).toHaveLength(2)
+    const heads = Array.from(container.querySelectorAll('polygon'))
+    expect(heads).toHaveLength(2)
+    // the tips sit exactly on the silhouette ends, x = -5 and 405
+    expect(heads[0].getAttribute('points')!.startsWith('-5,-15 ')).toBe(true)
+    expect(heads[1].getAttribute('points')!.startsWith('405,-15 ')).toBe(true)
   })
 
-  it('keeps the extent ticks even when no line piece has room for them', () => {
-    // a 25 cm wall: the text gap swallows the whole line, the ticks stay —
-    // marking the measured extent is the point when a value refines
+  it('moves the arrowheads outside a short extent, onto leader lines', () => {
+    // a 25 cm wall: the text gap swallows the whole line, so the heads move
+    // outside the extent, pointing inward at each other — marking the
+    // measured extent is the point when a value refines
     const { plan, wall } = planWith(0, 0, 25, 0)
     const { container } = render(
       <svg>
@@ -117,13 +117,15 @@ describe('DimLabel value', () => {
       </svg>,
     )
     expect(container.querySelector('text')!.textContent).toBe('35 cm')
+    // the two leader lines carrying the outside heads
     expect(container.querySelectorAll('line')).toHaveLength(2)
+    expect(container.querySelectorAll('polygon')).toHaveLength(2)
   })
 
-  it('gives up part of the inset rather than fold a short extent onto itself', () => {
+  it('pins the arrow tips to the span ends, however small the span', () => {
     // a 20 cm wall between two 19 cm walls: measured 9.5→10.5 on the inner
-    // side, a 1 cm span. A full inset at each end would collapse both ticks
-    // onto the midpoint, so the inset drops to a quarter of the span.
+    // side, a 1 cm span — the tips stay exactly on its ends, the heads and
+    // leaders simply overhang outside.
     let wallId = ''
     const plan = buildPlan((b) => {
       const l = b.point(0, 0)
@@ -141,13 +143,14 @@ describe('DimLabel value', () => {
         <DimLabel plan={plan} wall={plan.walls[wallId]} />
       </svg>,
     )
-    const xs = Array.from(container.querySelectorAll('line')).map((l) => l.getAttribute('x1'))
-    expect(xs).toEqual(['9.75', '10.25'])
+    const heads = Array.from(container.querySelectorAll('polygon'))
+    expect(heads[0].getAttribute('points')!.startsWith('9.5,15 ')).toBe(true)
+    expect(heads[1].getAttribute('points')!.startsWith('10.5,15 ')).toBe(true)
   })
 })
 
 describe('DimLabel selection', () => {
-  // The whole dimension — text, line pieces, ticks — shares the selected
+  // The whole dimension — text, line pieces, arrowheads — shares the selected
   // wall's accent, so the wall and its measure read as one selected thing.
   it('renders the whole dimension in accent when its wall is selected', () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
@@ -158,11 +161,14 @@ describe('DimLabel selection', () => {
     )
     expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(true)
     const lines = Array.from(container.querySelectorAll('line'))
-    expect(lines).toHaveLength(4)
+    expect(lines).toHaveLength(2)
     for (const line of lines) expect(line.getAttribute('stroke')).toBe(COLORS.wallSelected)
+    for (const head of Array.from(container.querySelectorAll('polygon'))) {
+      expect(head.getAttribute('fill')).toBe(COLORS.wallSelected)
+    }
   })
 
-  it('keeps the plain grays when its wall is not selected', () => {
+  it('keeps the measure ink when its wall is not selected', () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { container } = render(
       <svg>
@@ -171,7 +177,10 @@ describe('DimLabel selection', () => {
     )
     expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(false)
     for (const line of Array.from(container.querySelectorAll('line'))) {
-      expect(line.getAttribute('stroke')).toBe('var(--rail)')
+      expect(line.getAttribute('stroke')).toBe('var(--dim-line)')
+    }
+    for (const head of Array.from(container.querySelectorAll('polygon'))) {
+      expect(head.getAttribute('fill')).toBe('var(--dim-line)')
     }
   })
 })
