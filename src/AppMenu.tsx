@@ -93,11 +93,12 @@ export default function AppMenu({
               </button>
               <div className="menu-sep" />
               {/* picking a theme keeps the panel open — it's a setting, not an action */}
+              {/* no shortcut hint on this row: it would have to sit between the
+                  label and the group, since it describes neither of the three
+                  buttons in particular, and there it crowds a row that already
+                  carries four things. Alt+Shift+D is in the help dialog. */}
               <div className="menu-row">
                 <span>Theme</span>
-                {/* the hint sits before the group, not after: it describes the
-                    row's action, and none of the three buttons in particular */}
-                <Hint action="toggleTheme" />
                 <div className="menu-row-group" role="group" aria-label="Theme">
                   {THEME_OPTIONS.map(({ value, title, Icon }) => (
                     <button
