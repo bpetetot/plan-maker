@@ -1,6 +1,5 @@
-// @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { render } from 'vitest-browser-react'
 import { GridLines, gridLevels, loadGridVisible, saveGridVisible } from './grid'
 
 // Fade ramp (CONTEXT.md: Grid — "minor lines fade out when their cells get
@@ -49,10 +48,8 @@ describe('grid visibility preference', () => {
 })
 
 describe('GridLines', () => {
-  afterEach(cleanup)
-
-  const draw = (view: { x: number; y: number; w: number; h: number }, zoomScale: number) => {
-    const { container } = render(
+  const draw = async (view: { x: number; y: number; w: number; h: number }, zoomScale: number) => {
+    const { container } = await render(
       <svg>
         <GridLines view={view} pxPerCm={zoomScale} />
       </svg>,
@@ -60,21 +57,21 @@ describe('GridLines', () => {
     return container
   }
 
-  it('rules the view every 10 cm, 50 cm lines drawn as major', () => {
+  it('rules the view every 10 cm, 50 cm lines drawn as major', async () => {
     // x: 31 multiples of 10 in [0, 300], 7 of them 50s; y: 21 in [0, 200], 5 of them 50s
-    const c = draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
+    const c = await draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
     expect(c.querySelectorAll('[data-grid="minor"] line')).toHaveLength(24 + 16)
     expect(c.querySelectorAll('[data-grid="major"] line')).toHaveLength(7 + 5)
   })
 
-  it('dashes the minor family, keeps the major solid', () => {
-    const c = draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
+  it('dashes the minor family, keeps the major solid', async () => {
+    const c = await draw({ x: 0, y: 0, w: 300, h: 200 }, 1)
     expect(c.querySelector('[data-grid="minor"]')?.getAttribute('stroke-dasharray')).toBe('3 3')
     expect(c.querySelector('[data-grid="major"]')?.hasAttribute('stroke-dasharray')).toBe(false)
   })
 
-  it('spans each line across the whole view', () => {
-    const c = draw({ x: -50, y: -30, w: 200, h: 100 }, 1)
+  it('spans each line across the whole view', async () => {
+    const c = await draw({ x: -50, y: -30, w: 200, h: 100 }, 1)
     const vertical = [...c.querySelectorAll('[data-grid="major"] line')].find(
       (l) => l.getAttribute('x1') === '100',
     )!
@@ -82,21 +79,21 @@ describe('GridLines', () => {
     expect(vertical.getAttribute('y2')).toBe('70')
   })
 
-  it('applies the fade as group opacity', () => {
+  it('applies the fade as group opacity', async () => {
     // minor cells 6 px → halfway through the fade ramp
-    const c = draw({ x: 0, y: 0, w: 300, h: 200 }, 0.6)
+    const c = await draw({ x: 0, y: 0, w: 300, h: 200 }, 0.6)
     expect(c.querySelector('[data-grid="minor"]')?.getAttribute('opacity')).toBe('0.5')
     expect(c.querySelector('[data-grid="major"]')?.getAttribute('opacity')).toBe('1')
   })
 
-  it('omits the minor family entirely once faded out', () => {
-    const c = draw({ x: 0, y: 0, w: 1000, h: 800 }, 0.3)
+  it('omits the minor family entirely once faded out', async () => {
+    const c = await draw({ x: 0, y: 0, w: 1000, h: 800 }, 0.3)
     expect(c.querySelector('[data-grid="minor"]')).toBeNull()
     expect(c.querySelectorAll('[data-grid="major"] line').length).toBeGreaterThan(0)
   })
 
-  it('renders nothing at extreme zoom-out', () => {
-    const c = draw({ x: 0, y: 0, w: 100000, h: 80000 }, 0.02)
+  it('renders nothing at extreme zoom-out', async () => {
+    const c = await draw({ x: 0, y: 0, w: 100000, h: 80000 }, 0.02)
     expect(c.querySelector('[data-grid]')).toBeNull()
   })
 })

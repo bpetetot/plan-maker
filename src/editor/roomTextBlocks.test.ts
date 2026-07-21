@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 // Room text blocks (CONTEXT.md: Room label) — a default-placement label
 // renders at its room's live centroid; a custom placement renders where it
 // was dragged; default labels of one room stack in a single block, oldest

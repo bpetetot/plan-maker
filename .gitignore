@@ -1,3 +1,7 @@
 node_modules/
 dist/
 dev-dist/
+
+# Vitest browser mode writes these next to the failing test, on failure only
+__screenshots__/
+.vitest-attachments/

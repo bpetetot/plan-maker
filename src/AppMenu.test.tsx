@@ -1,9 +1,10 @@
-// @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import AppMenu from './AppMenu'
 
-// jsdom has no matchMedia; stub it with a fixed system preference.
+// The browser has a real matchMedia, reporting whatever the machine running
+// the suite prefers; pin it so the system option has a known answer.
 const stubMatchMedia = (systemDark: boolean) => {
   window.matchMedia = ((query: string) =>
     ({
@@ -18,7 +19,8 @@ const noop = () => {}
 const renderMenu = () =>
   render(<AppMenu onOpen={noop} onSaveAs={noop} onExportImage={noop} onReset={noop} resetDisabled={false} />)
 
-const openMenu = () => fireEvent.click(screen.getByTitle('Menu'))
+const openMenu = () => userEvent.click(page.getByTitle('Menu'))
+const themeOption = (title: string) => page.getByTitle(title)
 
 beforeEach(() => {
   localStorage.clear()
@@ -26,41 +28,39 @@ beforeEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-afterEach(cleanup)
-
 describe('theme picker', () => {
-  it('offers the three options with system active by default', () => {
-    renderMenu()
-    openMenu()
-    expect(screen.getByTitle('System theme').className).toContain('active')
-    expect(screen.getByTitle('Light theme').className).not.toContain('active')
-    expect(screen.getByTitle('Dark theme').className).not.toContain('active')
+  it('offers the three options with system active by default', async () => {
+    await renderMenu()
+    await openMenu()
+    expect(themeOption('System theme').element().className).toContain('active')
+    expect(themeOption('Light theme').element().className).not.toContain('active')
+    expect(themeOption('Dark theme').element().className).not.toContain('active')
   })
 
-  it('applies dark when the dark option is clicked, and persists it', () => {
-    renderMenu()
-    openMenu()
-    fireEvent.click(screen.getByTitle('Dark theme'))
+  it('applies dark when the dark option is clicked, and persists it', async () => {
+    await renderMenu()
+    await openMenu()
+    await userEvent.click(themeOption('Dark theme'))
     expect(document.documentElement.dataset.theme).toBe('dark')
-    expect(screen.getByTitle('Dark theme').className).toContain('active')
+    expect(themeOption('Dark theme').element().className).toContain('active')
     expect(localStorage.getItem('plan-maker:theme')).toBe('dark')
   })
 
-  it('follows the OS again when switching back to system', () => {
+  it('follows the OS again when switching back to system', async () => {
     stubMatchMedia(true)
-    renderMenu()
-    openMenu()
-    fireEvent.click(screen.getByTitle('Light theme'))
+    await renderMenu()
+    await openMenu()
+    await userEvent.click(themeOption('Light theme'))
     expect(document.documentElement.dataset.theme).toBe('light')
-    fireEvent.click(screen.getByTitle('System theme'))
+    await userEvent.click(themeOption('System theme'))
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('plan-maker:theme')).toBeNull()
   })
 
-  it('keeps the menu open while picking a theme', () => {
-    renderMenu()
-    openMenu()
-    fireEvent.click(screen.getByTitle('Dark theme'))
-    expect(screen.getByTitle('Light theme')).toBeTruthy()
+  it('keeps the menu open while picking a theme', async () => {
+    await renderMenu()
+    await openMenu()
+    await userEvent.click(themeOption('Dark theme'))
+    await expect.element(themeOption('Light theme')).toBeInTheDocument()
   })
 })
