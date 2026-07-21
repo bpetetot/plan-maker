@@ -26,6 +26,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      # Run even on a cache hit: near-instant when the binary is already there,
+      # and it installs the apt deps the cache does not cover.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps --only-shell chromium
+
       - name: Format
         run: npm run format:check
 

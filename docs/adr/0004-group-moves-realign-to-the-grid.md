@@ -69,5 +69,15 @@ centimetres, for group moves as for point placement.
 - The merge and the planar insertion that follow happen inside the gesture's
   history entry, so one undo restores the exact pre-drag plan, including a wall
   that degenerated and was deleted with its openings.
-- The realigning move ships silent — no drag feedback of any kind. A deliberate
-  "not now", recorded with its rationale in `.scratch/grid-snap/spec.md` §7.
+- The realigning move ships silent — no drag feedback of any kind: no marker at
+  the reference's landing intersection, no signal for an impending merge, no
+  signal for a wall about to degenerate. Undo is the whole safety net. Existing
+  point-placement feedback is untouched; this covers group moves only.
+- The silence is a deliberate **"not now"**, not a permanent no. The rework's
+  value is the grid guarantee itself, and shipping it unadorned keeps the first
+  implementation small. The counter-argument — that the colliding point may be
+  far from the cursor or entirely off-screen — was never refuted, only
+  outweighed, and is the first thing to re-read if this is re-opened.
+- Recorded for whoever re-opens it: previewing the merged outcome makes a
+  selected wall disappear mid-drag, so the selection empties under the user's
+  hands. Any future "show the outcome" approach has to answer that.

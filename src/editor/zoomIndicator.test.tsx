@@ -1,19 +1,15 @@
-// @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import { usePlanStore } from '../store/planStore'
 import { emptyPlan } from '../model/types'
 import Editor from './Editor'
-import { installSvgGeometry, zoomLabel } from './testHelpers'
-
-beforeAll(installSvgGeometry)
+import { wheel, zoomLabel } from './testKit'
 
 beforeEach(() => {
   usePlanStore.setState({ plan: emptyPlan() })
   usePlanStore.temporal.getState().clear()
 })
-
-afterEach(cleanup)
 
 // The displayed percentage is relative to the default framing (820×620 fitted
 // with the min ratio into the window at the last load or Fit). The window
@@ -23,34 +19,34 @@ const scale = (w: number, h: number) => Math.min(800 / w, 600 / h)
 const pct = (w: number, h: number) => `${Math.round((scale(w, h) / scale(820, 620)) * 100)}%`
 
 describe('zoom percentage indicator', () => {
-  it('shows 100% for the initial view', () => {
-    render(<Editor />)
+  it('shows 100% for the initial view', async () => {
+    await render(<Editor />)
     expect(zoomLabel()).toBe(pct(820, 620)) // 100%
   })
 
-  it('refreshes after a single click on Zoom in', () => {
-    render(<Editor />)
-    fireEvent.click(screen.getByLabelText('Zoom in')) // view ×(1/1.25)
+  it('refreshes after a single click on Zoom in', async () => {
+    await render(<Editor />)
+    await userEvent.click(page.getByLabelText('Zoom in')) // view ×(1/1.25)
     expect(zoomLabel()).toBe(pct(820 / 1.25, 620 / 1.25)) // 125%
   })
 
-  it('refreshes after a single click on Zoom out', () => {
-    render(<Editor />)
-    fireEvent.click(screen.getByLabelText('Zoom out')) // view ×1.25
+  it('refreshes after a single click on Zoom out', async () => {
+    await render(<Editor />)
+    await userEvent.click(page.getByLabelText('Zoom out')) // view ×1.25
     expect(zoomLabel()).toBe(pct(820 * 1.25, 620 * 1.25)) // 80%
   })
 
-  it('refreshes after a wheel zoom', () => {
-    const { container } = render(<Editor />)
+  it('refreshes after a wheel zoom', async () => {
+    const { container } = await render(<Editor />)
     const svg = container.querySelector('svg')!
-    fireEvent.wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 }) // view ×(1/1.08)
+    await wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 }) // view ×(1/1.08)
     expect(zoomLabel()).toBe(pct(820 / 1.08, 620 / 1.08)) // 108%
   })
 
-  it('refreshes after a single click on Fit to plan', () => {
-    render(<Editor />)
-    fireEvent.click(screen.getByLabelText('Zoom in')) // leave the default view
-    fireEvent.click(screen.getByTitle('Fit to plan')) // empty plan → default view
+  it('refreshes after a single click on Fit to plan', async () => {
+    await render(<Editor />)
+    await userEvent.click(page.getByLabelText('Zoom in')) // leave the default view
+    await userEvent.click(page.getByTitle('Fit to plan')) // empty plan → default view
     expect(zoomLabel()).toBe(pct(820, 620)) // 100%
   })
 })

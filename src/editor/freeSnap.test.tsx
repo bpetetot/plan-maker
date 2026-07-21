@@ -1,22 +1,17 @@
-// @vitest-environment jsdom
 // A free move (Alt) filters the snap ladder instead of short-circuiting it
 // (issue 13): the alignment targets — 45° axes, grid — are suspended, the
 // connection ones — existing points, wall bodies — survive, so a freely drawn
 // wall still joins the plan's topology.
-import { cleanup, fireEvent, render } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
 import Editor from './Editor'
-import { clientAt, installSvgGeometry } from './testHelpers'
-
-beforeAll(installSvgGeometry)
+import { clientAt, key, pointer } from './testKit'
 
 beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
-
-afterEach(cleanup)
 
 // A single horizontal wall to draw against.
 function hostPlan(): Plan {
@@ -33,25 +28,25 @@ function hostPlan(): Plan {
 
 const plan = () => usePlanStore.getState().plan
 
-function setup() {
+async function setup() {
   usePlanStore.setState({ plan: hostPlan(), planEpoch: 0 })
   usePlanStore.temporal.getState().clear()
-  const { container } = render(<Editor />)
+  const { container } = await render(<Editor />)
   const svg = container.querySelector('svg')!
-  fireEvent.keyDown(window, { key: '2' }) // Wall tool
+  await key(window, '2') // Wall tool
   return { svg }
 }
 
 // Alt is tracked from key events, so hold it down before the gesture.
-const holdAlt = () => fireEvent.keyDown(window, { key: 'Alt', altKey: true })
+const holdAlt = () => key(window, 'Alt', { altKey: true })
 
 describe('drawing a wall during a free move', () => {
-  it('anchors onto a wall body and splits it, while the free end stays off the grid', () => {
-    const { svg } = setup()
-    holdAlt()
+  it('anchors onto a wall body and splits it, while the free end stays off the grid', async () => {
+    const { svg } = await setup()
+    await holdAlt()
     // start off-grid and off-axis, end on w1's body at x = 203
-    fireEvent.pointerDown(svg, { button: 0, altKey: true, ...clientAt(svg, 203, 187) })
-    fireEvent.pointerDown(svg, { button: 0, altKey: true, ...clientAt(svg, 203, 3) })
+    await pointer(svg, 'pointerdown', { button: 0, altKey: true, ...clientAt(svg, 203, 187) })
+    await pointer(svg, 'pointerdown', { button: 0, altKey: true, ...clientAt(svg, 203, 3) })
 
     const junction = Object.values(plan().points).find((p) => p.x === 203 && p.y === 0)
     expect(junction).toBeDefined()
@@ -67,7 +62,7 @@ describe('drawing a wall during a free move', () => {
 })
 
 describe('dragging a point during a free move', () => {
-  it('still merges onto an existing point', () => {
+  it('still merges onto an existing point', async () => {
     usePlanStore.setState({
       plan: {
         points: {
@@ -86,20 +81,20 @@ describe('dragging a point during a free move', () => {
       planEpoch: 0,
     })
     usePlanStore.temporal.getState().clear()
-    const { container } = render(<Editor />)
+    const { container } = await render(<Editor />)
     const svg = container.querySelector('svg')!
 
     // select w2 to reveal its point handles, then drag d onto b with Alt held
-    fireEvent.pointerDown(svg, { button: 0, ...clientAt(svg, 150, 250) })
-    fireEvent.pointerMove(svg, clientAt(svg, 450, 350))
-    fireEvent.pointerUp(svg)
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 150, 250) })
+    await pointer(svg, 'pointermove', clientAt(svg, 450, 350))
+    await pointer(svg, 'pointerup')
     const handles = svg.querySelectorAll('circle')
     expect(handles).toHaveLength(2)
 
-    holdAlt()
-    fireEvent.pointerDown(handles[1], { button: 0, altKey: true, ...clientAt(svg, 400, 300) })
-    fireEvent.pointerMove(svg, { altKey: true, ...clientAt(svg, 397, 4) })
-    fireEvent.pointerUp(svg)
+    await holdAlt()
+    await pointer(handles[1], 'pointerdown', { button: 0, altKey: true, ...clientAt(svg, 400, 300) })
+    await pointer(svg, 'pointermove', { altKey: true, ...clientAt(svg, 397, 4) })
+    await pointer(svg, 'pointerup')
 
     expect(plan().points.d).toBeUndefined()
     expect(plan().walls.w2).toMatchObject({ startPointId: 'c', endPointId: 'b' })

@@ -1,6 +1,6 @@
 # Plan Maker
 
-A PWA to draw simple 2D floor plans, per `.scratch/plan-maker/spec.md`. Stack:
+A PWA to draw simple 2D floor plans, per `CONTEXT.md`. Stack:
 React + TypeScript + Vite, plain SVG rendering, zustand + zundo (undo/redo),
 idb-keyval (autosave), vite-plugin-pwa.
 
@@ -33,6 +33,32 @@ idb-keyval (autosave), vite-plugin-pwa.
 - UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
   Unicode glyphs (exception: the zoom-percentage button, which is a text
   indicator)
+
+## Testing
+
+- `*.test.tsx` runs in browser mode (Chromium), `*.test.ts` in node. The
+  extension *is* the environment marker — there is no per-file docblock.
+- The target decides the style, for events and queries alike:
+  - a control a user could name (button, field, visible text) → semantic
+    locator (`page.getBy*`) + `userEvent`
+  - a point on the canvas, the `svg`, or `window` → `container.querySelector`
+    + the `pointer()` / `mouse()` / `key()` helpers
+- Never construct an event object directly — always a `src/editor/testKit.ts`
+  helper (`pointer`, `mouse`, `key`, `keyUp`, `wheel`, `blur`). They carry the mandatory
+  init (`pointerId: 1`, `bubbles`), and they `await` React's commit, which
+  browser mode does not do on its own. **Every dispatch must be awaited**;
+  `pointer()` alone knows that a `pointermove` or a `wheel` commits a turn
+  later than a `pointerdown`.
+- `unmount()` and `cleanup()` from `vitest-browser-react` are async. An
+  un-awaited one overlaps the next `act()` and breaks every later test in the
+  file — the failure surfaces far from its cause.
+- `page.getByText` matches substrings, unlike testing-library's `getByText`.
+  Pass `{ exact: true }` when a shorter string could also match a hint or a
+  longer label.
+- No `act()` — it does not exist in browser mode. A state change made outside
+  any dispatched event still needs a retrying assertion: `expect.element` on a
+  locator, `expect.poll` on a hand-rolled DOM read. Reads of the zustand store
+  right after an awaited dispatch stay synchronous.
 
 ## Agent skills
 

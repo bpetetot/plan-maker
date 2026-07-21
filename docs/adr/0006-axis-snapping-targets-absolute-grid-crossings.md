@@ -65,4 +65,5 @@ higher rung and a connection target, and connecting outranks aligning.
   step suffers, in an already pathological case.
 - Alt free mode is untouched: it suspends the alignment rungs wholesale, this
   one included.
-- Replaces `.scratch/grid-snap/spec.md` §4 and its tickets 06 and 10.
+- Supersedes the earlier grid-snap rule, under which axis snapping stepped
+  relative to the anchor rather than targeting absolute grid crossings.

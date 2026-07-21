@@ -1,4 +1,4 @@
-// Tool panel (CONTEXT.md; grew out of .scratch/selection-panel/spec.md):
+// Tool panel (CONTEXT.md):
 // fixed floating card on the left. Shows the selection's parameters and
 // actions when the selection is non-empty, the active tool's Tool defaults
 // otherwise; hidden only in the Select tool with nothing selected. Selection

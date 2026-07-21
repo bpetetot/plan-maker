@@ -1,15 +1,13 @@
-// @vitest-environment jsdom
 // Snap is a state, not a permanent behavior (ADR 0007): it is on by default,
 // can be turned off for the whole editor as a per-device preference, and Alt
 // inverts it for the duration of a gesture — in both directions.
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import { emptyPlan } from '../model/types'
 import { usePlanStore } from '../store/planStore'
 import Editor from './Editor'
-import { clientAt, installSvgGeometry } from './testHelpers'
-
-beforeAll(installSvgGeometry)
+import { blur, clientAt, key, keyUp, pointer } from './testKit'
 
 beforeEach(() => {
   localStorage.clear()
@@ -17,16 +15,14 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-afterEach(cleanup)
-
 const plan = () => usePlanStore.getState().plan
-const toggle = () => screen.getByLabelText('Snap')
-const pressed = () => toggle().getAttribute('aria-pressed')
+const toggle = () => page.getByLabelText('Snap')
+const pressed = () => toggle().element().getAttribute('aria-pressed')
 
-function setup() {
-  const { container, unmount } = render(<Editor />)
+async function setup() {
+  const { container, unmount } = await render(<Editor />)
   const svg = container.querySelector('svg')!
-  fireEvent.keyDown(window, { key: '2' }) // Wall tool
+  await key(window, '2') // Wall tool
   return { svg, unmount }
 }
 
@@ -41,103 +37,103 @@ const SNAPPED = [
 ]
 const FREE = [A, B]
 
-function drawWall(svg: SVGSVGElement, altKey = false) {
-  fireEvent.pointerDown(svg, { button: 0, altKey, ...clientAt(svg, A.x, A.y) })
-  fireEvent.pointerDown(svg, { button: 0, altKey, ...clientAt(svg, B.x, B.y) })
+async function drawWall(svg: SVGSVGElement, altKey = false) {
+  await pointer(svg, 'pointerdown', { button: 0, altKey, ...clientAt(svg, A.x, A.y) })
+  await pointer(svg, 'pointerdown', { button: 0, altKey, ...clientAt(svg, B.x, B.y) })
   return Object.values(plan().points).map((p) => ({ x: p.x, y: p.y }))
 }
 
-const holdAlt = () => fireEvent.keyDown(window, { key: 'Alt', altKey: true })
-const releaseAlt = () => fireEvent.keyUp(window, { key: 'Alt', altKey: false })
+const holdAlt = () => key(window, 'Alt', { altKey: true })
+const releaseAlt = () => keyUp(window, 'Alt', { altKey: false })
 
 describe('snap toggle', () => {
-  it('snaps by default, toggle pressed', () => {
-    const { svg } = setup()
+  it('snaps by default, toggle pressed', async () => {
+    const { svg } = await setup()
     expect(pressed()).toBe('true')
-    expect(drawWall(svg)).toEqual(SNAPPED)
+    expect(await drawWall(svg)).toEqual(SNAPPED)
   })
 
-  it('drops the alignment targets once snap is off', () => {
-    const { svg } = setup()
-    fireEvent.click(toggle())
+  it('drops the alignment targets once snap is off', async () => {
+    const { svg } = await setup()
+    await userEvent.click(toggle())
     expect(pressed()).toBe('false')
-    expect(drawWall(svg)).toEqual(FREE)
+    expect(await drawWall(svg)).toEqual(FREE)
   })
 
-  it('toggles with the S key', () => {
-    const { svg } = setup()
-    fireEvent.keyDown(window, { key: 's' })
+  it('toggles with the S key', async () => {
+    const { svg } = await setup()
+    await key(window, 's')
     expect(pressed()).toBe('false')
-    expect(drawWall(svg)).toEqual(FREE)
+    expect(await drawWall(svg)).toEqual(FREE)
   })
 
-  it('ignores S under a modifier — Ctrl/Cmd+S is the Save reflex', () => {
-    setup()
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true })
-    fireEvent.keyDown(window, { key: 's', metaKey: true })
+  it('ignores S under a modifier — Ctrl/Cmd+S is the Save reflex', async () => {
+    await setup()
+    await key(window, 's', { ctrlKey: true })
+    await key(window, 's', { metaKey: true })
     expect(pressed()).toBe('true')
   })
 
-  it('remembers the choice across sessions', () => {
-    const { unmount } = setup()
-    fireEvent.click(toggle())
-    unmount()
+  it('remembers the choice across sessions', async () => {
+    const { unmount } = await setup()
+    await userEvent.click(toggle())
+    await unmount()
 
-    const second = setup()
+    const second = await setup()
     expect(pressed()).toBe('false')
-    expect(drawWall(second.svg)).toEqual(FREE)
+    expect(await drawWall(second.svg)).toEqual(FREE)
   })
 })
 
 describe('Alt inverts the mode', () => {
-  it('suspends the alignment targets while snap is on', () => {
-    const { svg } = setup()
-    holdAlt()
-    expect(drawWall(svg, true)).toEqual(FREE)
+  it('suspends the alignment targets while snap is on', async () => {
+    const { svg } = await setup()
+    await holdAlt()
+    expect(await drawWall(svg, true)).toEqual(FREE)
   })
 
-  it('restores them while snap is off', () => {
-    const { svg } = setup()
-    fireEvent.click(toggle())
-    holdAlt()
-    expect(drawWall(svg, true)).toEqual(SNAPPED)
+  it('restores them while snap is off', async () => {
+    const { svg } = await setup()
+    await userEvent.click(toggle())
+    await holdAlt()
+    expect(await drawWall(svg, true)).toEqual(SNAPPED)
   })
 })
 
 describe('the toggle shows the effective state', () => {
-  it('unpresses while Alt is held with snap on, and recovers on release', () => {
-    setup()
+  it('unpresses while Alt is held with snap on, and recovers on release', async () => {
+    await setup()
     expect(pressed()).toBe('true')
-    holdAlt()
+    await holdAlt()
     expect(pressed()).toBe('false')
-    releaseAlt()
+    await releaseAlt()
     expect(pressed()).toBe('true')
   })
 
-  it('presses while Alt is held with snap off', () => {
-    setup()
-    fireEvent.click(toggle())
-    holdAlt()
+  it('presses while Alt is held with snap off', async () => {
+    await setup()
+    await userEvent.click(toggle())
+    await holdAlt()
     expect(pressed()).toBe('true')
-    releaseAlt()
+    await releaseAlt()
     expect(pressed()).toBe('false')
   })
 
-  it('clicking while Alt is held toggles snapping, not the inversion', () => {
-    setup()
-    holdAlt()
-    fireEvent.click(toggle()) // snapping on -> off, Alt still inverting
+  it('clicking while Alt is held toggles snapping, not the inversion', async () => {
+    await setup()
+    await holdAlt()
+    await userEvent.click(toggle()) // snapping on -> off, Alt still inverting
     expect(pressed()).toBe('true')
-    releaseAlt()
+    await releaseAlt()
     expect(pressed()).toBe('false')
   })
 
-  it('drops a held Alt when the window loses focus, rather than staying stuck', () => {
-    const { svg } = setup()
-    holdAlt()
+  it('drops a held Alt when the window loses focus, rather than staying stuck', async () => {
+    const { svg } = await setup()
+    await holdAlt()
     expect(pressed()).toBe('false')
-    fireEvent.blur(window) // Alt+Tab away: the keyup never arrives
+    await blur(window) // Alt+Tab away: the keyup never arrives
     expect(pressed()).toBe('true')
-    expect(drawWall(svg)).toEqual(SNAPPED)
+    expect(await drawWall(svg)).toEqual(SNAPPED)
   })
 })

@@ -1,10 +1,7 @@
-// @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { render } from 'vitest-browser-react'
 import type { Opening, Plan, Wall } from '../model/types'
 import { OpeningGlyph } from './render'
-
-afterEach(cleanup)
 
 // A single horizontal wall carrying the given opening.
 function planWith(opening: Opening): Plan {
@@ -36,8 +33,8 @@ const win: Opening = { id: 'n', wallId: 'w', type: 'window', offset: 200, width:
 // wall mass: thin leaf, hairline solid swing arc (dashed means "above the cut
 // plane" in section convention — not the case here), thin window strokes.
 describe('opening glyph line weights', () => {
-  it('draws the door leaf as a thin stroke', () => {
-    const { container } = render(
+  it('draws the door leaf as a thin stroke', async () => {
+    const { container } = await render(
       <svg>
         <OpeningGlyph plan={planWith(door)} opening={door} />
       </svg>,
@@ -45,8 +42,8 @@ describe('opening glyph line weights', () => {
     expect(container.querySelector('line')!.getAttribute('stroke-width')).toBe('2')
   })
 
-  it('draws the swing arc as a solid hairline', () => {
-    const { container } = render(
+  it('draws the swing arc as a solid hairline', async () => {
+    const { container } = await render(
       <svg>
         <OpeningGlyph plan={planWith(door)} opening={door} />
       </svg>,
@@ -56,8 +53,8 @@ describe('opening glyph line weights', () => {
     expect(arc.getAttribute('stroke-width')).toBe('1')
   })
 
-  it('draws the window glazing as thin strokes', () => {
-    const { container } = render(
+  it('draws the window glazing as thin strokes', async () => {
+    const { container } = await render(
       <svg>
         <OpeningGlyph plan={planWith(win)} opening={win} />
       </svg>,
@@ -67,11 +64,11 @@ describe('opening glyph line weights', () => {
     for (const line of lines) expect(line.getAttribute('stroke-width')).toBe('1.5')
   })
 
-  it('paints the jamb bars in the glyph register, over the wall strips', () => {
+  it('paints the jamb bars in the glyph register, over the wall strips', async () => {
     // the uncut wall strips under the bars guarantee registration with the
     // faces; the bars themselves carry the glyph's tint (dark on a selected
     // wall, accent on a selected window)
-    const { container } = render(
+    const { container } = await render(
       <svg>
         <OpeningGlyph plan={planWith(win)} opening={win} />
       </svg>,
