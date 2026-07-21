@@ -730,7 +730,7 @@ export default function Editor() {
             />
           ))}
         {dimmedOpenings.map((opening) => (
-          <PlacementDims key={opening.id} plan={plan} opening={opening} rooms={rooms} pxPerCm={zoomScale} />
+          <PlacementDims key={opening.id} plan={plan} opening={opening} pxPerCm={zoomScale} />
         ))}
         {selWall &&
           wallPoints(plan, selWall).map((p) => (

@@ -2,10 +2,10 @@
 import { faceSpan, junctionPatches, wallOutline } from '../model/faces'
 import { wallLength, wallPoints } from '../model/geometry'
 import { formatArea, formatLength } from '../model/format'
-import { openingPlacement } from '../model/openings'
+import { openingPlacement, openingRail } from '../model/openings'
 import type { Room } from '../model/rooms'
 import type { ElementRef } from '../model/selection'
-import { interiorSide, roomAt } from '../model/rooms'
+import { roomAt } from '../model/rooms'
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
 
@@ -536,11 +536,10 @@ const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10
 // shown while it is placed or moved and, past the release, for as long as it
 // stays in the selection (CONTEXT.md: Placement dimension).
 //
-// The side — interior whenever the wall borders exactly one room, else the
-// side the wall's Dimension sits on — decides the value read and nothing more:
-// each measure runs to the near edge of the opening from the silhouette end on
-// that side, or from the near edge of the closest neighbouring opening when one
-// intervenes, so every value is tape-measurable.
+// Each is the clearance left to one end of the opening's Rail — a mitered Face
+// corner, a free end's overhang, or the near edge of a neighbouring opening —
+// so every value is tape-measurable, and reads zero exactly when the opening
+// can travel no further.
 //
 // It is deliberately not drawn as a Dimension: no dimension line, no ticks, no
 // witness lines, no offset from a face. Each value is a filled accent chip
@@ -552,42 +551,21 @@ const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10
 // wider than its clearance simply overflows it. A clearance reduced to nothing
 // shows no chip; the other side shows its own normally. Editor feedback —
 // deliberately absent from PlanScene.
-export function PlacementDims({
-  plan,
-  opening,
-  rooms,
-  pxPerCm,
-}: {
-  plan: Plan
-  opening: Opening
-  rooms: Room[]
-  pxPerCm: number
-}) {
+export function PlacementDims({ plan, opening, pxPerCm }: { plan: Plan; opening: Opening; pxPerCm: number }) {
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
-  const { a, ux, uy, angle, side: frameSide } = dimLineFrame(plan, wall)
-  const side = interiorSide(rooms, wall) ?? frameSide
-  // point on the wall axis at distance t from the start Point — the side never
-  // enters here, only the values below
+  const { a, ux, uy, angle } = dimLineFrame(plan, wall)
+  // point on the wall axis at distance t from the start Point
   const at = (t: number) => ({ x: a.x + ux * t, y: a.y + uy * t })
   // a screen pixel expressed in plan units, so the chip keeps its size at
   // every zoom while its centre stays where it measures
   const k = 1 / Math.max(pxPerCm, 0.0001)
   const half = opening.width / 2
-  // outer bounds: the silhouette span on the chosen side, cut back to the
-  // near edge of the closest neighbouring opening when one intervenes
-  const span = faceSpan(plan, wall, side)
-  let startBound = span.from
-  let endBound = span.to
-  for (const other of Object.values(plan.openings)) {
-    if (other.wallId !== wall.id || other.id === opening.id) continue
-    if (other.offset <= placement.offset) startBound = Math.max(startBound, other.offset + other.width / 2)
-    else endBound = Math.min(endBound, other.offset - other.width / 2)
-  }
+  const rail = openingRail(plan, wall, placement.offset, opening.id)
   const segments = [
-    { key: 'start', from: startBound, to: placement.offset - half },
-    { key: 'end', from: placement.offset + half, to: endBound },
+    { key: 'start', from: rail.from, to: placement.offset - half },
+    { key: 'end', from: placement.offset + half, to: rail.to },
   ]
   return (
     <g pointerEvents="none">

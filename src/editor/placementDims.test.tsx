@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import type { Room } from '../model/rooms'
-import { detectRooms } from '../model/rooms'
 import { squareRoomPlan } from '../model/testHelpers'
 import { emptyPlan } from '../model/types'
 import type { Opening, Plan } from '../model/types'
@@ -32,10 +30,10 @@ function planWith(offset: number, width: number): { plan: Plan; opening: Opening
   return { plan, opening }
 }
 
-async function renderDims(plan: Plan, opening: Opening, rooms: Room[] = [], pxPerCm = 1) {
+async function renderDims(plan: Plan, opening: Opening, pxPerCm = 1) {
   const { container } = await render(
     <svg>
-      <PlacementDims plan={plan} opening={opening} rooms={rooms} pxPerCm={pxPerCm} />
+      <PlacementDims plan={plan} opening={opening} pxPerCm={pxPerCm} />
     </svg>,
   )
   return container
@@ -51,15 +49,15 @@ describe('PlacementDims', () => {
   })
 
   it('hides the side whose segment is 0 cm, measuring from the effective (clamped) offset', async () => {
-    // stored offset 0 clamps to half the width: the opening sits flush at the
-    // wall start, where the interior face begins — only the far side remains
+    // stored offset 0 clamps onto the rail: the opening comes to rest flush
+    // against the mitered corner at 5 — only the far side remains
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
     const opening: Opening = { id: 'o', wallId: bottom.id, type: 'window', offset: 0, width: 80 }
     plan.openings.o = opening
-    const container = await renderDims(plan, opening, detectRooms(plan))
+    const container = await renderDims(plan, opening)
     const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
-    expect(texts).toEqual(['3,15 m'])
+    expect(texts).toEqual(['3,10 m'])
   })
 
   it('centres a chip on each clearance, on the wall axis — never on a side', async () => {
@@ -84,35 +82,42 @@ describe('PlacementDims', () => {
     expect(group.getAttribute('transform')).toBe('translate(27.5,0) rotate(0) scale(1)')
   })
 
-  it('reads the interior side when the wall borders exactly one room, and only the value', async () => {
-    // 4×4 m square room; window (80) centered on the bottom wall. Whatever
-    // side the wall's Dimension sits on, the placement dimensions measure on
-    // the interior side: from the interior face corners at +5/395.
+  it('measures from the mitered corners, whatever side the wall dimension sits on', async () => {
+    // 4×4 m square room; window (80) centered on the bottom wall. The rail
+    // ends at the shorter face's corners, +5/395 — nothing about the wall's
+    // Dimension enters the reading.
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
     const opening: Opening = { id: 'o', wallId: bottom.id, type: 'window', offset: 200, width: 80 }
     plan.openings.o = opening
-    const rooms = detectRooms(plan)
     // default Dimension side for a horizontal wall: upper — outside the room
-    let container = await renderDims(plan, opening, rooms)
+    let container = await renderDims(plan, opening)
     let texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['1,55 m', '1,55 m'])
-    // the side chose the value; the chip still sits on the axis
     expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
       'translate(82.5,0) rotate(0) scale(1)',
     )
     // dragging the Dimension outside changes nothing for placement dims
     bottom.dimPlacement = { t: 0.5, side: -1 }
-    container = await renderDims(plan, opening, rooms)
+    container = await renderDims(plan, opening)
     texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
     expect(texts).toEqual(['1,55 m', '1,55 m'])
+  })
+
+  it('reads zero on the side an opening is pushed against, and hides that chip', async () => {
+    // the very property the rail buys: a free wall end no longer keeps a
+    // phantom 10 cm once the opening can travel no further
+    const { plan, opening } = planWith(35, 80)
+    const container = await renderDims(plan, opening)
+    const texts = Array.from(container.querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts).toEqual(['3,30 m'])
   })
 
   it('holds the same size on screen at every zoom, without moving its centre', async () => {
     const { plan, opening } = planWith(100, 80)
     // zoomed out to half scale: the chip doubles in plan units to keep its
     // on-screen size, and its centre stays on the clearance (ADR 0005)
-    const container = await renderDims(plan, opening, [], 0.5)
+    const container = await renderDims(plan, opening, 0.5)
     expect(container.querySelector('g[transform]')!.getAttribute('transform')).toBe(
       'translate(27.5,0) rotate(0) scale(2)',
     )

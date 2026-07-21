@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { faceLength, faceSpan, junctionPatches, wallOutline } from './faces'
+import { faceLength, faceSpan, fullThicknessSpan, junctionPatches, wallOutline } from './faces'
 import { buildPlan, squareRoomPlan } from './testHelpers'
 
 describe('faceLength', () => {
@@ -102,6 +102,39 @@ describe('faceSpan', () => {
     })
     const wall = Object.values(plan.walls)[0]
     expect(faceSpan(plan, wall, 1)).toEqual({ from: -5, to: 405 })
+  })
+})
+
+describe('fullThicknessSpan', () => {
+  it('keeps the shorter of the two faces at each end', () => {
+    const plan = squareRoomPlan()
+    const bottom = Object.values(plan.walls)[0]
+    // interior 5→395, exterior -5→405: the interior corners win on both ends
+    expect(fullThicknessSpan(plan, bottom)).toEqual({ from: 5, to: 395 })
+  })
+
+  it('reaches the overhang at a free end, where both faces stop together', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0))
+    })
+    const wall = Object.values(plan.walls)[0]
+    expect(fullThicknessSpan(plan, wall)).toEqual({ from: -5, to: 405 })
+  })
+
+  it('takes the exterior corner at a reflex corner, where it is the shorter one', () => {
+    // an L: the corner at (400,0) is convex for the vertical wall's right side
+    // and reflex for its left, so the two faces swap roles
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const c = b.point(400, 0)
+      const d = b.point(400, 400)
+      b.wall(a, c)
+      b.wall(c, d)
+    })
+    const vertical = Object.values(plan.walls)[1]
+    expect(faceSpan(plan, vertical, 1)).toEqual({ from: 5, to: 405 })
+    expect(faceSpan(plan, vertical, -1)).toEqual({ from: -5, to: 405 })
+    expect(fullThicknessSpan(plan, vertical)).toEqual({ from: 5, to: 405 })
   })
 })
 

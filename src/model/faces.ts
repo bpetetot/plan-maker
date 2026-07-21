@@ -109,6 +109,17 @@ export function faceSpan(plan: Plan, wall: Wall, side: 1 | -1): { from: number; 
   }
 }
 
+// The stretch of the axis where the wall is at full thickness: the shorter of
+// its two faces at each end. An Opening pierces the whole thickness, so this is
+// as far as one can reach before it meets the material of an adjacent wall —
+// the interior corner at a convex junction, the exterior one at a reflex
+// junction, the overhang at a free end (CONTEXT.md: Rail).
+export function fullThicknessSpan(plan: Plan, wall: Wall): { from: number; to: number } {
+  const left = faceSpan(plan, wall, 1)
+  const right = faceSpan(plan, wall, -1)
+  return { from: Math.max(left.from, right.from), to: Math.min(left.to, right.to) }
+}
+
 export function faceLength(plan: Plan, wall: Wall, side: 1 | -1): number {
   const { from, to } = faceSpan(plan, wall, side)
   return Math.max(0, to - from)

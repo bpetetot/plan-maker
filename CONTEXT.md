@@ -40,7 +40,10 @@ _Avoid_: Side, edge
 
 **Opening**:
 Something set into a wall — a door or a window. Belongs to exactly one wall,
-positioned by the distance from the wall's start to the opening's center.
+positioned by the distance from the wall's start to the opening's center, and
+free to slide along its Rail. Its width is what it takes of the wall, jambs
+included: no gesture lets it overlap a corner or a neighbouring opening,
+though it may come flush against either.
 _Avoid_: Fixture, insert
 
 **Door**:
@@ -248,13 +251,12 @@ The pair of temporary measures flanking an Opening, shown while it is being
 placed or moved and, past the release, for as long as it stays in the
 Selection — every Opening of the Selection shows its own, with no cardinality
 threshold, while a selected Wall stays silent for the Openings it carries.
-Each measures to the near edge of the opening from the silhouette end — the
-mitered Face corner at a junction, the body overhang at a free end — or from
-the near edge of the closest neighbouring opening when one intervenes, so
-every value is tape-measurable. The side — interior whenever exactly one side
-of the wall faces a Room; else, dangling wall, party wall, or a wall jutting
-into its own Room, the side the wall's Dimension sits on — decides the value
-read and nothing more: it never decides where the measure is drawn.
+Each is the clearance left to one end of the opening's Rail: from the near
+edge of the opening to the mitered Face corner at a junction, the body
+overhang at a free end, or the near edge of the neighbouring opening that
+intervenes — so every value is tape-measurable. Because it is read against the
+very bound that stops the opening, it reaches zero exactly when the opening
+can travel no further.
 It is deliberately not drawn as a Dimension: no dimension line, no ticks, no
 witness lines, no offset from a Face. Each value is a filled accent chip
 centred on the clearance it measures, on the wall's axis, inside the wall
@@ -265,19 +267,26 @@ scale, its centre stays in plan coordinates. It never shrinks, never shifts
 and never disappears: a chip wider than the clearance it measures simply
 overflows it. A clearance reduced to nothing shows no chip at all, and the
 other side shows its own normally.
-Pure editor feedback, like the Rail: never part of the plan, never exported.
+Pure editor feedback, like a Dimension's Rail: never part of the plan, never
+exported.
 Not a Measure, despite the name — it belongs to a gesture, so it never follows
 the Measure toggle and shows even when measures are hidden.
 _Avoid_: Side measure, clearance, flanking dimension, Chip — the graphic is a
 chip, the concept is not
 
 **Rail**:
-The invisible travel line a Dimension's text slides along while it is being
-dragged — the dimension line of the side the pointer is on, bounded by the
-arrowheads: the text can at most touch a head, never cover it, and a span too
-narrow for the text pins it to the middle. Nothing is drawn: the Rail is a
-constraint, not a graphic. Pure editor behavior: never part of the plan,
-never exported.
+An invisible bounded travel line. Nothing is drawn: a Rail is a constraint,
+not a graphic. Two things have one.
+A Dimension's text slides along the dimension line of the side the pointer is
+on, bounded by the arrowheads: the text can at most touch a head, never cover
+it, and a span too narrow for the text pins it to the middle. Pure editor
+behavior: never part of the plan, never exported.
+An Opening slides along the stretch of its wall that is at full thickness —
+bounded at each end by the shorter of the two Faces, since the opening pierces
+the whole thickness, and cut back to the near edge of the closest neighbouring
+opening when one intervenes. That Rail binds the plan and not merely the
+gesture: it is what every placement, move and widening lands on, and a wall
+whose Rail is narrower than the opening refuses it outright.
 _Avoid_: Guide, track
 
 **Theme**:

@@ -54,9 +54,10 @@ describe('dragging an opening keeps the grab point under the cursor', () => {
     // grab 30 cm right of center: delta is −30 for the whole gesture
     const grab = openingGrab(container)
     await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 280, 100) })
-    // way past the wall end: the center clamps at 335 (length 400, margin 65)
+    // way past the wall end: the center stops at 345, flush against the rail's
+    // far end (the free end's overhang at 405, less half the 120 width)
     await pointer(svg, 'pointermove', clientAt(svg, 600, 100))
-    expect(usePlanStore.getState().plan.openings.o1.offset).toBe(335)
+    expect(usePlanStore.getState().plan.openings.o1.offset).toBe(345)
     // coming back, the opening re-sticks to cursor+delta exactly — the clamp
     // never re-based the grab point
     await pointer(svg, 'pointermove', clientAt(svg, 430, 100))

@@ -24,6 +24,7 @@ import {
   toggleHingeSide,
   toggleSwing,
 } from './operations'
+import { openingRail } from './openings'
 import { buildPlan, squareRoomPlan } from './testHelpers'
 import { DOOR_WIDTH } from './types'
 
@@ -112,19 +113,20 @@ describe('splitWall', () => {
     expect(Object.keys(next.openings)).toHaveLength(0)
   })
 
-  it('deletes an opening whose half is too short to host it', () => {
+  it('keeps an opening the cut barely clears, however tight the half', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0)
       const p2 = b.point(400, 0)
       const cut = b.point(96, 0)
       const wall = b.wall(p1, p2)
-      b.opening(wall, 'door', 50) // interval 5..95, clear of the cut, but a 96 cm half cannot host 90+2×5
+      b.opening(wall, 'door', 50) // interval 5..95, one centimetre clear of the cut
       void cut
     })
     const cut = Object.keys(plan.points)[2]
     const wallId = Object.keys(plan.walls)[0]
-    const next = splitWall(plan, wallId, cut)
-    expect(Object.keys(next.openings)).toHaveLength(0)
+    const doorId = Object.keys(plan.openings)[0]
+    // its rail on the 96 cm half runs -5..96, still wider than the door
+    expect(splitWall(plan, wallId, cut).openings[doorId]).toMatchObject({ offset: 50 })
   })
 
   it('deletes an opening the cut would force to shift, instead of moving it', () => {
@@ -133,9 +135,9 @@ describe('splitWall', () => {
       const p2 = b.point(400, 0)
       const cut = b.point(100, 0)
       const wall = b.wall(p1, p2)
-      // interval 7..97: clear of the cut, but inside the 5 cm end margin of
-      // the 100 cm start half — clamping would silently move it to 50
-      b.opening(wall, 'door', 52)
+      // interval -15..75: clear of the cut, but hanging past the start half's
+      // overhang at -5 — clamping would silently move it to 40
+      b.opening(wall, 'door', 30)
       void cut
     })
     const cut = Object.keys(plan.points)[2]
@@ -150,7 +152,7 @@ describe('splitWall', () => {
       const p2 = b.point(400, 0)
       const cut = b.point(100, 0)
       const wall = b.wall(p1, p2)
-      b.opening(wall, 'door', 50) // interval 5..95 with margins: exact fit of the 100 cm half
+      b.opening(wall, 'door', 50) // interval 5..95, inside the half's rail of -5..100
       void cut
     })
     const cut = Object.keys(plan.points)[2]
@@ -558,25 +560,43 @@ describe('openings', () => {
   it('places a window with the given width, clamped to fit', () => {
     const base = rectPlan()
     const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'window', 390, { width: 60 })
-    expect(plan.openings[id!]).toMatchObject({ type: 'window', width: 60, offset: 365 })
+    // free wall: the rail reaches the overhang at 405, so the window sits flush
+    expect(plan.openings[id!]).toMatchObject({ type: 'window', width: 60, offset: 375 })
   })
 
-  it('clamps the offset so the opening fits inside the wall', () => {
+  it('clamps the offset to the rail, flush against each end', () => {
     const plan = rectPlan()
     const wall = Object.values(plan.walls)[0]
-    expect(clampOpeningOffset(plan, wall, 10, 90)).toBe(50)
-    expect(clampOpeningOffset(plan, wall, 395, 90)).toBe(350)
+    // rail -5 → 405: a 90 opening centres between 40 and 360
+    expect(clampOpeningOffset(plan, wall, 10, 90)).toBe(40)
+    expect(clampOpeningOffset(plan, wall, 395, 90)).toBe(360)
     expect(clampOpeningOffset(plan, wall, 200, 90)).toBe(200)
   })
 
-  it('refuses to place an opening on a too-short wall', () => {
+  it('lands exactly on a rail end that is not a whole centimetre', () => {
+    // a 45° corner miters the rail end to an irrational offset: rounding to
+    // whole centimetres must never push the opening off its bound, or the
+    // measure that reads it would no longer reach zero
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0)
+      const corner = b.point(400, 0)
+      b.wall(a, corner)
+      b.wall(corner, b.point(700, 300))
+    })
+    const wall = Object.values(plan.walls)[0]
+    const rail = openingRail(plan, wall, 200)
+    expect(Number.isInteger(rail.to)).toBe(false)
+    expect(clampOpeningOffset(plan, wall, 400, 90)).toBe(rail.to - 45)
+  })
+
+  it('refuses to place an opening on a wall narrower than it', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0)
-      const p2 = b.point(80, 0)
+      const p2 = b.point(60, 0)
       b.wall(p1, p2)
     })
     const wallId = Object.keys(plan.walls)[0]
-    const [next, id] = placeOpening(plan, wallId, 'door', 40)
+    const [next, id] = placeOpening(plan, wallId, 'door', 30)
     expect(next).toBe(plan)
     expect(id).toBeNull()
   })
@@ -586,7 +606,26 @@ describe('openings', () => {
     const wallId = Object.keys(plan.walls)[0]
     let id: string | null
     ;[plan, id] = placeOpening(plan, wallId, 'window', 200)
-    expect(moveOpening(plan, id!, 390).openings[id!].offset).toBe(335)
+    expect(moveOpening(plan, id!, 390).openings[id!].offset).toBe(345)
+  })
+
+  it('stops a move at the near edge of a neighbouring opening', () => {
+    let plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'window', 100, { width: 80 })
+    // a door (90) at 300 occupies 255 → 345; the window can reach 215 at most
+    ;[plan] = placeOpening(plan, wallId, 'door', 300, { width: 90 })
+    expect(moveOpening(plan, id!, 400).openings[id!].offset).toBe(215)
+  })
+
+  it('places a new opening beside the one already under the pointer', () => {
+    let plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    ;[plan] = placeOpening(plan, wallId, 'door', 200, { width: 90 }) // 155 → 245
+    const [next, id] = placeOpening(plan, wallId, 'window', 220, { width: 60 })
+    // 220 sits past the door's centre, so the new window takes the far side
+    expect(next.openings[id!].offset).toBe(275)
   })
 
   it('changes width, re-clamping the offset', () => {
@@ -596,7 +635,21 @@ describe('openings', () => {
     ;[plan, id] = placeOpening(plan, wallId, 'door', 55)
     const next = setOpeningWidth(plan, id!, 160)
     expect(next.openings[id!].width).toBe(160)
-    expect(next.openings[id!].offset).toBe(85)
+    expect(next.openings[id!].offset).toBe(75)
+  })
+
+  it('slides an opening to make room for its new width, and refuses when it cannot', () => {
+    let plan = rectPlan()
+    const wallId = Object.keys(plan.walls)[0]
+    let id: string | null
+    ;[plan, id] = placeOpening(plan, wallId, 'window', 100, { width: 60 }) // 70 → 130
+    ;[plan] = placeOpening(plan, wallId, 'door', 200, { width: 90 }) // 155 → 245
+    // rail for the window: -5 → 155. Widening to 120 slides it up against the
+    // door, where it spans 35 → 155
+    const wider = setOpeningWidth(plan, id!, 120)
+    expect(wider.openings[id!]).toMatchObject({ width: 120, offset: 95 })
+    // 200 cannot fit in a 160-wide rail at all: the plan is left untouched
+    expect(setOpeningWidth(plan, id!, 200)).toBe(plan)
   })
 
   it('toggles door hinge side and swing', () => {

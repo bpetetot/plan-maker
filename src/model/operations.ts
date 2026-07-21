@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { Vec } from './geometry'
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry'
+import { clampCenter, openingPlacement, openingRail } from './openings'
 import type { Snap } from './snap'
 import type { Opening, Plan, Wall } from './types'
 import { defaultOpeningWidth, WALL_THICKNESS } from './types'
@@ -70,20 +71,33 @@ export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
 
   const start = plan.points[wall.startPointId]
   const cut = distance(start.x, start.y, point.x, point.y)
-  const openings: Record<string, Opening> = {}
+  // Two passes: every opening is first rebased onto its half, so the second
+  // pass reads the neighbours where they will actually be. Clamping against
+  // half-migrated openings would have them bound each other from the offsets
+  // they held on the wall that no longer exists.
+  const rebased: Record<string, Opening> = {}
+  const moved: string[] = []
   for (const opening of Object.values(plan.openings)) {
     if (opening.wallId !== wallId) {
-      openings[opening.id] = opening
+      rebased[opening.id] = opening
       continue
     }
     if (opening.offset - opening.width / 2 < cut && opening.offset + opening.width / 2 > cut) continue
     const host = opening.offset < cut ? startHalf : endHalf
     const offset = Math.round(opening.offset < cut ? opening.offset : opening.offset - cut)
+    rebased[opening.id] = { ...opening, wallId: host.id, offset }
+    moved.push(opening.id)
+  }
+  const staged = { ...next, openings: rebased }
+  const openings = { ...rebased }
+  for (const id of moved) {
+    const opening = rebased[id]
     // Kept only where it already sits: an opening the clamp would shift no
     // longer fits its half and is deleted, never silently moved.
-    const clamped = clampOpeningOffset(next, host, offset, opening.width)
-    if (clamped !== offset) continue
-    openings[opening.id] = { ...opening, wallId: host.id, offset }
+    const host = staged.walls[opening.wallId]
+    if (clampOpeningOffset(staged, host, opening.offset, opening.width, opening) !== opening.offset) {
+      delete openings[id]
+    }
   }
   return { ...next, openings }
 }
@@ -403,15 +417,28 @@ export function deleteOpening(plan: Plan, id: string): Plan {
 
 // ---------- openings ----------
 
-const OPENING_END_MARGIN = 5 // cm kept between an opening and the wall ends
-
-// Clamps a desired center offset so the opening (plus margin) fits the wall.
-// Returns null when the wall is too short to host it at all.
-export function clampOpeningOffset(plan: Plan, wall: Wall, offset: number, width: number): number | null {
-  const length = wallLength(plan, wall)
-  if (length < width + 2 * OPENING_END_MARGIN) return null
-  const margin = width / 2 + OPENING_END_MARGIN
-  return Math.round(Math.max(margin, Math.min(length - margin, offset)))
+// Clamps a desired center offset onto the opening's Rail, so it comes to rest
+// against the first thing that stops it — a mitered corner, a free end, or a
+// neighbouring opening — and never past it. Returns null when the rail is
+// narrower than the opening, the one case a gesture is refused outright.
+// `opening` is the one being moved or widened: it bounds nothing itself, and
+// its drawn position is what sides its neighbours. Omit it when placing a new
+// one, where the desired offset plays that part.
+export function clampOpeningOffset(
+  plan: Plan,
+  wall: Wall | undefined,
+  offset: number,
+  width: number,
+  opening?: Opening,
+): number | null {
+  if (!wall) return null
+  const reference = (opening && openingPlacement(plan, opening)?.offset) ?? offset
+  const rail = openingRail(plan, wall, reference, opening?.id)
+  if (rail.to - rail.from < width) return null
+  // Offsets are whole centimetres, but a mitered rail end is not: rounding
+  // comes first and the rail has the last word, so an opening pushed flush
+  // lands exactly on its bound and its measure reads exactly zero.
+  return clampCenter(rail, width, Math.round(clampCenter(rail, width, offset)))
 }
 
 // Returns the new plan and the placed opening's id (null when placement is
@@ -449,7 +476,7 @@ export function placeOpening(
 export function moveOpening(plan: Plan, id: string, offset: number): Plan {
   const opening = plan.openings[id]
   if (!opening) return plan
-  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], offset, opening.width)
+  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], offset, opening.width, opening)
   if (clamped === null) return plan
   return { ...plan, openings: { ...plan.openings, [id]: { ...opening, offset: clamped } } }
 }
@@ -457,7 +484,7 @@ export function moveOpening(plan: Plan, id: string, offset: number): Plan {
 export function setOpeningWidth(plan: Plan, id: string, width: number): Plan {
   const opening = plan.openings[id]
   if (!opening) return plan
-  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], opening.offset, width)
+  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], opening.offset, width, opening)
   if (clamped === null) return plan
   return { ...plan, openings: { ...plan.openings, [id]: { ...opening, width, offset: clamped } } }
 }
