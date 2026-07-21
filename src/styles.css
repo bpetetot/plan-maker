@@ -354,6 +354,20 @@ svg text.room-area {
 .help-label {
   color: var(--text);
 }
+/* The alternatives that reach one action, kept on a single line: the row is
+   about the action, and wrapping the badges would suggest two of them. */
+.help-keys {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.help-or {
+  margin-right: 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
 /* One badge for keys and gestures alike: "Scroll" and "2" are both answers to
    "what do I do". It hugs its content — the column is ragged by design, since
    the eye arrives here from the label rather than scanning the badges. */

@@ -15,6 +15,14 @@ wants to know how to leave a tool, someone reading "Editor" wants the whole
 cascade. Two sections carrying identical text would read as a rendering bug, so
 the multiplicity has to earn itself by saying something different.
 
+Within a section, **the label is the identity of an action**, and entries
+sharing one merge into a single row showing its keys as alternatives — Escape
+and right-click both leave a tool, and two rows carrying the same words read as
+a rendering fault rather than as a choice. Nothing is declared paired, so a
+shortcut that later says what a gesture already says joins it on its own. It
+also means a label reused carelessly for two unrelated things silently merges
+them, which is the failure this trades for, and it surfaces on screen.
+
 The map is typed **non-empty**. An undocumented shortcut is the one failure mode
 that is otherwise silent — nothing breaks, the key simply never appears — and a
 test that has to notice it is weaker than a type that refuses to compile it. The

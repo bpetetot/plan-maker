@@ -103,6 +103,25 @@ describe('every shortcut is documented', () => {
   })
 })
 
+// Escape and right-click both leave a tool. Listed as two rows carrying the
+// same words they read as a rendering fault, so the label is what identifies
+// an action and the ways to reach it gather on its row.
+describe('two ways to one action', () => {
+  it('gives them a single row, not one each', async () => {
+    const { unmount } = await setupEditor()
+    await key('?', { shiftKey: true })
+
+    const label = page.getByText('Back to the Select tool', { exact: true })
+    await expect.element(label).toBeVisible()
+    expect(label.elements()).toHaveLength(1)
+
+    const row = label.element().closest('.help-row')!
+    const keys = [...row.querySelectorAll('.help-key')].map((el) => el.textContent)
+    expect(keys).toEqual([keyHint('cancel'), 'Right-click'])
+    await unmount()
+  })
+})
+
 // A dialog with no visible way out is a trap on a touch screen, where there is
 // no Escape to press — this app is a PWA.
 describe('the close button', () => {

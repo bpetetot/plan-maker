@@ -115,20 +115,41 @@ export const keyHint = (action: ShortcutAction) =>
   SHORTCUTS[action].display ?? formatForDisplay(SHORTCUTS[action].hotkey)
 
 export interface HelpRow {
-  keys: string
+  /** Every way to reach this row's action — a row shows them as alternatives. */
+  keys: string[]
   label: string
 }
 
-/** What the help dialog lists under one section: shortcuts first, then gestures. */
-export const helpRows = (section: HelpSection): HelpRow[] => [
-  ...SHORTCUT_ACTIONS.flatMap((action) => {
+/**
+ * What the help dialog lists under one section: shortcuts first, then gestures.
+ *
+ * Entries carrying the *same label in the same section* are the same action
+ * reached two ways, and merge into one row — Escape and right-click both leave
+ * a tool, and listing that twice reads as a rendering fault rather than as a
+ * choice. The label is the whole identity: nothing has to be declared paired,
+ * so a future shortcut that says what a gesture already says joins it on its
+ * own. The row keeps the position of its first key.
+ */
+export const helpRows = (section: HelpSection): HelpRow[] => {
+  const rows: HelpRow[] = []
+  const byLabel = new Map<string, HelpRow>()
+  const add = (key: string, label: string) => {
+    const row = byLabel.get(label)
+    if (row) return void row.keys.push(key)
+    const fresh = { keys: [key], label }
+    byLabel.set(label, fresh)
+    rows.push(fresh)
+  }
+  for (const action of SHORTCUT_ACTIONS) {
     const label = SHORTCUTS[action].sections[section]
-    return label ? [{ keys: keyHint(action), label }] : []
-  }),
-  ...GESTURES.flatMap(({ gesture, sections }) =>
-    sections[section] ? [{ keys: gesture, label: sections[section] }] : [],
-  ),
-]
+    if (label) add(keyHint(action), label)
+  }
+  for (const { gesture, sections } of GESTURES) {
+    const label = sections[section]
+    if (label) add(gesture, label)
+  }
+  return rows
+}
 
 // Second bindings for an action the user may arrive with muscle memory for.
 // Never displayed: a button shows one key, and it is the primary above.
