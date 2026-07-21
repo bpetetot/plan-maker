@@ -2,8 +2,7 @@ import { mergeCoincidentPoints } from '../model/operations'
 import { dropOrphanRoomLabels } from '../model/rooms'
 import type { Opening, Plan } from '../model/types'
 
-// One schema, one migration path (spec §7): the IndexedDB record and the JSON
-// export file share this version and replay the same ordered migrations.
+// Spec §7: the IndexedDB record and the JSON export file share this version.
 export const SCHEMA_VERSION = 2
 
 export interface StoredRecord {
@@ -12,11 +11,10 @@ export interface StoredRecord {
   plan: Plan
 }
 
-// Keyed by the version they migrate FROM; applied in order up to SCHEMA_VERSION.
+// Keyed by the version they migrate FROM.
 type Migration = (plan: unknown) => unknown
 export const migrations: Record<number, Migration> = {
-  // v2 added the optional Wall.dimPlacement; absent means default rendering,
-  // so v1 plans are already valid v2 plans.
+  // v2 only added the optional Wall.dimPlacement: v1 plans are already valid v2.
   1: (plan) => plan,
 }
 
@@ -34,10 +32,8 @@ export function runMigrations(
   return current
 }
 
-// Shared load path for storage records and transfer files: migrate, validate,
-// then normalize — coincident points merge first (ADR 0003), since closing a
-// loop may give an otherwise-orphan label its room back. Throws like
-// runMigrations on a missing migration step.
+// Merge coincident points before dropping orphan labels (ADR 0003): closing a
+// loop can give an otherwise-orphan label its room back.
 export function decodePlanPayload(fromVersion: number, plan: unknown): Plan | null {
   const validated = validatePlan(runMigrations(fromVersion, plan))
   return validated && dropOrphanRoomLabels(mergeCoincidentPoints(validated))
@@ -63,7 +59,7 @@ function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening 
   return value.type === 'window'
 }
 
-// Structural + referential validation of a plan at the CURRENT schema version.
+// Assumes the plan is already migrated to SCHEMA_VERSION.
 export function validatePlan(value: unknown): Plan | null {
   if (!isRecord(value)) return null
   const { points, walls, openings, roomLabels } = value

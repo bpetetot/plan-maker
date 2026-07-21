@@ -1,7 +1,5 @@
-// Planar insertion at the end of a drag (issue 08, extending ADR 0002): a
-// point dropped onto another wall's body splits that wall (T junction), and a
-// dragged wall crossing another gets both split at the intersection (X
-// junction) — the whole gesture one history entry.
+// Planar insertion at the end of a drag, extending ADR 0002: drop on a body
+// splits it (T), crossing splits both (X) — one history entry per gesture.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
@@ -51,7 +49,6 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
 describe('point drag ending on a wall body', () => {
   it('splits the host wall at the dropped point (T junction), in one history entry', async () => {
     const { svg } = await setup()
-    // select w2 to reveal its point handles
     await marqueeSelect(svg, { x: 150, y: 50 }, { x: 250, y: 350 })
     const handles = svg.querySelectorAll('circle')
     expect(handles).toHaveLength(2)
@@ -71,7 +68,7 @@ describe('point drag ending on a wall body', () => {
 describe('group move ending wall-across-wall', () => {
   it('splits both walls at the crossing (X junction), in one history entry', async () => {
     const { svg } = await setup()
-    // select w2 and move it up by 150: it now spans (200,-50)→(200,150), crossing w1
+    // w2 moved up 150: spans (200,-50)→(200,150), crossing w1 at (200,0)
     await marqueeSelect(svg, { x: 150, y: 150 }, { x: 250, y: 350 })
     const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[1]
     await pointer(wallHit, 'pointerdown', { button: 0, ...clientAt(svg, 200, 200) })

@@ -49,8 +49,7 @@ describe('booleanPreference', () => {
   })
 })
 
-// The three preferences adopting the helper must keep the keys and sentinels
-// they shipped with — a rename would silently reset every existing device.
+// Keys and sentinels are frozen: a rename silently resets every existing device.
 describe('the preferences built on it', () => {
   it('keeps the grid on plan-maker:grid / hidden', () => {
     saveGridVisible(false)

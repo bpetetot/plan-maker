@@ -6,8 +6,7 @@ import { replacePlan, usePlanStore } from '../store/planStore'
 import Editor from './Editor'
 import { viewBoxOf } from './testKit'
 
-// A plan drawn far from the origin, entirely outside the default view.
-// Bounding box: x 2000, y 3000, w 600, h 400.
+// Bounding box x 2000, y 3000, w 600, h 400 — outside the default view.
 const farPlan = (): Plan => ({
   points: {
     a: { id: 'a', x: 2000, y: 3000 },
@@ -18,14 +17,12 @@ const farPlan = (): Plan => ({
   roomLabels: {},
 })
 
-// Fit framing = bounding box + 120 cm margin on each side, grown to the
-// screen's aspect ratio (the viewBox always matches the screen) and centered.
+// Fit = bbox + 120 cm margin per side, grown to screen aspect, centered.
 const FAR_PLAN_FIT = { x: 1880, y: 2880, w: 840, h: 640 }
 const DEFAULT_FRAME = { x: -80, y: -80, w: 820, h: 620 }
 
-// replacePlan mutates the store from outside any dispatched event, so the
-// reframe it triggers commits on React's scheduler — the one case where an
-// assertion has to retry (CLAUDE.md: no act() in browser mode).
+// replacePlan fires outside any event: the reframe commits on React's
+// scheduler, so poll (CLAUDE.md: no act() in browser mode).
 const expectFraming = async (
   container: HTMLElement,
   rect: { x: number; y: number; w: number; h: number },

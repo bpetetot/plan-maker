@@ -33,8 +33,8 @@ describe('elementsInRect', () => {
       const a = b.point(0, 0)
       const c = b.point(200, 0)
       const d = b.point(200, 500)
-      b.wall(a, c) // fully inside
-      b.wall(c, d) // one endpoint outside
+      b.wall(a, c)
+      b.wall(c, d)
     })
     const [inside, crossing] = Object.values(plan.walls)
     const refs = elementsInRect(plan, { x: -10, y: -10 }, { x: 300, y: 100 })
@@ -58,7 +58,7 @@ describe('elementsInRect', () => {
     })
     const wall = Object.values(plan.walls)[0]
     const opening = Object.values(plan.openings)[0]
-    // rect covers the middle of the wall: opening span [455, 545] fits, wall does not
+    // opening span [455, 545] fits the rect; the wall does not
     const refs = elementsInRect(plan, { x: 400, y: -50 }, { x: 600, y: 50 })
     expect(isSelected(refs, openingRef(opening.id))).toBe(true)
     expect(isSelected(refs, wallRef(wall.id))).toBe(false)
@@ -143,7 +143,7 @@ describe('translateElements', () => {
       const c = b.point(400, 0)
       const d = b.point(400, 300)
       b.wall(a, c)
-      b.wall(c, d) // neighbor, not selected
+      b.wall(c, d)
     })
     const [w1, w2] = Object.values(plan.walls)
     const next = translateElements(plan, [wallRef(w1.id)], 100, 0)
@@ -216,7 +216,6 @@ describe('deleteElements — room label cascade', () => {
 
   it('deletes the label of a room whose wall is deleted', () => {
     const { plan, leftWalls, rightLabel } = twoLabeledRooms()
-    // deleting one boundary wall opens the left loop: its label goes too
     const next = deleteElements(plan, [wallRef(leftWalls[0])])
     expect(Object.keys(next.roomLabels)).toEqual([rightLabel])
   })

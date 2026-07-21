@@ -1,8 +1,5 @@
-// The editor's shortcut registry: history, tool switching, and the typing
-// guard that silences every one of them while a room is being named. The
-// guard is the reason these keystrokes are dispatched at the focused element
-// and left to bubble — dispatched at window they would bypass the very thing
-// under test.
+// Keystrokes leave from the focused element and bubble: dispatched at window
+// they would bypass the typing guard under test.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -44,9 +41,7 @@ async function setup() {
   return { container, svg: container.querySelector('svg')!, unmount }
 }
 
-// Deleting the top wall is the cheapest undoable edit to observe on the plan.
-// A marquee rather than a click: it selects on geometry alone, with no
-// tolerance to get right.
+// Marquee, not a click: selects on geometry alone, no tolerance to get right.
 async function deleteAWall(svg: SVGSVGElement) {
   await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 80, 80) })
   await pointer(svg, 'pointermove', clientAt(svg, 520, 120))
@@ -83,8 +78,7 @@ describe('tool shortcuts', () => {
     await key('2')
     expect(pressed('Wall')).toBe('true')
 
-    // Ctrl+1 is a browser tab shortcut, not a tool switch — the strict modifier
-    // match is what keeps the bare digit from answering for the combo too.
+    // Ctrl+1 is a browser tab shortcut, not a tool switch.
     await key('1', { ctrlKey: true })
     expect(pressed('Wall')).toBe('true')
 
@@ -94,10 +88,8 @@ describe('tool shortcuts', () => {
   })
 })
 
-// The point of the registry is that the key a button advertises and the key
-// that works are the same fact. Pressing what is on screen is the only
-// assertion that catches them drifting apart — comparing the label to the
-// registry would just be the registry compared to itself.
+// Press the on-screen hint, not the registry value: comparing the label to the
+// registry would be the registry compared to itself.
 describe('the advertised key is the working key', () => {
   it('activates each tool by pressing the hint printed on its button', async () => {
     const { container, unmount } = await setup()
@@ -113,7 +105,7 @@ describe('the advertised key is the working key', () => {
   it('toggles snap by pressing the key named in the toggle title', async () => {
     const { container, unmount } = await setup()
     const snap = container.querySelector('button[aria-label="Snap"]')!
-    // title reads "Disable snap (S)" — the parenthesised key is the contract
+    // title reads "Disable snap (S)"
     const hint = snap.getAttribute('title')!.match(/\(([^)]+)\)/)![1]
     expect(snap.getAttribute('aria-pressed')).toBe('true')
     await key(hint)
@@ -125,8 +117,6 @@ describe('the advertised key is the working key', () => {
 describe('the typing guard', () => {
   it('leaves the plan alone when Mod+Z is pressed while naming a room', async () => {
     const { svg, unmount } = await setup()
-    // One committed edit to undo — and the room stays closed, so it can be
-    // double-clicked again to reopen the field.
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300))
     await userEvent.fill(nameInput(), 'Kitchen')
     await userEvent.keyboard('{Enter}')
@@ -134,8 +124,6 @@ describe('the typing guard', () => {
 
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300))
     await userEvent.fill(nameInput(), 'Kitchenette')
-    // Mod+Z here belongs to the field the user is typing in. Undoing the *plan*
-    // under a half-typed name would be a silent, unrelated edit.
     await key('z', { ctrlKey: true })
     expect(Object.values(plan().roomLabels)[0]).toMatchObject({ name: 'Kitchen' })
     await unmount()
@@ -147,8 +135,6 @@ describe('the typing guard', () => {
     expect(snapPressed()).toBe('true')
 
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300))
-    // The keystroke has to leave from the field itself, or the guard under test
-    // is never on its path — assert where the focus is rather than assume it.
     expect(document.activeElement).toBe(nameInput().element())
     await key('s')
     expect(snapPressed()).toBe('true')

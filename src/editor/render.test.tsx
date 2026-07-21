@@ -15,7 +15,6 @@ import {
   WallLine,
 } from './render'
 
-// A single-wall plan from (x1,y1) to (x2,y2), thickness 10 unless given.
 function planWith(
   x1: number,
   y1: number,
@@ -68,9 +67,6 @@ describe('labelAngle', () => {
 })
 
 describe('DimLabel value', () => {
-  // A dimension measures the rendered silhouette on the side it sits on —
-  // 3,90 m inside, 4,10 m outside a 4×4 m axis square, and the hors-tout
-  // extent (axis + thickness) on a free-standing wall.
   it('shows the hors-tout extent on a free-standing wall', async () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { text } = await renderDim(plan, wall)
@@ -80,10 +76,10 @@ describe('DimLabel value', () => {
   it('measures the silhouette on the side it sits on', async () => {
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
-    // default side for a horizontal wall is the upper one — outside the room
+    // default side of a horizontal wall: upper — outside the room
     expect((await renderDim(plan, bottom)).text.textContent).toBe('4,10 m')
     await cleanup()
-    // dragged inside the room (side +1, below in screen coords): interior face
+    // side +1: below in screen coords — the interior face
     bottom.dimPlacement = { t: 0.5, side: 1 }
     expect((await renderDim(plan, bottom)).text.textContent).toBe('3,90 m')
   })
@@ -95,19 +91,16 @@ describe('DimLabel value', () => {
         <DimLabel plan={plan} wall={wall} />
       </svg>,
     )
-    // 2 line pieces around the text + 2 arrowheads inside the extent
     expect(container.querySelectorAll('line')).toHaveLength(2)
     const heads = Array.from(container.querySelectorAll('polygon'))
     expect(heads).toHaveLength(2)
-    // the tips sit exactly on the silhouette ends, x = -5 and 405
+    // tips on the silhouette ends: x = -5 and 405
     expect(heads[0].getAttribute('points')!.startsWith('-5,-15 ')).toBe(true)
     expect(heads[1].getAttribute('points')!.startsWith('405,-15 ')).toBe(true)
   })
 
   it('moves the arrowheads outside a short extent, as bare triangles', async () => {
-    // a 25 cm wall: the text gap swallows the whole line, so the heads move
-    // outside the extent, pointing inward at each other — marking the
-    // measured extent is the point when a value refines
+    // 25 cm wall: the text gap swallows the line, heads move outside
     const { plan, wall } = planWith(0, 0, 25, 0)
     const { container } = await render(
       <svg>
@@ -115,16 +108,12 @@ describe('DimLabel value', () => {
       </svg>,
     )
     expect(container.querySelector('text')!.textContent).toBe('35 cm')
-    // two short line pieces survive between the head tips and the plate —
-    // inside the extent, nothing sticks out past the outside heads
     expect(container.querySelectorAll('line')).toHaveLength(2)
     expect(container.querySelectorAll('polygon')).toHaveLength(2)
   })
 
   it('pins the arrow tips to the span ends, however small the span', async () => {
-    // a 20 cm wall between two 19 cm walls: measured 9.5→10.5 on the inner
-    // side, a 1 cm span — the tips stay exactly on its ends, the heads
-    // simply overhang outside.
+    // 20 cm wall between two 19 cm walls: inner-side span 9.5→10.5
     let wallId = ''
     const plan = buildPlan((b) => {
       const l = b.point(0, 0)
@@ -149,11 +138,9 @@ describe('DimLabel value', () => {
 })
 
 describe('dimTravelBounds', () => {
-  // The Rail: the text center's travel along the wall, bounded so the plate
-  // never rides an arrowhead.
   it('stops the plate at the base of inside heads', () => {
-    // free-standing 400 cm wall, thickness 10: silhouette -5..405, "4,10 m"
-    // → plate half-width 16.4, heads inside → margin 7 + 16.4 = 23.4
+    // 400 cm wall, thickness 10: silhouette -5..405, plate half-width 16.4
+    // heads inside → margin 7 + 16.4 = 23.4
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { min, max } = dimTravelBounds(plan, wall, -1)
     expect(min).toBeCloseTo((-5 + 23.4) / 400, 5)
@@ -161,7 +148,7 @@ describe('dimTravelBounds', () => {
   })
 
   it('lets the plate reach the extent bounds when the heads sit outside', () => {
-    // 30 cm wall, thickness 10: silhouette -5..35 (40 cm), plate 28 wide —
+    // 30 cm wall, thickness 10: silhouette -5..35, plate 28 wide
     // heads outside → margin is the plate half-width only
     const { plan, wall } = planWith(0, 0, 30, 0)
     const { min, max } = dimTravelBounds(plan, wall, -1)
@@ -179,8 +166,6 @@ describe('dimTravelBounds', () => {
 })
 
 describe('DimLabel selection', () => {
-  // The whole dimension — text, line pieces, arrowheads — shares the selected
-  // wall's accent, so the wall and its measure read as one selected thing.
   it('renders the whole dimension in accent when its wall is selected', async () => {
     const { plan, wall } = planWith(0, 0, 400, 0)
     const { container } = await render(
@@ -234,7 +219,7 @@ describe('WallLine', () => {
     const plan = squareRoomPlan()
     const bottom = Object.values(plan.walls)[0]
     const polygon = await renderWall(plan, bottom)
-    // interior face (y=5) from 5 to 395, exterior face (y=-5) from -5 to 405
+    // interior face y=5 spans 5..395, exterior face y=-5 spans -5..405
     expect(polygon.getAttribute('points')).toBe('5,5 395,5 405,-5 -5,-5')
   })
 })
@@ -255,7 +240,7 @@ describe('DimLabel on a vertical wall', () => {
   it('defaults to the left side of the wall (above the reading line)', async () => {
     const { plan, wall } = planWith(0, 0, 0, 200)
     const { group } = await renderDim(plan, wall)
-    // the text group sits on the dimension line, 15 left of the wall axis
+    // -15: on the dimension line, left of the wall axis
     expect(group.getAttribute('transform')).toBe('translate(-15,100) rotate(-90)')
   })
 
@@ -273,9 +258,8 @@ describe('DimLabel on a vertical wall', () => {
   })
 
   it('keeps a stored placement on its geometric side', async () => {
-    // Geometric right is side -1 when drawn downward, side +1 when drawn
-    // upward (side is a sign along the start→end left normal). Both must
-    // land 15 right of the wall axis.
+    // side is a sign along the start→end left normal: geometric right is
+    // -1 drawn downward, +1 drawn upward — both land at x = 15
     for (const [y1, y2, side] of [
       [0, 200, -1],
       [200, 0, 1],
@@ -337,8 +321,7 @@ describe('JunctionPatches', () => {
 })
 
 describe('Grab zones', () => {
-  // The grab zone covers the element's body plus a constant on-screen margin
-  // (2 px per side), whatever the wall's thickness (CONTEXT.md: Grab zone).
+  // Body plus a constant 2 screen px per side (CONTEXT.md: Grab zone).
   it('sizes a wall grab zone to the body plus 2 screen px per side', async () => {
     const { plan, wall } = planWith(0, 0, 400, 0, 30)
     const { container } = await render(
@@ -362,8 +345,8 @@ describe('Grab zones', () => {
   })
 
   it('covers the square body overhang at a free wall end: square cap', async () => {
-    // A round cap of radius thickness/2 + margin misses the square corners of
-    // the body overhang (at 0.707 × thickness from the Point on thick walls).
+    // Not a round cap: it misses the square corners of the body overhang,
+    // at 0.707 × thickness from the Point.
     const { plan, wall } = planWith(0, 0, 400, 0, 30)
     const { container } = await render(
       <svg>

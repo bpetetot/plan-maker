@@ -1,6 +1,4 @@
-// The per-device display preferences, held as session state so the shortcut,
-// the toolbar button and the PNG export all read one value (CONTEXT.md:
-// Preference).
+// CONTEXT.md: Preference — one session value behind shortcut, toolbar, export.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadGridVisible } from './grid'
 import { loadMeasuresVisible } from './measurePref'
@@ -32,10 +30,8 @@ describe('toggling', () => {
   })
 })
 
-// ADR 0008: the editor draws with the measure preference and the export prints
-// with it, so the two may never disagree. Storage does nothing, silently, when
-// it is unavailable — which is why the session holds the value and storage only
-// makes it outlive a reload.
+// ADR 0008: editor and export may never disagree. Session, not storage —
+// storage fails silently when unavailable.
 describe('the export reader', () => {
   it('follows the session, not storage', () => {
     toggleMeasures()

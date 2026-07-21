@@ -11,10 +11,8 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-// The displayed percentage is relative to the default framing (820×620 fitted
-// with the min ratio into the window at the last load or Fit). The window
-// never resizes here, so expected values read as ratios of framing scales.
-// The test screen is 800×600.
+// Percentage = ratio to the default 820×620 framing, fitted with the min ratio
+// into the fixed 800×600 test screen.
 const scale = (w: number, h: number) => Math.min(800 / w, 600 / h)
 const pct = (w: number, h: number) => `${Math.round((scale(w, h) / scale(820, 620)) * 100)}%`
 
@@ -26,27 +24,27 @@ describe('zoom percentage indicator', () => {
 
   it('refreshes after a single click on Zoom in', async () => {
     await render(<Editor />)
-    await userEvent.click(page.getByLabelText('Zoom in')) // view ×(1/1.25)
+    await userEvent.click(page.getByLabelText('Zoom in'))
     expect(zoomLabel()).toBe(pct(820 / 1.25, 620 / 1.25)) // 125%
   })
 
   it('refreshes after a single click on Zoom out', async () => {
     await render(<Editor />)
-    await userEvent.click(page.getByLabelText('Zoom out')) // view ×1.25
+    await userEvent.click(page.getByLabelText('Zoom out'))
     expect(zoomLabel()).toBe(pct(820 * 1.25, 620 * 1.25)) // 80%
   })
 
   it('refreshes after a wheel zoom', async () => {
     const { container } = await render(<Editor />)
     const svg = container.querySelector('svg')!
-    await wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 }) // view ×(1/1.08)
+    await wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 })
     expect(zoomLabel()).toBe(pct(820 / 1.08, 620 / 1.08)) // 108%
   })
 
   it('refreshes after a single click on Fit to plan', async () => {
     await render(<Editor />)
-    await userEvent.click(page.getByLabelText('Zoom in')) // leave the default view
-    await userEvent.click(page.getByTitle('Fit to plan')) // empty plan → default view
+    await userEvent.click(page.getByLabelText('Zoom in'))
+    await userEvent.click(page.getByTitle('Fit to plan'))
     expect(zoomLabel()).toBe(pct(820, 620)) // 100%
   })
 })

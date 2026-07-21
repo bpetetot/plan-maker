@@ -11,12 +11,11 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-// The viewport is the fixture here — a real resize, observed by a real
-// ResizeObserver — so it is restored for the files that follow.
+// These tests really resize the viewport; restore it for the files that follow.
 afterEach(() => page.viewport(800, 600))
 
-// Default framing on the 800×600 test screen: the default frame (820×620 at
-// -80,-80) fitted with the min ratio — scale 600/620, centered horizontally.
+// Default frame 820×620 at -80,-80 fitted to the 800×600 screen: min ratio
+// 600/620, centered horizontally.
 const S0 = 600 / 620
 
 describe('window resize never pans or zooms the view', () => {

@@ -11,30 +11,21 @@ import {
 } from './geometry'
 import type { Plan, RoomLabel, Wall } from './types'
 
-// Rooms are derived, never stored (spec §2): the closed faces of the wall
-// graph, found by walking every directed edge with a "most clockwise turn"
-// rule. Interior faces come out with positive shoelace area in screen
-// coordinates; the outer face of each component is negative — it is the
-// component's silhouette, and when it lies inside a room of another
-// component it punches a hole in that room (CONTEXT.md: Room): a room fully
-// contained in another is excluded from it, walls included.
+// Rooms are derived, never stored (spec §2; CONTEXT.md: Room): faces of the
+// wall graph. Positive area = interior, negative = silhouette, punches holes.
 
 export interface Room {
   pointIds: string[]
   polygon: Vec[]
-  // silhouettes of the islands directly inside this room — directed point
-  // loops as the face walk produced them (the room lies on side +1 of each
-  // edge, like its own boundary loop) and their axis polygons
+  // island silhouettes, directed as the face walk left them: room on side +1
   holeLoops: string[][]
   holes: Vec[][]
   areaCm2: number
-  // where the room's text block sits by default: the centroid of the holed
-  // region, or the pole of inaccessibility when the centroid falls inside an
-  // island (CONTEXT.md: Room label)
+  // default text-block position (CONTEXT.md: Room label)
   anchor: Vec
 }
 
-const MIN_ROOM_AREA_CM2 = 100 // drop degenerate slivers
+const MIN_ROOM_AREA_CM2 = 100
 
 export function detectRooms(plan: Plan): Room[] {
   const neighbors = new Map<string, string[]>()
@@ -54,7 +45,6 @@ export function detectRooms(plan: Plan): Room[] {
     return Math.atan2(to.y - from.y, to.x - from.x)
   }
 
-  // neighbors sorted by ascending angle, for rotational "next edge" lookup
   const sorted = new Map<string, { id: string; angle: number }[]>()
   for (const [id, list] of neighbors) {
     sorted.set(
@@ -63,10 +53,8 @@ export function detectRooms(plan: Plan): Room[] {
     )
   }
 
-  // Next face edge after arriving at `v` from `u`: the neighbor whose angle is
-  // the next one clockwise from the back edge (v→u) — i.e. the largest angle
-  // strictly below the back-edge angle, wrapping to the overall largest.
-  // The back edge itself is only taken at a dead end.
+  // Next edge clockwise from the back edge (v→u), wrapping to the largest.
+  // Back edge itself only at a dead end.
   const nextInFace = (u: string, v: string): string => {
     const around = sorted.get(v)!
     const backAngle = angleFrom(v, u)
@@ -82,9 +70,8 @@ export function detectRooms(plan: Plan): Room[] {
     return (below ?? wrap)?.id ?? u
   }
 
-  // connected component of every Point, to tell an island — a separate
-  // component whose silhouette lies inside a room — from a lobe of the room's
-  // own walls (already excluded by the face walk itself)
+  // an island is a *separate* component inside a room, not a lobe of the
+  // room's own walls
   const componentOf = new Map<string, number>()
   let componentCount = 0
   for (const id of neighbors.keys()) {
@@ -118,7 +105,6 @@ export function detectRooms(plan: Plan): Room[] {
       const facePointIds: string[] = []
       let u = start
       let v = first
-      // walk the face; every directed edge belongs to exactly one face
       while (!visited.has(edgeKey(u, v))) {
         visited.add(edgeKey(u, v))
         facePointIds.push(u)
@@ -142,9 +128,6 @@ export function detectRooms(plan: Plan): Room[] {
     anchor: { x: 0, y: 0 },
   }))
 
-  // each component's silhouette punches a hole in the innermost room of
-  // another component containing it — detection and containment stay on the
-  // axis polygons
   for (const silhouette of silhouettes) {
     const rep = plan.points[silhouette.pointIds[0]]
     let container: number | null = null
@@ -160,9 +143,8 @@ export function detectRooms(plan: Plan): Room[] {
   }
 
   for (const room of rooms) {
-    // the room's area is its floor surface: bounded by its walls' interior
-    // faces, minus each island's footprint out to its exterior faces — the
-    // silhouette loop runs the other way, so interiorPolygon offsets outward
+    // islands count out to their exterior faces: the silhouette loop runs the
+    // other way, so interiorPolygon offsets outward
     const floor = polygonArea(interiorPolygon(plan, room.pointIds))
     const islands = room.holeLoops.reduce(
       (sum, loop) => sum + Math.abs(polygonArea(interiorPolygon(plan, loop))),
@@ -189,8 +171,6 @@ export function roomAt(rooms: Room[], x: number, y: number): Room | null {
   return rooms.find((room) => roomContains(room, x, y)) ?? null
 }
 
-// Nearest point of the room's region to `point`: inside the boundary and
-// outside every island. Degenerate regions fall back to the anchor.
 export function clampToRoom(point: Vec, room: Room): Vec {
   const inBoundary = clampToPolygon(point, room.polygon)
   const hole = room.holes.find((h) => pointInPolygon(inBoundary, h))
@@ -199,8 +179,6 @@ export function clampToRoom(point: Vec, room: Room): Vec {
   return roomContains(room, out.x, out.y) ? out : room.anchor
 }
 
-// The walls tracing a room's boundary, one per consecutive pair of loop
-// points; null when a pair has no wall (degenerate plan).
 export function roomWallIds(plan: Plan, room: Room): string[] | null {
   const byPair = new Map<string, string>()
   for (const wall of Object.values(plan.walls)) {
@@ -222,19 +200,8 @@ const sameLoop = (a: Room, b: Room) => {
   return a.pointIds.every((id) => ids.has(id))
 }
 
-// Reconciliation after a wall change (CONTEXT.md: Room label) — an orphan
-// label never exists, and a room never keeps more than one label. A label
-// belongs to its room, not to a position: its home room (the one containing
-// it in `before`) is matched by point loop in `after`, so a wall sweeping
-// past the label never hands it to the neighbouring room. Position
-// containment only decides when the home loop is gone (a split or merge
-// changed the loop); a label inside no room is deleted. A default-placement
-// label's stored position is pinned to its room's live anchor (stored =
-// shown = exported); a custom placement holds only while its room contains
-// it, else it reverts to default. When several labels end up in one room
-// (e.g. deleting a dividing wall merged two named rooms), only the oldest
-// survives. Reconciling a plan against itself purges plain orphans (import,
-// restore).
+// A label belongs to its room, not a position (CONTEXT.md: Room label): home
+// room matched by loop, not containment, so a passing wall cannot steal it.
 export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
   const labels = Object.values(after.roomLabels)
   if (labels.length === 0) return after
@@ -243,8 +210,8 @@ export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
   let changed = false
   const kept: { label: RoomLabel; room: Room }[] = []
   for (const label of labels) {
-    // the label may have been moved by the gesture itself (rigid group move):
-    // its home room is found from its pre-change position
+    // a rigid group move may already have moved the label: home room comes
+    // from its pre-change position
     const pos = before.roomLabels[label.id] ?? label
     const homeBefore = roomAt(roomsBefore, pos.x, pos.y)
     const home = homeBefore ? (roomsAfter.find((room) => sameLoop(room, homeBefore)) ?? null) : null
@@ -282,19 +249,12 @@ export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
   return changed ? { ...after, roomLabels: next } : after
 }
 
-// Load-path guard: reconciling a plan against itself drops orphans (an
-// orphan label never exists — CONTEXT.md: Room label) and pins stray
-// default placements back to their room's centroid.
+// Self-reconcile on load: drops orphans, re-pins stray default placements
+// (CONTEXT.md: Room label).
 export const dropOrphanRoomLabels = (plan: Plan): Plan => reconcileRoomLabels(plan, plan)
 
-// The side of the wall facing a detected room, when exactly one of its two
-// sides does — the wall then "borders exactly one room" and that side is its
-// interior. Null otherwise: standalone wall (no side faces a room), party
-// wall between two rooms — including an island wall, whose outer face
-// borders the containing room —, or dangling wall inside a room (both sides
-// face the same room). Sides follow the faces convention: the face walk
-// leaves its region on side +1 (the start→end left normal) of every directed
-// edge, for boundary and hole loops alike.
+// Null unless exactly one side faces a room (standalone, party, dangling).
+// Faces convention: a region lies on side +1 of its directed edges.
 export function interiorSide(rooms: Room[], wall: Wall): 1 | -1 | null {
   const sides = new Set<1 | -1>()
   for (const room of rooms) {
@@ -311,10 +271,8 @@ export function interiorSide(rooms: Room[], wall: Wall): 1 | -1 | null {
   return sides.has(1) ? 1 : -1
 }
 
-// Display measures of a wall, derived (never stored) from the same silhouette
-// readings the canvas Dimensions use, so the two can never disagree. Oriented
-// when the wall borders exactly one room: the interior side's tape-measurable
-// span, the exterior side's (the hors-tout extent), and the thickness.
+// Derived from the same silhouette readings as the canvas Dimensions, so the
+// two cannot disagree.
 export type WallMeasures =
   | { kind: 'oriented'; interior: number; exterior: number; thickness: number }
   | { kind: 'plain'; length: number; thickness: number }
@@ -329,8 +287,7 @@ export function wallMeasures(plan: Plan, rooms: Room[], wall: Wall): WallMeasure
       thickness: wall.thickness,
     }
   }
-  // no claimed orientation: the hors-tout extent — the union of the two faces'
-  // axis spans, i.e. the full drawn body between mitered corners and overhangs
+  // unoriented: hors-tout extent — union of both faces' axis spans
   const s1 = faceSpan(plan, wall, 1)
   const s2 = faceSpan(plan, wall, -1)
   const length = Math.max(0, Math.max(s1.to, s2.to) - Math.min(s1.from, s2.from))

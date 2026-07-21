@@ -1,6 +1,4 @@
-// Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05
-// prototype: full-bleed canvas, floating toolbar, click-to-click walls,
-// selection panel on the left, dimensions always visible.
+// Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05 prototype.
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useKeyHold } from '@tanstack/react-hotkeys'
 import {
@@ -80,48 +78,34 @@ import { useSpaceHeld, useView } from './useView'
 
 type Drag =
   | { kind: 'pan'; x: number; y: number }
-  // `orig` is the plan at drag start — labels reconcile against it at the
-  // end of the gesture, never on intermediate states
+  // `orig`: plan at drag start. Labels reconcile against it at gesture end,
+  // never on intermediate states.
   | { kind: 'point'; id: string; orig: Plan }
   | {
       kind: 'group'
       refs: ElementRef[]
       start: Vec
       orig: Plan
-      // set when the drag started on an element of a multi-selection: a
-      // movement below the click threshold collapses the selection to it
       clickRef?: ElementRef
-      // the point the realignment lands on the grid, fixed at pointer-down so
-      // the preview never jumps when another candidate becomes the nearest
+      // Fixed at pointer-down, not recomputed: the preview would jump when
+      // another candidate became the nearest.
       refPoint: Vec | null
       moved?: boolean
     }
-  // dragging an opening along its wall; below the click threshold it is a
-  // plain click — the placement dimensions only show once it becomes a move.
-  // `grabDelta` keeps the grab point under the cursor for the whole gesture
-  // (CONTEXT.md: Grab zone): center offset minus the cursor's projection at
-  // pointer-down, applied to every subsequent projection
+  // `grabDelta` keeps the grab point under the cursor (CONTEXT.md: Grab zone).
   | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
-  // dragging a room's text block. `room` is the room containing the block at
-  // drag start: the block can never leave it (the drag clamps to its region).
-  // null is defensive — an orphan label cannot arise from plan operations
-  // (CONTEXT.md: Room label) — and lets such a label move freely. Same
-  // grab-point rule: rendered block position minus the cursor.
+  // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
+  // Room label) is defensive and moves freely.
   | { kind: 'label'; id: string; room: Room | null; grabDelta: Vec }
-  // dragging the text block of a room that has no label yet: the nameless
-  // label is only created once the pointer crosses the click threshold, so a
-  // plain click never touches the plan. Same grab-point rule, from the
-  // block's rendered position (the room anchor)
+  // The label is created only past the click threshold: a plain click must
+  // not touch the plan.
   | { kind: 'newLabel'; start: Vec; room: Room; grabDelta: Vec; id?: string }
-  // dragging a wall's dimension label; a movement below the click threshold
-  // resolves to "select the wall" on pointer up. Same grab-point rule: the
-  // text's position along the axis (cm) minus the cursor's projection
   | { kind: 'dim'; id: string; start: Vec; grabDelta: number; moved?: boolean }
-  // the live rect lives on the drag ref (b is mutated on move) so pointer-up
-  // never reads a stale React state; the marquee state only drives rendering
+  // `b` is mutated on the ref, not held in state: pointer-up would read a
+  // stale React value.
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
 
-// Below this movement (screen px) a marquee or group drag is a plain click.
+// Screen px; below this a drag is a plain click.
 const CLICK_PX = 4
 
 const pointSnap = (p: Plan, id: string): Snap => ({
@@ -131,15 +115,8 @@ const pointSnap = (p: Plan, id: string): Snap => ({
   pointId: id,
 })
 
-/**
- * What the editor can be told to do from outside it.
- *
- * The shortcut registry sits in App (ADR 0012), but these commands read state
- * that has no reason to leave the editor — the wall chain mid-draw, the current
- * selection, the camera and the `<svg>` it is measured against. Lifting that
- * state to App to make a keystroke reach it would move the editor's insides
- * into its parent. A ref is read at call time, so no callback here can go stale.
- */
+/** Registry lives in App (ADR 0012); lifting this state there instead would
+ *  move the editor's insides into its parent. Read through a ref, never stale. */
 export interface EditorCommands {
   cancel: () => void
   deleteSelection: () => void
@@ -152,13 +129,7 @@ export interface EditorCommands {
   zoomActual: () => void
 }
 
-/**
- * The registry actions the editor owns, bound to a mounted one.
- *
- * Shared so that whoever mounts the registry — App, or a test harness — reaches
- * the editor the same way. Each call goes through `ref.current` at the moment
- * the key is pressed, so an unmounted editor simply does nothing.
- */
+/** Shared so App and test harnesses reach the editor the same way. */
 export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => ({
   cancel: () => ref.current?.cancel(),
   deleteSelection: () => ref.current?.deleteSelection(),
@@ -170,8 +141,6 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
   zoomActual: () => ref.current?.zoomActual(),
 })
 
-// `ref` is renamed on the way in: the editor's own handlers use `ref` for an
-// ElementRef, the plan's notion, and that word was here first.
 export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
@@ -188,21 +157,17 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults)
   const [sel, setSel] = useState<ElementRef[]>([])
   const [hoverWall, setHoverWall] = useState<string | null>(null)
-  // A wall chain being drawn. The first click is held as a pending snap —
-  // nothing is committed to the plan until the first wall commit, so aborting
-  // the chain (Esc, tool switch, double-click) never mutates the plan.
+  // First click held as a pending snap, not committed: aborting the chain
+  // (Esc, tool switch, double-click) must not mutate the plan.
   const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null)
   const [snap, setSnap] = useState<Snap | null>(null)
   const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null)
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
     null,
   )
-  // wall whose dimension is being dragged past the click threshold — drives the rails
-  // opening being solo-dragged — drives its placement dimensions
   const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null)
-  // Inline room-name editing over a text block (Excalidraw-style). The plan is
-  // only touched on commit — one undo entry — and Escape cancels; labelId is
-  // null while the room has no label yet (one is created on non-empty commit).
+  // Plan touched on commit only, not per keystroke: one undo entry.
+  // labelId null until the room has a label — created on non-empty commit.
   const [editing, setEditing] = useState<{
     key: string
     labelId: string | null
@@ -213,18 +178,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const editCancelled = useRef(false)
   const space = useSpaceHeld()
   const drag = useRef<Drag | null>(null)
-  // Alt is tracked, not just sampled: the snap toggle shows the *effective*
-  // state, so pressing and releasing the key has to re-render. The tracker
-  // re-renders only on this key's own transitions, and clears itself when the
-  // window goes away — the keyup after an Alt+Tab never arrives.
+  // Tracked, not sampled: the snap toggle shows the *effective* state, so Alt
+  // transitions must re-render. The keyup after an Alt+Tab never arrives.
   const altHeld = useKeyHold('Alt')
-  // Snap's two alignment rungs are suspended when snapping is off, and Alt
-  // inverts whichever state is current for the gesture's duration (ADR 0007).
+  // Alt inverts the current snap state for the gesture (ADR 0007).
   const isFree = (alt: boolean) => !snapEnabled !== alt
   const free = isFree(altHeld)
 
-  // Fit after any replacement of the plan (open, startup restore, reset).
-  // Runs on mount too, which frames the plan restored before the editor mounted.
+  // Fit on any plan replacement (open, restore, reset); mount included, which
+  // frames a plan restored before the editor mounted.
   useEffect(() => {
     fitPlan(usePlanStore.getState().plan)
     // fitPlan is recreated every render but only reads the svg ref; epoch is the trigger
@@ -233,9 +195,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
 
   const rooms = useMemo(() => detectRooms(plan), [plan])
   const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan])
-  // While walls are dragged the plan only reconciles labels at the end of the
-  // gesture — but the displayed labels preview that reconciliation live, so a
-  // default-placement block keeps tracking its room's anchor mid-gesture.
+  // The plan reconciles labels only at gesture end; the display previews it
+  // live, so a default-placement block tracks its room's anchor mid-drag.
   const dragNow = drag.current
   const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null
   const overlayLabels = useMemo(
@@ -268,10 +229,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     saveSnapEnabled(!snapEnabled)
   }, [snapEnabled])
 
-  // No dependency list: the handle is rebuilt every render, so every command
-  // closes over the state of the render that installed it. The alternative —
-  // one list naming chain, sel, tool, snapEnabled and the camera — would go
-  // stale the first time someone forgot to extend it.
+  // No dependency list: a list naming chain, sel, tool, snapEnabled and the
+  // camera goes stale the first time someone forgets to extend it.
   useImperativeHandle(commands, () => ({
     cancel: () => {
       if (chain) setChain(null)
@@ -284,9 +243,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     zoomIn: () => zoomCenter(1 / 1.25),
     zoomOut: () => zoomCenter(1.25),
     fit: () => fitPlan(plan),
-    // zoomCenter divides the scale by its factor, and zoomRatio *is* the
-    // current scale over the 100% reference — so the ratio is the factor that
-    // lands exactly on 100%.
+    // zoomCenter divides by its factor and zoomRatio is scale over the 100%
+    // reference, so the ratio is the factor landing exactly on 100%.
     zoomActual: () => zoomCenter(zoomRatio),
   }))
 
@@ -298,7 +256,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const onSvgPointerDown = (e: React.PointerEvent) => {
     const svg = svgRef.current!
     if (drag.current) {
-      // a child handler already started a drag — just capture the pointer
       svg.setPointerCapture(e.pointerId)
       return
     }
@@ -313,7 +270,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined
       const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free })
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
-        // clicking the chain's start point closes the room
         setPlan(
           (p) =>
             commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start), defaults.wallThickness)[0],
@@ -323,8 +279,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         return
       }
       if (chain) {
-        // one setPlan per drawn wall: resolving the (possibly pending) start
-        // and committing the wall land in a single history entry (ADR 0002)
+        // One setPlan per drawn wall: pending start and wall land in a single
+        // history entry (ADR 0002).
         const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last)
         const [withStart, startId] = commitPoint(plan, startSnap)
         const [next, pointId] = commitWall(
@@ -339,8 +295,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         setChain({ pending: s })
       }
     } else if ((tool === 'door' || tool === 'window') && openPreview) {
-      // keep the placement tool active, but select the new opening so its
-      // panel shows right away
+      // Tool stays active, but the new opening is selected so its panel shows.
       const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset, {
         width: tool === 'door' ? defaults.doorWidth : defaults.windowWidth,
         hingeSide: defaults.doorHinge,
@@ -349,24 +304,18 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setPlan(() => next)
       setSel(id ? [{ type: 'opening', id }] : [])
     } else if (tool === 'select') {
-      // dragging on empty canvas draws a selection marquee; a click-sized
-      // marquee resolves to "clear the selection" on pointer up
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c }
       setMarquee({ a: c, b: c })
       svg.setPointerCapture(e.pointerId)
     } else {
-      // clicking empty canvas clears the selection in every non-wall tool
       setSel([])
     }
   }
 
-  // Shared click grammar for walls, openings and labels: Shift+click toggles
-  // membership; clicking an element of a multi-selection drags the whole
-  // group; anything else selects just this element and starts its solo drag.
   const onElementPointerDown = (ref: ElementRef, e: React.PointerEvent, soloDrag: (c: Vec) => Drag) => {
     if (e.button !== 0 || space) return
     if (e.shiftKey) {
-      // don't let the svg handler start a marquee on top of this toggle
+      // Or the svg handler starts a marquee on top of this toggle.
       e.stopPropagation()
       setSel((s) => toggleRef(s, ref))
       return
@@ -407,8 +356,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           d.moved = true
         }
         if (d.moved) {
-          // e.altKey rather than the tracked key state: it is correct even
-          // when Alt was already down before the window had focus
+          // e.altKey, not the tracked state: correct even when Alt went down
+          // before the window had focus.
           const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, isFree(e.altKey))
           setPlan(() => translateElements(d.orig, d.refs, dx, dy))
         }
@@ -477,13 +426,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   }
 
-  // Right-click exits the drawing gesture; the canvas never shows the
-  // native context menu.
   const onSvgContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     if (drag.current) return
     if (chain) {
-      // like Escape's first rung: end the chain, stay in the Wall tool
       setChain(null)
       setSnap(null)
     } else if (tool !== 'select') {
@@ -507,20 +453,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setMarquee(null)
       return
     }
-    // a click (no movement) on an element of a multi-selection collapses the
-    // selection to that element instead of dragging the group
     if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef])
-    // a click on a dimension label selects its wall; a drag never touches the
-    // selection — the label is a handle, not an element
+    // The dim label is a handle, not an element: only a click selects its wall.
     if (d.kind === 'dim') {
       if (!d.moved) setSel([{ type: 'wall', id: d.id }])
     }
     if (d.kind === 'point') setSnap(null)
     if (d.kind === 'opening') setMovingOpeningId(null)
-    // wall geometry changed: coincident points merge (ADR 0003), walls split
-    // at new junctions (ADR 0002, issue 08) and labels reconcile once, at the
-    // end of the gesture (CONTEXT.md: Room label), inside the same history
-    // group
+    // Merge (ADR 0003), split (ADR 0002) and reconcile (CONTEXT.md: Room
+    // label) once at gesture end, inside the same history group.
     if (d.kind === 'point' || d.kind === 'group') {
       setPlan((p) => {
         const moving = new Set<string>()
@@ -565,14 +506,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           }
       : null
 
-  // The opening being placed (ghost) or moved.
   const placementOpening = ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null)
 
-  // Openings showing placement dimensions: the one under the gesture, plus
-  // every opening of the selection — no cardinality threshold, and a selected
-  // wall stays silent for the openings it carries. Gesture and selection draw
-  // identically, so the drag merely continues past the release into the
-  // selection it leaves behind.
+  // Gesture plus selection, no cardinality threshold; a selected wall stays
+  // silent for the openings it carries.
   const dimmedOpenings = useMemo(() => {
     const byId = new Map<string, Opening>()
     if (placementOpening) byId.set(placementOpening.id, placementOpening)
@@ -584,10 +521,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     return [...byId.values()]
   }, [placementOpening, sel, plan.openings])
 
-  // Room labels are never selected (CONTEXT.md: Selection) — each line of a
-  // text block is dragged and double-click-edited directly. Dragging a line
-  // gives its label a custom placement; on an unlabeled room the drag
-  // creates the label.
+  // Room labels are never selected (CONTEXT.md: Selection): a line is dragged
+  // and double-click-edited directly.
   const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
     if (tool !== 'select' || e.button !== 0 || space) return
     if (label) {
@@ -610,8 +545,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   }
 
   const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
-    // the input overlays the label's own name slot in the (possibly stacked)
-    // block; creation targets the top slot
+    // The input overlays the label's own slot in a stacked block; creation
+    // targets the top slot.
     const named = blockNameSlots(block, label?.id)
     const line = label
       ? Math.max(
@@ -629,8 +564,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   }
 
   // Commit path shared by Enter, Escape and clicking away — all end in a blur.
-  // An empty name only clears the label's name: the marker (and the area's
-  // position) survives.
   const finishEditing = (value: string) => {
     const ed = editing
     setEditing(null)
@@ -660,7 +593,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (tool !== 'select') return
     const c = toPlan(e.clientX, e.clientY)
     const room = roomAt(rooms, c.x, c.y)
-    // edit the room's area-carrying block: its oldest label, or create one
     const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined
     if (block) startEditing(block, block.labels[0] ?? null)
   }
@@ -751,11 +683,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               }
             />
           ))}
-        {/* after the grab zones so the label wins the hit-test where they overlap.
-            Every wall keeps its own dimension throughout: placement dimensions
-            wear a different register and no longer share its slot.
-            Hiding is global — selecting a wall does not bring its dimension
-            back, so a hidden plan stays clean whatever is selected. */}
+        {/* After the grab zones so the label wins the hit-test. Hiding is
+            global: selecting a wall does not bring its dimension back. */}
         {measuresVisible &&
           Object.values(plan.walls).map((wall) => (
             <DimLabel
@@ -821,8 +750,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
         {tool === 'wall' && <SnapMarker snap={snap} />}
         {drag.current?.kind === 'point' && <SnapMarker snap={snap} />}
-        {/* inline room-name editing, directly on the sheet (Excalidraw-style);
-            sized to sit on the block's name line, above the area */}
         {editing && (
           <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input
@@ -871,7 +798,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         ))}
       </div>
 
-      {/* one-line contextual hint */}
       <div
         className="hint"
         style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}
@@ -885,7 +811,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
-      {/* zoom controls and undo/redo (bottom-left) */}
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
         <div className="floating">
           <button
@@ -914,8 +839,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             <ZoomIn size={16} aria-hidden />
           </button>
           <span className="floating-sep" />
-          {/* shows the *effective* state — Alt inverts the state it holds, and
-              a click always toggles snapping itself, never the inversion */}
+          {/* Effective state: a click toggles snapping itself, never Alt's
+              inversion. */}
           <button
             className={free ? 'floating-btn icon' : 'floating-btn icon active'}
             title={`${snapEnabled ? 'Disable' : 'Enable'} snap (${keyHint('toggleSnap')})`}
@@ -966,7 +891,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         </div>
       </div>
 
-      {/* tool panel, fixed floating card on the left (CONTEXT.md: Tool panel) */}
+      {/* CONTEXT.md: Tool panel */}
       <ToolPanel
         plan={plan}
         rooms={rooms}

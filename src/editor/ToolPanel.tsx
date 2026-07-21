@@ -1,9 +1,5 @@
-// Tool panel (CONTEXT.md):
-// fixed floating card on the left. Shows the selection's parameters and
-// actions when the selection is non-empty, the active tool's Tool defaults
-// otherwise; hidden only in the Select tool with nothing selected. Selection
-// values are derived on render (wallMeasures) — the panel can never disagree
-// with the canvas Dimensions, including live during drags.
+// CONTEXT.md: Tool panel. Selection values derived on render, never stored —
+// the panel cannot disagree with the canvas, drags included.
 import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { formatLength } from '../model/format'
@@ -107,8 +103,7 @@ export function ToolPanel({
   )
 }
 
-// Tool defaults facet (CONTEXT.md: Tool defaults): what the next placed
-// element will be made of. No Delete — there is no element yet.
+// CONTEXT.md: Tool defaults. No Delete — no element yet.
 function ToolDefaultsFacet({
   tool,
   defaults,
@@ -163,8 +158,8 @@ function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
   )
 }
 
-// A cm-preset select. An imported plan may hold a value outside the presets:
-// it is kept as an extra option so the select never lies about the element.
+// An imported value outside the presets is kept as an extra option, not
+// dropped — the select would lie about the element.
 function PresetSelect({
   presets,
   value,
@@ -208,9 +203,8 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
   )
 }
 
-// Wall measure rows (spec §2): oriented Interior/Exterior when the wall
-// borders exactly one room, a single hors-tout Length otherwise. Thickness is
-// rendered by the caller — it is editable, not a derived measure.
+// Spec §2: oriented Interior/Exterior when the wall borders exactly one room,
+// hors-tout Length otherwise.
 function WallRows({ plan, rooms, wall }: { plan: Plan; rooms: Room[]; wall: Wall }) {
   const m = wallMeasures(plan, rooms, wall)
   const rows =

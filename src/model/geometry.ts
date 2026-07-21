@@ -17,8 +17,6 @@ export const wallLength = (plan: Plan, wall: Wall): number => {
   return distance(a.x, a.y, b.x, b.y)
 }
 
-// Projects (x, y) onto the wall axis: t is the distance from the wall start
-// along the axis (clamped to [0, length]), d the distance to that projection.
 export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t: number; d: number } {
   const [a, b] = wallPoints(plan, wall)
   const length = distance(a.x, a.y, b.x, b.y)
@@ -29,8 +27,8 @@ export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t
   return { t, d: distance(a.x + ux * t, a.y + uy * t, x, y) }
 }
 
-// Which side of the wall's axis (x, y) is on: +1 along the left normal of
-// start→end (the axis rotated +90°), -1 opposite. Points on the axis get +1.
+// +1 on the left normal of start→end, -1 opposite.
+// On-axis points get +1.
 export function wallSide(plan: Plan, wall: Wall, x: number, y: number): 1 | -1 {
   const [a, b] = wallPoints(plan, wall)
   const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)
@@ -55,9 +53,8 @@ export function nearestWall(
   return best
 }
 
-// Proper crossing of two segments: the intersection point when it lies
-// strictly inside both, null otherwise (parallel, collinear, or touching at
-// an endpoint). Endpoint contacts are junction matters, not crossings.
+// Strict interior crossings only: endpoint contacts are junctions, not
+// crossings, so they return null alongside parallel and collinear.
 export function segmentIntersection(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
   const rx = b.x - a.x
   const ry = b.y - a.y
@@ -112,9 +109,8 @@ function nearestOnSegment(p: Vec, a: Vec, b: Vec): Vec {
   return { x: a.x + t * dx, y: a.y + t * dy }
 }
 
-// Projection of `point` on the polygon's boundary, nudged one unit to the
-// side that satisfies `wantInside` — so the result still tests correctly
-// even after integer rounding.
+// One unit past the boundary, not the exact projection: that still tests
+// on the wrong side after integer rounding.
 function nudgeAcrossBoundary(point: Vec, polygon: Vec[], wantInside: boolean): Vec {
   let best: { p: Vec; d: number; a: Vec; b: Vec } | null = null
   for (let i = 0; i < polygon.length; i++) {
@@ -132,8 +128,7 @@ function nudgeAcrossBoundary(point: Vec, polygon: Vec[], wantInside: boolean): V
     const candidate = { x: best.p.x + (sign * -dy) / len, y: best.p.y + (sign * dx) / len }
     if (pointInPolygon(candidate, polygon) === wantInside) return candidate
   }
-  // vertex case: both edge normals fall on the wrong side — step along the
-  // centroid direction instead
+  // Vertex case: both edge normals land on the wrong side — step toward the centroid.
   const centroid = polygonCentroid(polygon)
   const cd = Math.hypot(centroid.x - best.p.x, centroid.y - best.p.y) || 1
   const step = wantInside ? 1 : -1
@@ -144,21 +139,15 @@ function nudgeAcrossBoundary(point: Vec, polygon: Vec[], wantInside: boolean): V
   return pointInPolygon(nudged, polygon) === wantInside ? nudged : best.p
 }
 
-// Nearest interior point of `polygon` to `point`: the point itself when it
-// already lies inside, else its projection on the boundary nudged one unit
-// inward.
 export function clampToPolygon(point: Vec, polygon: Vec[]): Vec {
   return pointInPolygon(point, polygon) ? point : nudgeAcrossBoundary(point, polygon, true)
 }
 
-// Mirror of clampToPolygon: nearest point *outside* `polygon`.
 export function clampOutsidePolygon(point: Vec, polygon: Vec[]): Vec {
   return pointInPolygon(point, polygon) ? nudgeAcrossBoundary(point, polygon, false) : point
 }
 
-// Centroid of a region with holes, area-weighted; ring windings need not
-// agree — absolute areas are used. Falls back to the outer ring's centroid
-// for a degenerate region.
+// Absolute areas, so ring windings need not agree.
 export function regionCentroid(polygon: Vec[], holes: Vec[][]): Vec {
   const outer = polygonCentroid(polygon)
   let area = Math.abs(polygonArea(polygon))
@@ -175,9 +164,8 @@ export function regionCentroid(polygon: Vec[], holes: Vec[][]): Vec {
   return { x: cx / area, y: cy / area }
 }
 
-// Pole of inaccessibility of a region with holes: the interior point farthest
-// from every boundary — the center of the largest inscribed circle — found by
-// polylabel-style grid subdivision down to `precision` centimeters.
+// Center of the largest inscribed circle, by polylabel-style grid
+// subdivision down to `precision` centimeters.
 export function poleOfInaccessibility(polygon: Vec[], holes: Vec[][], precision = 1): Vec {
   const rings = [polygon, ...holes]
   const boundaryDistance = (p: Vec) => {
@@ -209,9 +197,9 @@ export function poleOfInaccessibility(polygon: Vec[], holes: Vec[][], precision 
   interface Cell {
     x: number
     y: number
-    h: number // half the cell size
-    d: number // signed distance at the center
-    max: number // upper bound of d over the cell
+    h: number
+    d: number
+    max: number
   }
   const cell = (x: number, y: number, h: number): Cell => {
     const d = signedDistance({ x, y })

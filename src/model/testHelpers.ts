@@ -10,7 +10,7 @@ export interface PlanBuilder {
 
 let counter = 0
 
-// Deterministic plan construction for tests, without going through snapping.
+// Bypasses snapping: coordinates land exactly where the test asks.
 export function buildPlan(build: (b: PlanBuilder) => void): Plan {
   const plan = emptyPlan()
   const builder: PlanBuilder = {
@@ -45,8 +45,7 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
   return plan
 }
 
-// A closed 4×4 m room drawn axis-to-axis, walls 10 cm thick — the recurring
-// face-measure scenario: interior faces run 3,90 m, exterior faces 4,10 m.
+// 4×4 m axis-to-axis, walls 10 cm: interior faces 3,90 m, exterior 4,10 m.
 export function squareRoomPlan(): Plan {
   return buildPlan((b) => {
     const p1 = b.point(0, 0)
@@ -60,8 +59,7 @@ export function squareRoomPlan(): Plan {
   })
 }
 
-// A closed 4×3 m room carrying a name — the scenario that tells a Measure
-// (the area) apart from the Room name beside it.
+// 4×3 m named room: tells the area measure apart from the room name.
 export function namedRoomPlan(name = 'Kitchen'): Plan {
   return buildPlan((b) => {
     const p1 = b.point(0, 0)

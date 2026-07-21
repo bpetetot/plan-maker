@@ -1,6 +1,4 @@
-// Coincident points merge at the end of a drag (ADR 0003): a point dropped
-// onto another becomes one shared Point — the stationary point survives — so
-// a loop closed by a drag is detected as a Room.
+// Coincident points merge at drag end (ADR 0003): the stationary point survives.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
@@ -12,7 +10,7 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-// Two walls whose free ends b (500,100) and c (500,200) do not touch yet.
+// Free ends b (500,100) and c (500,200) do not touch yet.
 function openCorner(): Plan {
   return {
     points: {
@@ -50,7 +48,6 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
 describe('point drag ending on another point', () => {
   it('merges the dragged point into the stationary one, in one history entry', async () => {
     const { svg } = await setup()
-    // select w2 to reveal its point handles
     await marqueeSelect(svg, { x: 450, y: 150 }, { x: 550, y: 550 })
     const handles = svg.querySelectorAll('circle')
     expect(handles).toHaveLength(2)
@@ -68,7 +65,7 @@ describe('point drag ending on another point', () => {
 describe('group move ending point-on-point', () => {
   it('merges the moved wall end into the stationary point', async () => {
     const { svg } = await setup()
-    // select w2 and move it up by 100: c lands on b
+    // w2 up by 100: c lands on b
     await marqueeSelect(svg, { x: 450, y: 150 }, { x: 550, y: 550 })
     const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[1]
     await pointer(wallHit, 'pointerdown', { button: 0, ...clientAt(svg, 500, 350) })

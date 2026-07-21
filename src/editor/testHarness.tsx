@@ -1,13 +1,5 @@
-// The editor with a keyboard, for tests.
-//
-// The registry moved to App (ADR 0012), so a bare `<Editor />` no longer
-// answers a keystroke — nothing is registered above it. Tests about the
-// editor's own keys mount this instead: it is the smallest thing that is both
-// an editor and a place shortcuts are bound.
-//
-// The editor half of the wiring is `editorCommands`, the very function App
-// uses, so the two cannot drift. The rest is stubbed — a test that wants to see
-// Open or Reset fire passes its own spy.
+// Registry lives in App (ADR 0012): a bare `<Editor />` answers no keystroke.
+// Wired through `editorCommands`, App's own function, so the two cannot drift.
 import { useRef } from 'react'
 import type { EditorCommands } from './Editor'
 import Editor, { editorCommands } from './Editor'

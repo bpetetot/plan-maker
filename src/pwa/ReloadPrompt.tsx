@@ -4,8 +4,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 
 const HOUR_MS = 60 * 60 * 1000
 
-// Spec §6: prompt update flow — the user chooses when to reload, so unsaved
-// in-memory editor state (undo history, selection) is never lost silently.
+// Spec §6: prompt, not auto-reload — auto would drop undo history and selection.
 export default function ReloadPrompt() {
   const updateInterval = useRef<ReturnType<typeof setInterval> | null>(null)
   const {

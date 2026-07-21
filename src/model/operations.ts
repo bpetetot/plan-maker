@@ -6,8 +6,6 @@ import type { Snap } from './snap'
 import type { Opening, Plan, Wall } from './types'
 import { defaultOpeningWidth, WALL_THICKNESS } from './types'
 
-// All operations are immutable: they return a new Plan (or the same one when a no-op).
-
 const newId = () => nanoid(10)
 
 export function ensurePoint(plan: Plan, snap: Snap): [Plan, string] {
@@ -44,10 +42,8 @@ export function setPoints(plan: Plan, updates: Record<string, { x: number; y: nu
   return { ...plan, points }
 }
 
-// Splits a wall in two at an existing point (ADR 0002). The start-side half
-// keeps the wall's id, so its openings keep their wallId and offset. Each
-// opening goes to the half containing its center; one straddling the cut, or
-// no longer fitting its half, is deleted. Both halves drop their dimPlacement.
+// ADR 0002. Start-side half keeps the wall's id, so its openings keep their
+// wallId and offset.
 export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
   const wall = plan.walls[wallId]
   const point = plan.points[pointId]
@@ -71,10 +67,8 @@ export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
 
   const start = plan.points[wall.startPointId]
   const cut = distance(start.x, start.y, point.x, point.y)
-  // Two passes: every opening is first rebased onto its half, so the second
-  // pass reads the neighbours where they will actually be. Clamping against
-  // half-migrated openings would have them bound each other from the offsets
-  // they held on the wall that no longer exists.
+  // Rebase all, then clamp: clamping mid-pass would bound openings against
+  // offsets held on the wall that no longer exists.
   const rebased: Record<string, Opening> = {}
   const moved: string[] = []
   for (const opening of Object.values(plan.openings)) {
@@ -92,8 +86,7 @@ export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
   const openings = { ...rebased }
   for (const id of moved) {
     const opening = rebased[id]
-    // Kept only where it already sits: an opening the clamp would shift no
-    // longer fits its half and is deleted, never silently moved.
+    // An opening the clamp would shift is deleted, never silently moved.
     const host = staged.walls[opening.wallId]
     if (clampOpeningOffset(staged, host, opening.offset, opening.width, opening) !== opening.offset) {
       delete openings[id]
@@ -102,10 +95,9 @@ export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
   return { ...next, openings }
 }
 
-// Two model positions closer than this are treated as the same junction, and
-// a point this close to a wall's line sits on it. Well under the 10 cm wall
-// thickness, and above the ~0.7 cm drift that integer rounding can introduce.
-const JUNCTION_TOLERANCE = 1 // cm
+// Under the 10 cm wall thickness, above the ~0.7 cm drift integer rounding
+// can introduce.
+const JUNCTION_TOLERANCE = 1
 
 function findPointNear(plan: Plan, x: number, y: number): string | null {
   let best: string | null = null
@@ -120,8 +112,6 @@ function findPointNear(plan: Plan, x: number, y: number): string | null {
   return best
 }
 
-// The shared Point at (x, y), reusing one within the junction tolerance
-// before minting a new one.
 function ensurePointAt(plan: Plan, x: number, y: number): [Plan, string] {
   const existing = findPointNear(plan, x, y)
   if (existing) return [plan, existing]
@@ -129,9 +119,6 @@ function ensurePointAt(plan: Plan, x: number, y: number): [Plan, string] {
   return [{ ...plan, points: { ...plan.points, [id]: { id, x, y } } }, id]
 }
 
-// Distance along a→b of p's projection when p lies on the segment's open
-// interior — within the junction tolerance of the axis, clear of both ends —
-// null otherwise.
 function interiorProjection(a: Vec, b: Vec, p: Vec): number | null {
   const length = distance(a.x, a.y, b.x, b.y)
   if (length < 1) return null
@@ -142,11 +129,8 @@ function interiorProjection(a: Vec, b: Vec, p: Vec): number | null {
   return t
 }
 
-// Resolves a drawing click to a point id, splitting the host wall when the
-// snap targets a wall body. The host is looked up at resolution time (not
-// trusted from the snap) because an earlier split may have replaced it.
-// Whatever the snap kind, a position landing on an existing point reuses it:
-// two Points never coincide (ADR 0003).
+// ADR 0003. Host looked up here, not trusted from the snap: an earlier split
+// may have replaced it.
 export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
   if (snap.pointId) return [plan, snap.pointId]
   const x = Math.round(snap.x)
@@ -154,8 +138,8 @@ export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
   const existing = findPointNear(plan, x, y)
   if (snap.kind === 'wall') {
     const host = nearestWall(plan, x, y, JUNCTION_TOLERANCE + 1)
-    // A reused point still splits the host (no-op when it is one of its
-    // ends): the contact must be a junction, not a dangling overlap.
+    // A reused point still splits the host: the contact must be a junction,
+    // not a dangling overlap.
     if (existing) return [host ? splitWall(plan, host.wall.id, existing) : plan, existing]
     const [next, id] = ensurePoint(plan, snap)
     return [host ? splitWall(next, host.wall.id, id) : next, id]
@@ -164,10 +148,8 @@ export function commitPoint(plan: Plan, snap: Snap): [Plan, string] {
   return ensurePoint(plan, snap)
 }
 
-// Commits one drawn wall with planar insertion (ADR 0002): ends snapped onto
-// a wall body split it (T junction), and a crossed wall is split at the
-// intersection along with the new wall itself (X junction). Returns the
-// resolved end point id so the drawing chain can continue from it.
+// Planar insertion (ADR 0002). Returns the resolved end point id so the
+// drawing chain continues from it.
 export function commitWall(
   plan: Plan,
   start: Snap,
@@ -186,12 +168,10 @@ export function commitWall(
   const length = distance(a.x, a.y, b.x, b.y)
   const along = (x: number, y: number) => ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / length
 
-  // Cut the new wall at every junction it creates. Walls are snapshotted
-  // here: two straight walls cross at most once, so the halves a split
-  // produces never need re-examination.
-  const cuts = new Map<string, number>() // pointId → distance along a→b
+  // Walls snapshotted: two straight walls cross at most once, so split halves
+  // never need re-examination.
+  const cuts = new Map<string, number>()
 
-  // existing points lying on the new wall's interior (reversed T junction)
   for (const point of Object.values(next.points)) {
     if (point.id === startId || point.id === endId) continue
     const t = interiorProjection(a, b, point)
@@ -216,15 +196,12 @@ export function commitWall(
   return [next, endId]
 }
 
-// Two walls spanning the same endpoint pair collapse into the first-seen one
-// (ADR 0003); the removed twin's openings transpose onto the survivor — the
-// geometry is the same; when the twins run in opposite directions the offset
-// mirrors and a door's wall-relative hinge and swing flip with the frame,
-// keeping the door physically identical.
+// ADR 0003. Opposed twins mirror the offset and flip hinge/swing, so the door
+// stays physically identical.
 function dedupeTwinWalls(plan: Plan): Plan {
   const walls: Record<string, Wall> = {}
-  const twinOf = new Map<string, Wall>() // removed twin id → surviving wall
-  const byEndpoints = new Map<string, Wall>() // unordered endpoint pair → wall
+  const twinOf = new Map<string, Wall>()
+  const byEndpoints = new Map<string, Wall>()
   for (const wall of Object.values(plan.walls)) {
     const pair = JSON.stringify([wall.startPointId, wall.endPointId].sort())
     const twin = byEndpoints.get(pair)
@@ -261,9 +238,6 @@ function dedupeTwinWalls(plan: Plan): Plan {
   return { ...next, openings }
 }
 
-// Merges the absorbed point into the survivor: walls are rewired to the
-// survivor; a wall whose two ends collapse onto it is deleted with its
-// openings; a wall made identical to another dedupes per the twin rule above.
 function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
   const points = { ...plan.points }
   delete points[absorbedId]
@@ -272,23 +246,19 @@ function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
   for (const wall of Object.values(plan.walls)) {
     const startPointId = wall.startPointId === absorbedId ? survivorId : wall.startPointId
     const endPointId = wall.endPointId === absorbedId ? survivorId : wall.endPointId
-    if (startPointId === endPointId) continue // degenerate: both ends merged
+    if (startPointId === endPointId) continue
     walls[wall.id] = { ...wall, startPointId, endPointId }
   }
 
   const openings: Record<string, Opening> = {}
   for (const opening of Object.values(plan.openings)) {
-    // an opening whose wall degenerated goes with it
     if (walls[opening.wallId]) openings[opening.id] = opening
   }
   return dedupeTwinWalls({ ...plan, points, walls, openings })
 }
 
-// Enforces the invariant "two Points never coincide" (ADR 0003): every pair
-// of points within the junction tolerance is merged into one. When `moving`
-// lists the points a gesture displaced, a stationary point survives over a
-// moved one; otherwise the first-seen point survives. Returns the same plan
-// when nothing coincides.
+// Invariant "two Points never coincide" (ADR 0003). `moving` lists gesture-
+// displaced points: a stationary point survives over a moved one.
 export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
   let next = plan
   for (let merged = true; merged;) {
@@ -310,17 +280,13 @@ export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
   return next
 }
 
-// Enforces the invariant "walls only meet at shared Points" (ADR 0002) on an
-// already-built plan — the drag-end counterpart of commitWall's planar
-// insertion: a point lying on a wall's body splits that wall (T junction),
-// and two crossing walls are both split at their intersection (X junction).
-// Runs to a fixpoint; returns the same plan when nothing violates the
-// invariant.
+// Invariant "walls only meet at shared Points" (ADR 0002), drag-end
+// counterpart of commitWall's planar insertion. Runs to a fixpoint.
 export function planarize(plan: Plan): Plan {
   let next = plan
   for (let changed = true; changed;) {
     changed = false
-    // splits along a collinear overlap leave two walls on the same pair
+    // Splits along a collinear overlap leave two walls on the same pair.
     next = dedupeTwinWalls(next)
     outer: for (const point of Object.values(next.points)) {
       for (const wall of Object.values(next.walls)) {
@@ -334,7 +300,7 @@ export function planarize(plan: Plan): Plan {
     }
     if (changed) continue
     // T junctions first: once no point sits on a wall body, remaining
-    // contacts are proper crossings, cut like commitWall's X junctions.
+    // contacts are proper crossings.
     const walls = Object.values(next.walls)
     crossings: for (let i = 0; i < walls.length; i++) {
       for (let j = i + 1; j < walls.length; j++) {
@@ -354,7 +320,7 @@ export function planarize(plan: Plan): Plan {
   return next
 }
 
-// Deleting a wall deletes its openings (spec §2) and any point no longer used by a wall.
+// Openings die with their wall (spec §2).
 export function deleteWall(plan: Plan, id: string): Plan {
   const wall = plan.walls[id]
   if (!wall) return plan
@@ -379,14 +345,8 @@ export function deleteWall(plan: Plan, id: string): Plan {
   return { ...plan, points, walls, openings }
 }
 
-// The label's travel is bounded by the caller — the editor passes the Rail
-// (the span the text's center may occupy, as ratios along the axis), derived
-// from the rendered silhouette and the arrowheads so the text never rides a
-// head. An empty travel (min > max) pins the text to the travel's middle.
-// The bound applies on write only — a stored placement that falls outside it
-// after the wall is shortened renders as stored. Ratio rounded to 3 decimals:
-// sub-centimeter on any wall a dimension shows on, without dragging float
-// noise into the persisted plan.
+// `travel` bounds the text center on write only: a stored placement falling
+// outside it after a shorten renders as stored.
 export function setDimPlacement(
   plan: Plan,
   wallId: string,
@@ -415,15 +375,8 @@ export function deleteOpening(plan: Plan, id: string): Plan {
   return { ...plan, openings }
 }
 
-// ---------- openings ----------
-
-// Clamps a desired center offset onto the opening's Rail, so it comes to rest
-// against the first thing that stops it — a mitered corner, a free end, or a
-// neighbouring opening — and never past it. Returns null when the rail is
-// narrower than the opening, the one case a gesture is refused outright.
-// `opening` is the one being moved or widened: it bounds nothing itself, and
-// its drawn position is what sides its neighbours. Omit it when placing a new
-// one, where the desired offset plays that part.
+// `opening` is the one being moved or widened: it bounds nothing itself. Omit
+// it when placing a new one, where the desired offset plays that part.
 export function clampOpeningOffset(
   plan: Plan,
   wall: Wall | undefined,
@@ -435,16 +388,11 @@ export function clampOpeningOffset(
   const reference = (opening && openingPlacement(plan, opening)?.offset) ?? offset
   const rail = openingRail(plan, wall, reference, opening?.id)
   if (rail.to - rail.from < width) return null
-  // Offsets are whole centimetres, but a mitered rail end is not: rounding
-  // comes first and the rail has the last word, so an opening pushed flush
-  // lands exactly on its bound and its measure reads exactly zero.
+  // Mitered rail ends are not whole centimetres: round first, rail last, so a
+  // flush opening lands exactly on its bound.
   return clampCenter(rail, width, Math.round(clampCenter(rail, width, offset)))
 }
 
-// Returns the new plan and the placed opening's id (null when placement is
-// refused), so callers can select the opening they just placed. `init` lets
-// the caller apply its Tool defaults; anything omitted falls back to the
-// built-in values.
 export function placeOpening(
   plan: Plan,
   wallId: string,
@@ -503,8 +451,6 @@ export function toggleSwing(plan: Plan, id: string): Plan {
   return { ...plan, openings: { ...plan.openings, [id]: { ...opening, swing } } }
 }
 
-// ---------- room labels ----------
-
 export function addRoomLabel(plan: Plan, name: string, x: number, y: number): [Plan, string] {
   const id = newId()
   const label = { id, name, x: Math.round(x), y: Math.round(y) }
@@ -517,8 +463,7 @@ export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {
   return { ...plan, roomLabels: { ...plan.roomLabels, [id]: { ...label, name } } }
 }
 
-// Moving a label is the user's placement gesture: it gives the label its
-// custom placement (CONTEXT.md: Room label).
+// A move is the user's placement gesture (CONTEXT.md: Room label).
 export function moveRoomLabel(plan: Plan, id: string, x: number, y: number): Plan {
   const label = plan.roomLabels[id]
   if (!label) return plan
@@ -531,9 +476,7 @@ export function moveRoomLabel(plan: Plan, id: string, x: number, y: number): Pla
   }
 }
 
-// Rigid-move companion of moveRoomLabel: shifts the label without touching
-// its placement state — the room is carrying its label along, this is not a
-// user placement gesture.
+// Not moveRoomLabel: the room carries its label along, so `placed` stays put.
 export function translateRoomLabel(plan: Plan, id: string, dx: number, dy: number): Plan {
   const label = plan.roomLabels[id]
   if (!label) return plan

@@ -16,17 +16,16 @@ export interface SnapOptions {
   tolerance: number
   anchor?: Vec
   exclude?: Set<string>
-  walls?: boolean // wall bodies become snap targets (Wall tool)
-  free?: boolean // Alt held: alignment targets suspended, connection ones kept
+  walls?: boolean
+  free?: boolean
 }
 
 const AXIS_STEP = Math.PI / 4
 const AXIS_TOLERANCE = (8 * Math.PI) / 180
-// An axis ∩ wall intersection farther than this many tolerances from the
-// cursor (grazing angle) is not what the eye is aiming at (ADR 0002).
+// Grazing-angle intersections farther than this many tolerances are not aimed at (ADR 0002).
 const AXIS_INTERSECTION_REACH = 2
 
-// The eight axes, as integer lattice steps ordered by octant from +x.
+// Ordered by octant from +x: `lockedAxis` indexes this by rounded octant.
 const AXIS_LATTICE: Vec[] = [
   { x: 1, y: 0 },
   { x: 1, y: 1 },
@@ -38,9 +37,6 @@ const AXIS_LATTICE: Vec[] = [
   { x: 1, y: -1 },
 ]
 
-// The 45° axis the anchor→cursor direction locks to — as a unit `direction`
-// and as the integer `step` one grid multiple along it — or null when the
-// cursor is not within the angular tolerance of any axis.
 function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: Vec } | null {
   const length = Math.hypot(x - anchor.x, y - anchor.y)
   if (length <= 1) return null
@@ -52,13 +48,8 @@ function lockedAxis(anchor: Vec, x: number, y: number): { direction: Vec; step: 
   return { direction: { x: step.x / norm, y: step.y / norm }, step }
 }
 
-// Where the locked axis crosses the grid lines of one component, expressed as
-// the ray parameter `t` in `anchor + t · step`, nearest to `projection`. The
-// crossings solve `anchor + t · step ≡ 0 (mod GRID)`, hence the progression
-// `t ≡ -anchor · step⁻¹` — written as `-anchor * step` because every axis step
-// is a unit lattice component, so `step⁻¹ = step`. Keeping `t > 0` is what
-// holds the endpoint strictly beyond the anchor. Null when the axis is parallel
-// to that component's lines — it then crosses none of them.
+// `t ≡ -anchor · step` because every axis step is a unit lattice component, so `step⁻¹ = step`.
+// `t > 0` holds the endpoint strictly beyond the anchor.
 function nearestCrossing(anchor: number, step: number, projection: number): number | null {
   if (step === 0) return null
   const residue = (((-anchor * step) % GRID) + GRID) % GRID
@@ -66,14 +57,8 @@ function nearestCrossing(anchor: number, step: number, projection: number): numb
   return residue + n * GRID
 }
 
-// A group move translates rigidly — the displacement applies to the group as a
-// whole, never to each element separately — and realigns it on the grid: the
-// delta is the one that lands the reference point (`referencePoint`, fixed at
-// pointer-down) exactly on a grid intersection, so an off-grid group heals on
-// its first ordinary move instead of carrying its offset forever. The grid is
-// the only target: a group move runs no part of the placement snap ladder.
-// A free move (Alt) and a selection with no wall point to reference both fall
-// back to whole-centimeter rounding.
+// Rigid: one delta landing `ref` on a grid intersection, not a per-element snap —
+// an off-grid group heals on its first move instead of carrying its offset forever.
 export function realignDelta(
   ref: Vec | null,
   dx: number,
@@ -85,11 +70,8 @@ export function realignDelta(
   return { dx: grid(ref.x + dx) - ref.x, dy: grid(ref.y + dy) - ref.y }
 }
 
-// Snap priority (spec §4 + ADR 0002): existing point > wall body (when enabled)
-// > 45° axis from the anchor > 10 cm grid.
-// A free move (Alt) filters that ladder rather than short-circuiting it: the
-// alignment rungs are suspended, the connection ones are not, so a wall drawn
-// freely still joins the plan's topology instead of landing beside it.
+// Priority (spec §4, ADR 0002): point > wall body > 45° axis > grid.
+// A free move (Alt) filters the ladder, not short-circuits it: alignment rungs off, connection rungs on.
 export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions): Snap {
   const aligning = !options.free
 
@@ -111,11 +93,8 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
       const [a, b] = wallPoints(plan, near.wall)
       const length = wallLength(plan, near.wall)
       if (length >= 1) {
-        // Default position: the cursor's orthogonal projection on the wall.
-        // When the anchor direction locks to a 45° axis, prefer the locked
-        // axis ∩ wall intersection so the junction keeps the drawn wall
-        // straight (ADR 0002). The rounding may drift a fraction of a cm;
-        // the junction stays topological because the wall is split there.
+        // Locked axis ∩ wall beats the orthogonal projection: keeps the drawn wall straight (ADR 0002).
+        // Rounding may drift a fraction of a cm; the junction holds because the wall is split there.
         let px = a.x + ((b.x - a.x) / length) * near.t
         let py = a.y + ((b.y - a.y) / length) * near.t
         let axisFrom: Vec | undefined
@@ -131,7 +110,7 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
             const iy = options.anchor.y + t * direction.y
             const s = ((ix - a.x) * wx + (iy - a.y) * wy) / (length * length)
             const within =
-              t > 0 && // the axis is a ray: never jump behind the anchor
+              t > 0 && // ray, not line: never behind the anchor
               s >= 0 &&
               s <= 1 &&
               distance(ix, iy, x, y) <= options.tolerance * AXIS_INTERSECTION_REACH
@@ -147,21 +126,13 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
     }
   }
 
-  // Below this line the ladder is pure alignment — a free move stops here.
   if (!aligning) return { x: Math.round(x), y: Math.round(y), kind: 'free' }
 
   if (options.anchor) {
     const axis = lockedAxis(options.anchor, x, y)
     if (axis) {
-      // The endpoint lands where the axis crosses the grid lines, taken
-      // absolutely rather than stepped from the anchor (ADR 0006), so at least
-      // one of its coordinates is exactly on the grid while the segment stays
-      // exactly on its axis. A diagonal offers two interleaved families of
-      // crossings — one aligning x, the other y — and the nearest to the cursor
-      // wins; an orthogonal axis offers only the one it is not parallel to.
-      // From an on-grid anchor both families collapse onto the whole grid
-      // multiples, which is why there is no fallback branch: the first crossing
-      // beyond the anchor is then the one-grid-step minimum of old.
+      // Grid crossings taken absolutely, not stepped from the anchor (ADR 0006).
+      // A diagonal has two interleaved families (x-aligning, y-aligning); nearest the cursor wins.
       const { step } = axis
       const projection =
         ((x - options.anchor.x) * step.x + (y - options.anchor.y) * step.y) /

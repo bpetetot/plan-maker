@@ -1,5 +1,4 @@
-// Snap is on by default and can be turned off for the whole editor (see
-// CONTEXT.md: Snap, and ADR 0007). A per-device preference.
+// CONTEXT.md: Snap. ADR 0007. Per-device, not per-plan.
 import { booleanPreference } from './preference'
 
 const pref = booleanPreference('plan-maker:snap', 'off')

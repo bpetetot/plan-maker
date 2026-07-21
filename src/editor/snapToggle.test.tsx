@@ -1,6 +1,5 @@
-// Snap is a state, not a permanent behavior (ADR 0007): it is on by default,
-// can be turned off for the whole editor as a per-device preference, and Alt
-// inverts it for the duration of a gesture — in both directions.
+// ADR 0007: snap is a state — on by default, a per-device preference, and Alt
+// inverts it for a gesture, in both directions.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -26,9 +25,8 @@ async function setup() {
   return { svg, unmount }
 }
 
-// Two clicks commit one wall. The cursor positions are deliberately off-grid
-// and 22.5° off the anchor — half way between two 45° axes, so no axis lock
-// intervenes and the grid is the only alignment target left to observe.
+// Off-grid, and 22.5° off the anchor — between two 45° axes, so no axis lock
+// intervenes and the grid is the only alignment target left.
 const A = { x: 203, y: 187 }
 const B = { x: 400, y: 273 }
 const SNAPPED = [
@@ -122,7 +120,7 @@ describe('the toggle shows the effective state', () => {
   it('clicking while Alt is held toggles snapping, not the inversion', async () => {
     await setup()
     await holdAlt()
-    await userEvent.click(toggle()) // snapping on -> off, Alt still inverting
+    await userEvent.click(toggle())
     expect(pressed()).toBe('true')
     await releaseAlt()
     expect(pressed()).toBe('false')

@@ -1,5 +1,3 @@
-// A selected wall's Dimension shares the wall's selection accent; hover and
-// unselected walls keep the plain dimension grays.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { buildPlan } from '../model/testHelpers'
@@ -34,10 +32,10 @@ describe('dimension of a selected wall', () => {
   it('turns accent on selection, and back to gray when cleared', async () => {
     const { svg } = await setup()
     expect(svg.querySelectorAll('text.dim-selected')).toHaveLength(0)
-    // select the first wall only
+    // marquee spans the y=0 wall only
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 })
     expect(svg.querySelectorAll('text.dim-selected')).toHaveLength(1)
-    // clicking empty canvas clears the selection
+    // degenerate marquee off-plan: a click on empty canvas
     await marqueeSelect(svg, { x: 600, y: -100 }, { x: 600, y: -100 })
     expect(svg.querySelectorAll('text.dim-selected')).toHaveLength(0)
   })

@@ -7,8 +7,7 @@ export interface AutosaveOptions {
   onError?: (error: unknown) => void
 }
 
-// Spec §5: subscribe to the store, debounce, flush on visibilitychange/pagehide
-// (not beforeunload), surface quota errors in the UI.
+// Spec §5: flush on visibilitychange/pagehide, not beforeunload.
 export function startAutosave({ debounceMs = 400, onError }: AutosaveOptions = {}): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null
   let pending: Plan | null = null
@@ -52,8 +51,6 @@ export function startAutosave({ debounceMs = 400, onError }: AutosaveOptions = {
   }
 }
 
-// Single-writer tab semantics via the Web Locks API. Resolves true when this
-// tab is the writer; the lock is held until the tab closes.
 export function acquireWriterLock(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.locks) return Promise.resolve(true)
   return new Promise((resolve) => {

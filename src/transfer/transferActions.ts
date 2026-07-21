@@ -22,9 +22,7 @@ const IMPORT_ERRORS: Record<string, string> = {
   'invalid-plan': 'This file is damaged and cannot be imported.',
 }
 
-// Import always replaces (spec §7): silent when the canvas has no walls,
-// explicit confirmation otherwise; invalid files leave the current plan
-// untouched; the undo/redo history is reset by replacePlan.
+// Import always replaces, never merges (spec §7).
 export function importPlanJson(onError: (message: string) => void) {
   const input = document.createElement('input')
   input.type = 'file'

@@ -1,6 +1,4 @@
-// Grid (see CONTEXT.md): the sheet's visible ruling — minor lines every
-// 10 cm (the snap step), major lines every 50 cm. Purely visual; the
-// show/hide choice is a per-device preference, like the Theme.
+// CONTEXT.md: Grid — minor lines every 10 cm (the snap step), major every 50 cm.
 import { GRID } from '../model/types'
 import { booleanPreference } from './preference'
 import type { View } from './useView'
@@ -8,9 +6,6 @@ import type { View } from './useView'
 const MINOR = GRID
 const MAJOR = 5 * GRID
 
-// A line family is fully opaque while its cells are FULL_PX or wider on
-// screen, gone at GONE_PX or below, linear in between — the grid stays
-// legible at any zoom instead of collapsing into noise.
 const GONE_PX = 4
 const FULL_PX = 8
 
@@ -20,8 +15,7 @@ export function gridLevels(pxPerCm: number): { minor: number; major: number } {
   return { minor: fade(MINOR * pxPerCm), major: fade(MAJOR * pxPerCm) }
 }
 
-// Every multiple of `step` inside [from, to] — integer multipliers, so the
-// positions stay exact and meter lines are recognized by modulo.
+// Integer multipliers, not accumulated addition: exact positions for the modulo test.
 const ticks = (from: number, to: number, step: number) => {
   const out: number[] = []
   for (let i = Math.ceil(from / step); i <= Math.floor(to / step); i++) out.push(i * step)
@@ -48,8 +42,7 @@ function GridFamily({
       opacity={opacity}
       stroke={`var(--grid-${kind})`}
       strokeWidth={1}
-      // dashes are in screen px too under non-scaling-stroke — the texture
-      // stays constant at any zoom
+      // non-scaling-stroke puts dashes in screen px: constant texture at any zoom.
       strokeDasharray={kind === 'minor' ? '3 3' : undefined}
     >
       {ticks(view.x, view.x + view.w, step)
@@ -73,7 +66,7 @@ export function GridLines({ view, pxPerCm }: { view: View; pxPerCm: number }) {
   )
 }
 
-// Shown by default; the choice is a per-device preference (CONTEXT.md: Grid).
+// CONTEXT.md: Grid — visibility is a per-device preference, shown by default.
 const pref = booleanPreference('plan-maker:grid', 'hidden')
 
 export const loadGridVisible = pref.load

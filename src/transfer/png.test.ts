@@ -51,8 +51,7 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('width="1000"')
     expect(svg).toContain('height="800"')
     expect(svg).toContain('fill="#ffffff"')
-    // dimensions measure the face they run along (default sides), the room
-    // area its interior faces: a 4×3 m axis rectangle with 10 cm walls
+    // 4×3 m axis rectangle, 10 cm walls: dimensions run along a face, area is interior.
     expect(svg).toContain('4,10 m')
     expect(svg).toContain('3,90 m')
     expect(svg).toContain('3,10 m')
@@ -69,14 +68,12 @@ describe('buildExportSvg', () => {
     ).toBeNull()
   })
 
-  // Hidden measures are hidden from the export too (ADR 0008) — hiding them
-  // is how you get a clean sheet to share.
+  // ADR 0008: hidden measures stay hidden in the export.
   it('omits wall dimensions and room areas when measures are hidden', () => {
     const svg = buildExportSvg(squarePlan(), { measuresVisible: false })!
     expect(svg).not.toContain('4,10 m')
     expect(svg).not.toContain('3,90 m')
     expect(svg).not.toContain('11,31 m²')
-    // the plan itself is untouched
     expect(svg).toContain('var(--wall)')
     expect(svg).toContain('fill="#ffffff"')
   })
@@ -87,21 +84,17 @@ describe('buildExportSvg', () => {
     expect(svg).not.toContain('11,31 m²')
   })
 
-  // Theme (CONTEXT.md): exports always render light, as a document. The scene
-  // paints with CSS variables, so the standalone SVG must pin their light values.
+  // CONTEXT.md: Theme — exports render light, so the SVG pins the var values.
   it('always renders light, whatever theme the editor is in', () => {
     const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
     expect(svg).toContain('var(--wall)')
     expect(svg).toContain('--wall: #1e293b')
     expect(svg).toContain('--sheet: #ffffff')
-    // the dimension extent lines and arrowheads paint with --dim-line — pinned too
     expect(svg).toContain('--dim-line: #93c9c3')
   })
 
-  // Measures render in a bundled mono font. The standalone SVG is rasterized
-  // through an <img>, which loads no external resource — so the export embeds
-  // the measure-glyph subset as a data URI, or it would silently fall back
-  // and break WYSIWYG.
+  // Rasterized through an <img>, which loads no external resource: without the
+  // embedded subset the mono font silently falls back.
   it('embeds the measure font as a data URI', () => {
     const svg = buildExportSvg(squarePlan(), { measuresVisible: true })!
     expect(svg).toContain('@font-face')

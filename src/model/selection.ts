@@ -6,10 +6,8 @@ import type { Room } from './rooms'
 import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms'
 import type { Plan, Point } from './types'
 
-// Multi-selection over plan elements: a selection is a list of refs to walls
-// and openings. Room labels are never selected — they are manipulated directly
-// in the editor (CONTEXT.md: Selection). It lives in the editor (never in the
-// plan) and supports exactly two group operations — delete and translate.
+// CONTEXT.md: Selection. Editor state, never the plan; room labels are never
+// selected.
 
 export interface ElementRef {
   type: 'wall' | 'opening'
@@ -18,19 +16,15 @@ export interface ElementRef {
 
 export const sameRef = (a: ElementRef, b: ElementRef) => a.type === b.type && a.id === b.id
 
-// Single string encoding of a ref's identity, for Set/Map membership.
 export const refKey = (ref: ElementRef) => `${ref.type}:${ref.id}`
 
 export const isSelected = (selection: ElementRef[], ref: ElementRef) => selection.some((r) => sameRef(r, ref))
 
-// Shift+click semantics: add the ref when absent, remove it when present.
 export function toggleRef(selection: ElementRef[], ref: ElementRef): ElementRef[] {
   return isSelected(selection, ref) ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref]
 }
 
-// Marquee capture rule: containment. An element is selected only when it
-// is entirely inside the rectangle (walls by both endpoints, openings by their
-// span on the wall). Wall thickness is ignored.
+// Marquee capture: containment, not intersection. Wall thickness ignored.
 export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   const minX = Math.min(a.x, b.x)
   const maxX = Math.max(a.x, b.x)
@@ -57,9 +51,6 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   return refs
 }
 
-// Group delete. Walls cascade their openings and orphan points (deleteWall)
-// and room labels left without a room (reconcileRoomLabels); refs to
-// elements already gone are no-ops.
 export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan
   for (const ref of refs) {
@@ -69,13 +60,8 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   return reconcileRoomLabels(plan, next)
 }
 
-// The point a group move realigns on the grid: the selection's wall point
-// nearest the grab, searched across every selected wall — the clicked element
-// may be an opening, which has no point of its own. Ties break deterministically
-// on endpoint `a` first then the lowest id, so the choice never depends on the
-// selection order; that order is an implementation detail, not a user-visible
-// rule. Null when the selection holds no wall point at all, in which case
-// nothing translates anyway.
+// Ties break on endpoint `a` then lowest id: selection order is an
+// implementation detail and must not decide the grid realignment point.
 export function referencePoint(plan: Plan, refs: ElementRef[], grab: Vec): Point | null {
   let best: { point: Point; reach: number; isStart: boolean } | null = null
   for (const ref of refs) {
@@ -96,12 +82,8 @@ export function referencePoint(plan: Plan, refs: ElementRef[], grab: Vec): Point
   return best?.point ?? null
 }
 
-// Group move: translate the union of the selected walls' points. Openings
-// follow their wall (their offset is wall-relative) and stay put when their
-// wall is not selected — only elements with a position of their own translate.
-// Unselected walls attached to a moved point stretch. A room whose boundary
-// walls are all selected translates rigidly: its label moves with it,
-// keeping its position relative to the room (CONTEXT.md: Room label).
+// CONTEXT.md: Room label. A room with every boundary wall selected translates
+// rigidly, label included.
 export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy: number): Plan {
   if (dx === 0 && dy === 0) return plan
   const updates: Record<string, Vec> = {}

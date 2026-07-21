@@ -21,9 +21,6 @@ export function makeRecord(plan: Plan): StoredRecord {
   return { schemaVersion: SCHEMA_VERSION, savedAt: Date.now(), plan }
 }
 
-// Loads the current record, falling back to the last-known-good backup when the
-// current one is missing or fails validation. A successful load refreshes the
-// backup with the loaded (already migrated) plan.
 export async function loadPlan(): Promise<Plan | null> {
   let plan: Plan | null = null
   try {

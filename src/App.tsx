@@ -24,9 +24,8 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const editor = useRef<EditorCommands>(null)
-  // Owned here, not in the menu: the shortcut and the menu's three buttons set
-  // the same preference, and two `useThemePreference` calls would be two states
-  // writing the same key — the buttons would stop reflecting the keystroke.
+  // Owned here, not in the menu: a second useThemePreference call would be a
+  // second state on the same key, deaf to the shortcut.
   const [themePreference, setThemePreference, toggleTheme] = useThemePreference()
 
   useEffect(() => {
@@ -62,18 +61,15 @@ export default function App() {
   const helpOpen = useHelpDialog((s) => s.open)
 
   const resetPlan = () => {
-    // Load-bearing, not a formality: Mod+Backspace is one modifier away from the
-    // Backspace that deletes the selection, so this dialog is what stands
-    // between a slipped thumb and the whole plan.
+    // Confirm is load-bearing: Mod+Backspace is one modifier from the Backspace
+    // that deletes the selection.
     if (!window.confirm('Reset the plan? Every wall, opening and room name will be lost.')) return
     replacePlan(emptyPlan())
   }
 
   const exportPng = async () => {
     try {
-      // the export follows the on-screen Measure toggle (ADR 0008) — the
-      // preference is a session value, so this reads what the editor is showing
-      // even when storage is unavailable
+      // ADR 0008: export follows the on-screen Measure toggle.
       const blob = await renderPlanPng(usePlanStore.getState().plan, {
         measuresVisible: measuresVisible(),
       })
@@ -90,9 +86,7 @@ export default function App() {
   const openPlan = () => importPlanJson(setNotice)
   const savePlanAs = () => exportPlanJson(usePlanStore.getState().plan)
 
-  // The whole application's shortcuts, mounted at the only node that sees both
-  // the menu and the editor (ADR 0012). The editor's own commands are reached
-  // through its ref, so its state never has to come up here.
+  // ADR 0012: mounted here, the only node seeing both menu and editor.
   useAppHotkeys(
     {
       undo,

@@ -8,8 +8,7 @@ import { reloadPreferences } from './preferences'
 
 beforeEach(() => {
   localStorage.clear()
-  // the preference is session state now, so an empty storage is only half of a
-  // fresh device — this is the other half
+  // preference is session state: clearing storage alone leaves it stale
   reloadPreferences()
   usePlanStore.setState({ plan: emptyPlan() })
   usePlanStore.temporal.getState().clear()
@@ -33,8 +32,8 @@ describe('grid visibility toggle', () => {
   })
 
   it('covers the whole screen, not just the viewBox', async () => {
-    // screen 800×600 vs viewBox 820×620 (default view): "meet" letterboxes
-    // horizontally, so the grid must start left of the viewBox's x = -80
+    // screen 800×600 vs viewBox 820×620: "meet" letterboxes horizontally, so the
+    // grid starts left of the viewBox's x = -80
     const { container } = await render(<Editor />)
     const horizontals = [...container.querySelectorAll('svg [data-grid="major"] line')].filter(
       (l) => l.getAttribute('y1') === l.getAttribute('y2'),
@@ -48,8 +47,7 @@ describe('grid visibility toggle', () => {
     await userEvent.click(toggle())
     await first.unmount()
 
-    // a reload, not just a remount: the point is that the choice came back from
-    // storage, which a surviving session value would hide
+    // reload, not remount: a surviving session value would hide the storage read
     reloadPreferences()
     const second = await render(<Editor />)
     expect(gridOnSheet(second.container)).toBeNull()

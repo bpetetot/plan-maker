@@ -1,5 +1,4 @@
-// Theme (see CONTEXT.md): the editor's light or dark appearance. A per-device
-// preference — never part of the plan, never exported.
+// CONTEXT.md: Theme — per-device preference, never part of the plan.
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
@@ -12,15 +11,7 @@ export function resolveTheme(preference: ThemePreference, systemDark: boolean): 
   return preference
 }
 
-/**
- * The preference that flips what is currently on screen.
- *
- * Resolving before inverting is what makes the shortcut honest: the preference
- * has three values but only two appearances, so cycling through all three would
- * spend one press in three changing nothing visible (from 'dark' to 'system' on
- * a dark system). Toggling the *resolved* theme always shows a change. It costs
- * 'system' its keyboard access — that is a set-once choice, and the menu keeps it.
- */
+/** Resolve then invert, not cycle the three values: one press in three would change nothing visible. */
 export function toggledTheme(preference: ThemePreference, systemDark: boolean): ThemePreference {
   return resolveTheme(preference, systemDark) === 'dark' ? 'light' : 'dark'
 }
@@ -30,13 +21,12 @@ export function loadThemePreference(): ThemePreference {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'light' || stored === 'dark') return stored
   } catch {
-    // storage unavailable (private mode…) — fall through to the default
+    // localStorage throws in private mode: fall through to the default.
   }
   return 'system'
 }
 
-// Browser-bar colors per theme: accent blue in light (the historic value),
-// sheet surface in dark. Also set by the inline script in index.html — keep in sync.
+// Also set by the inline script in index.html — keep in sync.
 const META_THEME_COLOR: Record<ResolvedTheme, string> = {
   light: '#2563eb',
   dark: '#1e1e1e',
@@ -52,6 +42,6 @@ export function saveThemePreference(preference: ThemePreference): void {
     if (preference === 'system') localStorage.removeItem(STORAGE_KEY)
     else localStorage.setItem(STORAGE_KEY, preference)
   } catch {
-    // storage unavailable — the choice just won't survive a reload
+    // localStorage throws in private mode: the choice won't survive a reload.
   }
 }

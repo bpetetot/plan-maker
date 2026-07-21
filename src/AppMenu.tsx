@@ -1,4 +1,3 @@
-// Floating burger menu (top-left) with the app-level file actions.
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'
 import {
   CircleQuestionMark,
@@ -32,24 +31,14 @@ export interface AppMenuProps {
   setThemePreference: (preference: ThemePreference) => void
 }
 
-// The shortcut as a menu annotation rather than a key badge: the help dialog is
-// a catalogue of keys, where the badge is the subject, but here the key is a
-// footnote to an action the user came for. Same source, two roles — this reads
-// from the same registry the help does, so a rebinding shows up in both.
-//
-// Hidden from assistive technology, which is why the items keep "Open" and
-// "Reset" as their accessible names. The hint is glyphs — "⌘ ⇧ E" — and a
-// screen reader has no good reading for those; the help dialog carries the
-// same information in a form built to be read.
+// aria-hidden: the hint is glyphs ("⌘ ⇧ E"), unreadable aloud.
 const Hint = ({ action }: { action: ShortcutAction }) => (
   <span className="menu-hint" aria-hidden>
     {keyHint(action)}
   </span>
 )
 
-// A Popover rather than a Menu: the ARIA menu pattern puts a roving tabindex on
-// its items, which would take the theme row's buttons out of the keyboard's
-// reach. This dropdown mixes actions with a setting, so it is not a menu.
+// Popover, not Menu: a menu's roving tabindex would strand the theme buttons.
 export default function AppMenu({
   onOpen,
   onSaveAs,
@@ -92,11 +81,7 @@ export default function AppMenu({
                 <Hint action="help" />
               </button>
               <div className="menu-sep" />
-              {/* picking a theme keeps the panel open — it's a setting, not an action */}
-              {/* no shortcut hint on this row: it would have to sit between the
-                  label and the group, since it describes neither of the three
-                  buttons in particular, and there it crowds a row that already
-                  carries four things. Alt+Shift+D is in the help dialog. */}
+              {/* no close() here: a theme pick is a setting, not an action */}
               <div className="menu-row">
                 <span>Theme</span>
                 <div className="menu-row-group" role="group" aria-label="Theme">

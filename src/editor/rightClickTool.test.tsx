@@ -40,10 +40,10 @@ describe('right-click exits the drawing tool', () => {
     const svg = container.querySelector('svg')!
     await userEvent.click(page.getByLabelText('Wall'))
     await pointer(svg, 'pointerdown', { button: 0, clientX: 400, clientY: 300 })
-    expect(page.getByText(/close the room/).element()).toBeTruthy() // chain in progress
+    expect(page.getByText(/close the room/).element()).toBeTruthy()
     await mouse(svg, 'contextmenu')
     expect(activeTool()).toBe('Wall')
-    expect(page.getByText(/start a wall chain/).element()).toBeTruthy() // chain ended
+    expect(page.getByText(/start a wall chain/).element()).toBeTruthy()
     await mouse(svg, 'contextmenu')
     expect(activeTool()).toBe('Select')
   })
@@ -65,23 +65,23 @@ describe('right-click exits the drawing tool', () => {
     await userEvent.click(page.getByLabelText('Door'))
     await pointer(svg, 'pointermove', clientAt(svg, 300, 100))
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 300, 100) })
-    expect(page.getByText('Door', { exact: true }).element()).toBeTruthy() // selection panel is up
+    expect(page.getByText('Door', { exact: true }).element()).toBeTruthy()
     await mouse(svg, 'contextmenu')
     expect(activeTool()).toBe('Select')
-    expect(page.getByText('Door', { exact: true }).element()).toBeTruthy() // panel survives the exit
+    expect(page.getByText('Door', { exact: true }).element()).toBeTruthy()
   })
 
   it('does not clear the selection in the Select tool', async () => {
     usePlanStore.setState({ plan: wallPlan() })
     const { container } = await render(<Editor />)
     const svg = container.querySelector('svg')!
-    // marquee around the wall to select it
+    // marquee around the wall
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 50, 50) })
     await pointer(svg, 'pointermove', clientAt(svg, 550, 150))
     await pointer(svg, 'pointerup')
-    expect(page.getByLabelText('Delete').element()).toBeTruthy() // wall panel is up
+    expect(page.getByLabelText('Delete').element()).toBeTruthy()
     await mouse(svg, 'contextmenu')
-    expect(page.getByLabelText('Delete').element()).toBeTruthy() // selection intact
+    expect(page.getByLabelText('Delete').element()).toBeTruthy()
   })
 
   it('suppresses the native menu but does nothing in the Select tool', async () => {

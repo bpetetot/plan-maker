@@ -1,4 +1,3 @@
-// Presentational SVG pieces, shared by the editor and the PNG export (WYSIWYG).
 import { faceSpan, junctionPatches, wallOutline } from '../model/faces'
 import { wallLength, wallPoints } from '../model/geometry'
 import { formatArea, formatLength } from '../model/format'
@@ -9,9 +8,8 @@ import { roomAt } from '../model/rooms'
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types'
 import type { Snap } from '../model/snap'
 
-// Theme-aware paints: the values live in styles.css (light under :root, dark
-// under [data-theme='dark']). The PNG export pins the light values in its own
-// <style> block, so the standalone SVG resolves them without the document.
+// Values live in styles.css; the PNG export pins the light ones in its own
+// <style>, so the standalone SVG resolves them without the document.
 export const COLORS = {
   wall: 'var(--wall)',
   wallHover: 'var(--wall-hover)',
@@ -21,8 +19,7 @@ export const COLORS = {
   label: 'var(--label)',
 }
 
-// ISO convention: label text reads from the bottom or the right of the sheet,
-// so vertical text is -90 (bottom-to-top), never +90.
+// ISO: text reads from the bottom or the right, so vertical is -90, never +90.
 export const labelAngle = (dx: number, dy: number) => {
   let angle = (Math.atan2(dy, dx) * 180) / Math.PI
   if (angle >= 90) angle -= 180
@@ -30,11 +27,8 @@ export const labelAngle = (dx: number, dy: number) => {
   return angle
 }
 
-// Abutting same-colored polygons (wall bodies, junction patches) share exact
-// edges, and the browser anti-aliases each edge against the background
-// independently — the background bleeds through the shared edge as a hairline
-// seam. A half-screen-pixel self-colored stroke overlaps the neighbours just
-// enough to close it, at every zoom.
+// The browser anti-aliases each shared edge separately: background bleeds
+// through as a hairline. A self-colored screen-pixel stroke closes it.
 const seamStroke = (paint: string) =>
   ({
     stroke: paint,
@@ -51,9 +45,8 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
   if (gaps.length === 0) {
     return <polygon points={points} fill={paint} {...seamStroke(paint)} pointerEvents="none" />
   }
-  // Openings cut real holes in the body (mask), so whatever lies beneath —
-  // the Grid — stays visible through the gap. Region: the outline's bbox,
-  // grown past the ±1 cm the gap rects overhang the faces.
+  // Mask, not a sheet-coloured overlay: the Grid must stay visible through
+  // the gap. Region is the bbox grown past the ±1 cm the gap rects overhang.
   const xs = outline.map((p) => p.x)
   const ys = outline.map((p) => p.y)
   const x = Math.min(...xs) - 2
@@ -72,10 +65,8 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
         <rect x={x} y={y} width={Math.max(...xs) - x + 2} height={Math.max(...ys) - y + 2} fill="#fff" />
         {gaps.map((o) => {
           const placement = openingPlacement(plan, o)
-          // a window's jambs are not drawn over the wall — they ARE the wall:
-          // the cut leaves a half-jamb strip of body uncut at each end, so the
-          // jamb shares the wall's polygon and can never mis-register with its
-          // faces (doors keep the full-width cut)
+          // window jambs ARE the wall: leaving a half-jamb strip uncut can
+          // never mis-register with the faces (doors keep the full-width cut)
           const inset = o.type === 'window' ? WINDOW_JAMB / 2 : 0
           return placement ? (
             <rect
@@ -95,11 +86,8 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
   )
 }
 
-// Junction patches: the polygons filling the central gaps wall outlines leave
-// at T and angled crossings (CONTEXT.md: Face). A patch belongs to every wall
-// at its Point, so it never takes a single wall's hover tint; it reads as
-// selected — never selectable itself — once the junction is between selected
-// walls: at least two of its walls in the Selection (CONTEXT.md: Selection).
+// Fills the central gaps outlines leave at crossings (CONTEXT.md: Face). Owned
+// by every wall at its Point: no hover tint, selected tint from two selected.
 export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: ElementRef[] }) {
   const selected = new Set((selection ?? []).filter((r) => r.type === 'wall').map((r) => r.id))
   return (
@@ -119,13 +107,12 @@ export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: E
   )
 }
 
-// Grab-zone margin around an element's body, per side, in screen px
-// (CONTEXT.md: Grab zone). Converted to plan units at the current zoom so it
-// stays constant on screen, whatever the wall's thickness.
+// Per side, in screen px (CONTEXT.md: Grab zone); converted to plan units so
+// it stays constant on screen whatever the zoom or the wall's thickness.
 const GRAB_MARGIN_PX = 2
 const grabMargin = (pxPerCm: number) => GRAB_MARGIN_PX / pxPerCm
 
-// Invisible grab zone for a wall; render above visible geometry.
+// Render above visible geometry.
 export function WallGrabZone({
   plan,
   wall,
@@ -161,17 +148,12 @@ export function WallGrabZone({
   )
 }
 
-// Full width of a window jamb bar, centered on each end of the wall gap.
-// WallLine's mask leaves the inner half-bar of wall body uncut under each bar:
-// that strip shares the wall's polygon, so whatever sub-pixel shortfall the
-// bar's own edges have, the gap fills with wall color — never the background.
-// The glyph still paints the bars on top, in its own tint: they must stay in
-// the glyph's register (dark on a selected wall, accent on a selected window,
-// preview on a ghost), not take the wall body's.
+// Full jamb bar width; WallLine's mask leaves a half-bar of body uncut beneath.
+// The glyph repaints the bars in its own tint, not the wall body's.
 const WINDOW_JAMB = 1.5
 
-// Door geometry in the door's local frame (center of the wall gap, wall along
-// x) — single source shared by the visible glyph and the invisible grab zone.
+// Local frame: origin at the gap centre, wall along x. Shared by glyph and
+// grab zone — they must not drift apart.
 const doorMirror = (door: Door) =>
   `scale(${door.hingeSide === 'end' ? -1 : 1},${door.swing === 'out' ? -1 : 1})`
 const doorLeaf = (door: Door) => ({
@@ -206,8 +188,7 @@ export function OpeningGlyph({
       opacity={ghost ? 0.55 : 1}
       pointerEvents="none"
     >
-      {/* a placed opening's gap is cut from the wall by WallLine's mask; the
-          ghost is not in the plan, so it previews its future hole itself */}
+      {/* the ghost is not in the plan, so WallLine's mask cuts no gap for it */}
       {ghost && (
         <rect
           x={-halfWidth}
@@ -220,8 +201,7 @@ export function OpeningGlyph({
       {opening.type === 'door' ? (
         <g transform={doorMirror(opening)}>
           <line {...doorLeaf(opening)} stroke={stroke} strokeWidth={2} />
-          {/* solid hairline: a dashed arc would read as "above the cut plane"
-              in section convention */}
+          {/* solid, not dashed: dashed reads as "above the cut plane" */}
           <path d={doorArc(opening)} fill="none" stroke={stroke} strokeWidth={1} />
         </g>
       ) : (
@@ -245,13 +225,11 @@ export function OpeningGlyph({
   )
 }
 
-// Grabbable stroke width for the door leaf/arc grab shapes, in screen px
-// (non-scaling-stroke keeps it constant at every zoom level — no unit
-// conversion needed, unlike grabMargin, because no plan-unit body is added).
+// Screen px: non-scaling-stroke needs no unit conversion, unlike grabMargin,
+// because no plan-unit body is added.
 const DOOR_GRAB_STROKE = 12
 
-// Invisible grab zone for an opening (its full span on the wall).
-// Render AFTER wall grab zones so clicking the opening's span wins (spec §4).
+// Render AFTER wall grab zones so the opening's span wins the click (spec §4).
 export function OpeningGrabZone({
   plan,
   opening,
@@ -275,7 +253,6 @@ export function OpeningGrabZone({
       onPointerDown={onPointerDown}
     >
       <rect x={-halfWidth} y={-halfHeight} width={opening.width} height={halfHeight * 2} fill="transparent" />
-      {/* the door leaf and swing arc are grabbable too */}
       {opening.type === 'door' && (
         <g transform={doorMirror(opening)}>
           <line
@@ -297,16 +274,10 @@ export function OpeningGrabZone({
   )
 }
 
-// Distance from the wall centerline to the line the dimension text is
-// vertically centered on — the same line the rails materialise. A constant
-// 10 cm from the wall face, whatever the thickness.
 const dimLineOffset = (wall: Wall) => wall.thickness / 2 + 10
 
-// Frame of a wall's dimension line, shared by everything that draws on it:
-// unit axis, ISO reading angle (and whether it flipped the wall's own frame),
-// and the side the line sits on — the stored placement, else the default look
-// (upper side for horizontal walls, left side for vertical ones), as a sign
-// along the start→end left normal.
+// `side` is a sign along the start→end left normal; its default puts the line
+// upper for horizontal walls, left for vertical ones.
 function dimLineFrame(plan: Plan, wall: Wall) {
   const [a, b] = wallPoints(plan, wall)
   const length = wallLength(plan, wall)
@@ -319,26 +290,20 @@ function dimLineFrame(plan: Plan, wall: Wall) {
   return { a, b, length, ux: dx / length, uy: dy / length, angle, flipped, side, off: dimLineOffset(wall) }
 }
 
-// Dimension text size in the editor; the PNG export renders a notch larger
-// and passes its own via PlanScene. The advance width of one measure-font
-// character derives from it (JetBrains Mono: 0.6 em), so every width estimate
-// follows the font size. Placement chips keep the 9px font, hence their own
-// constant.
+// Editor size; the PNG export passes its own via PlanScene. Advance width is
+// JetBrains Mono's 0.6 em; chips keep a 9px font, hence their own constant.
 const DIM_FONT_PX = 8
 const measureCharPx = (fontPx: number) => 0.6 * fontPx
 const CHIP_CHAR_PX = 5.4
 
-// The plate under a dimension text: a rounded sheet-coloured reserve covering
-// the whole text box, spaces included, so grid, walls and neighbouring
-// dimension lines never show through a measure.
+// The plate covers the whole text box, spaces included: grid, walls and
+// neighbouring dimension lines must never show through a measure.
 const PLATE_PAD_X = 2
 const PLATE_PAD_Y = 1
 const PLATE_RX = 2
 const plateHalfWidth = (label: string, fontPx: number) =>
   (label.length * measureCharPx(fontPx)) / 2 + PLATE_PAD_X
 
-// A measure text on its plate, centered on (x, y). The plate is the measure's
-// mask — the text itself carries no halo.
 function DimText({
   label,
   className,
@@ -380,18 +345,13 @@ function DimText({
 
 const EXTENT_STROKE = 1
 
-// ISO arrowheads bound the measured extent: a filled triangle at each end,
-// its tip exactly on the extent boundary — the value stays exact whatever
-// the head's size. All in plan units, like the extent line itself.
+// Plan units. Tips sit exactly on the extent boundary, so the measured value
+// stays exact whatever the head's size.
 const ARROW_LEN = 7
 const ARROW_HALF_WIDTH = 2.2
 
-// The broken dimension line DimLabel draws: a piece on each side of the text
-// gap (only where it has room) and an ISO arrowhead at each end of the
-// measured extent. When the span has room for the heads and the text, the
-// heads sit inside it pointing outward; on a shorter span they move outside,
-// pointing inward at each other as bare triangles — the ISO convention when
-// space runs out, minus the leader tails past the heads.
+// ISO: heads sit inside the extent pointing outward, and flip outside pointing
+// inward when the span runs out of room (minus the leader tails).
 function ExtentLine({
   at,
   ux,
@@ -413,7 +373,6 @@ function ExtentLine({
 }) {
   const gapWidth = Math.max(0, Math.min(gapTo, to) - Math.max(gapFrom, from))
   const inside = to - from >= 2 * ARROW_LEN + gapWidth + 8
-  // line pieces stop at the arrow bases when the heads sit inside the extent
   const start = inside ? from + ARROW_LEN : from
   const end = inside ? to - ARROW_LEN : to
   const g1 = Math.max(start, Math.min(gapFrom, end))
@@ -445,13 +404,8 @@ function ExtentLine({
   )
 }
 
-// The Rail (CONTEXT.md): the travel of a dimension text's center along its
-// wall, as ratios of the axis length. The plate stays clear of the
-// arrowheads — flush with their bases when the heads sit inside the extent,
-// free to reach the extent bounds when a short span pushes them outside. A
-// span too narrow for the plate collapses the travel to its middle, and the
-// stored ratio must stay in [0, 1] (schema), so the bounds are intersected
-// with it last.
+// The Rail (CONTEXT.md), as ratios of the axis length, keeping the plate clear
+// of the arrowheads. Clamped last: the schema requires a ratio in [0, 1].
 export function dimTravelBounds(plan: Plan, wall: Wall, side: 1 | -1, fontPx = DIM_FONT_PX) {
   const length = wallLength(plan, wall)
   if (length < 1) return { min: 0.5, max: 0.5 }
@@ -466,14 +420,8 @@ export function dimTravelBounds(plan: Plan, wall: Wall, side: 1 | -1, fontPx = D
   return { min: clamp01(min), max: clamp01(max) }
 }
 
-// Automatic dimension on every wall, always visible (spec §4). It measures
-// exactly the wall's rendered silhouette on the side it sits on — the mitered
-// Face corners at junction ends, the body overhang at free ends — drawn as a
-// broken dimension line with ISO arrowheads at the measured extent. The
-// text sits at wall.dimPlacement when set (ratio along the axis, side across
-// it), else at the midpoint, above the reading line (upper side for
-// horizontal walls, left side for vertical ones). With onPointerDown it
-// becomes a drag handle (Select tool); it is never part of the selection.
+// Automatic dimension on every wall (spec §4), measuring the rendered
+// silhouette on its side. Drag handle with onPointerDown; never selectable.
 export function DimLabel({
   plan,
   wall,
@@ -492,13 +440,9 @@ export function DimLabel({
   const span = faceSpan(plan, wall, side)
   const value = Math.max(0, span.to - span.from)
   const label = formatLength(value)
-  // point on the dimension line at axis parameter t (cm from the start Point)
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off })
   const tText = (wall.dimPlacement?.t ?? 0.5) * length
   const mid = at(tText)
-  // the line breaks exactly at the plate's edges. The arrowheads are always
-  // drawn — that legibility is the point when a value refines at a new
-  // junction — even when no line piece has room.
   const gapHalf = plateHalfWidth(label, fontPx)
   return (
     <g>
@@ -527,39 +471,20 @@ export function DimLabel({
   )
 }
 
-// The chip's on-screen metrics, in screen pixels: 9px measure text plus 5px
-// of padding on each side.
+// Screen pixels: 9px measure text plus 5px of padding each side.
 const CHIP_HEIGHT = 16
 const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10
 
-// Placement dimensions: the pair of temporary measures flanking an opening,
-// shown while it is placed or moved and, past the release, for as long as it
-// stays in the selection (CONTEXT.md: Placement dimension).
-//
-// Each is the clearance left to one end of the opening's Rail — a mitered Face
-// corner, a free end's overhang, or the near edge of a neighbouring opening —
-// so every value is tape-measurable, and reads zero exactly when the opening
-// can travel no further.
-//
-// It is deliberately not drawn as a Dimension: no dimension line, no ticks, no
-// witness lines, no offset from a face. Each value is a filled accent chip
-// centred on the clearance it measures, on the wall's axis, inside the wall
-// body — the one position no other register occupies, so it coexists with the
-// wall's Dimension instead of displacing it. Being interaction chrome, the chip
-// holds a constant size on screen while its centre stays in plan coordinates
-// (ADR 0005): it never shrinks, never shifts and never disappears, so a chip
-// wider than its clearance simply overflows it. A clearance reduced to nothing
-// shows no chip; the other side shows its own normally. Editor feedback —
-// deliberately absent from PlanScene.
+// CONTEXT.md: Placement dimension. Chips, not a Dimension: on the wall axis is
+// the one register free to coexist with the wall's own (ADR 0005). Editor only.
 export function PlacementDims({ plan, opening, pxPerCm }: { plan: Plan; opening: Opening; pxPerCm: number }) {
   const wall = plan.walls[opening.wallId]
   const placement = openingPlacement(plan, opening)
   if (!wall || !placement) return null
   const { a, ux, uy, angle } = dimLineFrame(plan, wall)
-  // point on the wall axis at distance t from the start Point
   const at = (t: number) => ({ x: a.x + ux * t, y: a.y + uy * t })
-  // a screen pixel expressed in plan units, so the chip keeps its size at
-  // every zoom while its centre stays where it measures
+  // a screen pixel in plan units: constant chip size, centre still where it
+  // measures
   const k = 1 / Math.max(pxPerCm, 0.0001)
   const half = opening.width / 2
   const rail = openingRail(plan, wall, placement.offset, opening.id)
@@ -595,25 +520,17 @@ export function PlacementDims({ plan, opening, pxPerCm }: { plan: Plan; opening:
   )
 }
 
-// Room texts group into blocks (CONTEXT.md: Room label): a custom-placed
-// label is its own block where it was dragged; a default-placement label
-// renders at its room's live centroid — as does the bare area of an
-// unlabeled room. Reconciliation keeps at most one label per room; should
-// several ever coexist (injected state), the centroid block stacks them
-// defensively, oldest first, and the oldest carries the area. A label
-// outside any room cannot arise from plan operations either, but is
-// defensively rendered as its name alone.
+// CONTEXT.md: Room label. Reconciliation keeps one label per room and none
+// outside a room; the extra cases here only guard injected state.
 export interface RoomTextBlock {
   key: string
   x: number
   y: number
-  // labels rendered in this block, oldest first; empty for the bare area
-  // block of an unlabeled room
+  // oldest first
   labels: RoomLabel[]
-  // the detected room this block belongs to; unset for an orphan label
+  // unset for an orphan label
   room?: Room
-  // set when this block holds the room's area (its oldest label is here, or
-  // the room has no label at all)
+  // set only on the block carrying the room's area
   area?: number
 }
 
@@ -642,7 +559,7 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
   for (const room of rooms) {
     const defaults = defaultsByRoom.get(room) ?? []
     const oldest = oldestByRoom.get(room)
-    if (defaults.length === 0 && oldest) continue // all labels custom: no centroid block
+    if (defaults.length === 0 && oldest) continue
     blocks.push({
       key: defaults[0]?.id ?? `room-${room.pointIds.join(':')}`,
       x: room.anchor.x,
@@ -655,24 +572,16 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
   return blocks
 }
 
-// Vertical pitch of a block's text lines; the editor positions its inline
-// name input on the same grid.
+// The editor positions its inline name input on this same grid.
 export const BLOCK_LINE_HEIGHT = 13
 
-// The labels of a block with a visible name slot: named, or being edited in
-// place (the input overlays the slot, so the layout must keep reserving it).
-// Shared with the editor so the input lands exactly on its line.
+// A label being edited keeps its slot: the editor's input overlays it and must
+// land on that line.
 export const blockNameSlots = (block: RoomTextBlock, editingKey?: string) =>
   block.labels.filter((label) => label.name || label.id === editingKey)
 
-// Room labels are never selected — each line of a block is dragged and
-// double-click-edited directly (CONTEXT.md: Selection): a name line targets
-// its label, the area line targets the block's oldest label (or, on an
-// unlabeled room, a label to be created). While the line named by editingKey
-// is edited the editor overlays an input on it, so its text hides but the
-// slot stays and the area keeps its offset.
-// The area line is a Measure and follows the Measure toggle; the name lines
-// are not, and always show (CONTEXT.md: Measure).
+// Room labels are never selected; lines are dragged and edited directly
+// (CONTEXT.md: Selection). Only the area line is a Measure (CONTEXT.md).
 export function RoomOverlay({
   rooms,
   labels,
@@ -717,9 +626,8 @@ export function RoomOverlay({
         // creating a label on an unlabeled room also reserves a name slot
         const slots = named.length > 0 ? named.length : block.key === editingKey ? 1 : 0
         const areaY = slots > 0 ? slots * BLOCK_LINE_HEIGHT : 5
-        // a block that renders nothing (nameless label whose room is gone, or
-        // a bare area with measures hidden) must not linger as an invisible
-        // drag target
+        // a block that renders nothing must not linger as an invisible drag
+        // target
         if (named.length === 0 && area === undefined) return null
         return (
           <g key={block.key} transform={`translate(${block.x},${block.y})`}>
@@ -754,8 +662,7 @@ export function SnapMarker({ snap }: { snap: Snap | null }) {
   if (!snap) return null
   return (
     <g pointerEvents="none">
-      {/* the dashed guide shows whenever a locked axis produced the position —
-          including a wall snap corrected to the axis ∩ wall intersection */}
+      {/* dashed guide for any locked-axis position, wall intersections too */}
       {snap.axisFrom && (
         <line
           x1={snap.axisFrom.x}
@@ -802,10 +709,8 @@ export function Handle({
   )
 }
 
-// Rubber-band wall while drawing, with a live length label (spec §4). The
-// ghost previews the future body honestly — square caps overhang each end by
-// half the thickness — and the label reads the overall (hors-tout) extent:
-// axis + thickness.
+// Rubber-band wall while drawing (spec §4). Square caps overhang by half the
+// thickness, so the label reads the hors-tout extent: axis + thickness.
 export function RubberWall({
   from,
   to,
@@ -838,10 +743,8 @@ export function RubberWall({
   )
 }
 
-// The full plan as it should appear in a PNG export: walls, openings, room
-// labels/areas, dimensions — no selection, no UI chrome (spec §7).
-// Hidden measures are hidden from the export too (ADR 0008), so the scene
-// takes the on-screen preference rather than always printing measures.
+// The PNG export's scene: no selection, no UI chrome (spec §7). Takes the
+// on-screen measure preference rather than always printing (ADR 0008).
 export function PlanScene({
   plan,
   rooms,

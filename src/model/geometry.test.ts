@@ -29,11 +29,10 @@ describe('segmentIntersection', () => {
   })
 
   it('returns null when the segments only touch at an endpoint', () => {
-    // shared endpoint
     expect(
       segmentIntersection({ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 50 }),
     ).toBeNull()
-    // T-touch: one segment ends on the other's interior
+    // T-touch: endpoint on the other's interior
     expect(
       segmentIntersection({ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 50 }),
     ).toBeNull()
@@ -78,7 +77,7 @@ describe('wallSide', () => {
       b.wall(a, c)
     })
     const wall = Object.values(plan.walls)[0]
-    // SVG y grows downward: the left normal of a +x wall points to +y
+    // SVG y grows downward: +y is the left normal of a +x wall.
     expect(wallSide(plan, wall, 50, 30)).toBe(1)
     expect(wallSide(plan, wall, 50, -30)).toBe(-1)
     expect(wallSide(plan, wall, 50, 0)).toBe(1)

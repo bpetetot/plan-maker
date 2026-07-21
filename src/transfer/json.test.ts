@@ -50,9 +50,8 @@ describe('serializePlanFile / parsePlanFile', () => {
 })
 
 describe('parsePlanFile — coincident points', () => {
-  // Field case: a wall deleted then redrawn left two Points at (400, 100), so
-  // the visually closed loop was never detected as a Room. Loading merges the
-  // twins (ADR 0003) and the room appears.
+  // Twin points at (400, 100) keep the closed loop from detecting as a room;
+  // loading merges them (ADR 0003).
   it('merges coincident points so the loop closes into a room', () => {
     const points: Record<string, [number, number]> = {
       A: [400, 100], // twin of H

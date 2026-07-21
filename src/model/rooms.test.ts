@@ -91,9 +91,8 @@ describe('detectRooms', () => {
   })
 
   it('subtracts the footprint of a dangling wall from the room area', () => {
-    // 400×300 room, stub from the middle of the bottom wall down to (200,100):
-    // the floor wraps around the stub slab (10 wide, from the bottom wall's
-    // inner face at y=5 to the stub tip at y=100 — free end stops at the Point)
+    // 400×300 room, stub from the bottom wall's midpoint to (200,100)
+    // subtracted slab: 10 wide, y=5 (inner face) to y=100 (tip at the Point)
     const plan = buildPlan((b) => {
       const a = b.point(0, 0)
       const m = b.point(200, 0)
@@ -128,8 +127,7 @@ describe('detectRooms', () => {
     })
     const rooms = detectRooms(plan)
     expect(rooms).toHaveLength(1)
-    // the spur slab eats into the interior-face area (390×290) without
-    // breaking detection; exact value depends on the diagonal footprint
+    // the diagonal spur slab eats into the 390×290 interior-face area
     expect(rooms[0].areaCm2).toBeLessThan(390 * 290)
     expect(rooms[0].areaCm2).toBeGreaterThan(390 * 290 - 10 * 250 - 100)
   })
@@ -219,8 +217,8 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
     const { inner, outer, rooms } = byArea(plan)
     expect(rooms).toHaveLength(2)
     expect(inner.areaCm2).toBe(140 * 90)
-    // outer interior faces 390×390, minus the island out to its exterior
-    // faces (160×110): walls included in the hole
+    // outer interior faces 390×390, minus the island's exterior faces
+    // (160×110): the island walls belong to the hole
     expect(outer.areaCm2).toBe(390 * 390 - 160 * 110)
     expect(outer.holes).toHaveLength(1)
     expect(inner.holes).toHaveLength(0)
@@ -294,7 +292,6 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
       },
     }
     const next = reconcileRoomLabels(plan, plan)
-    // both labels survive: they live in different rooms
     expect(next.roomLabels.li).toMatchObject({ name: 'Inner', x: 175, y: 150 })
     expect(next.roomLabels.lo).toMatchObject({ name: 'Outer', x: 203, y: 205 })
   })
@@ -329,8 +326,7 @@ describe('interiorSide', () => {
     })
     const rooms = detectRooms(plan)
     const [bottom, right, top, left] = Object.values(plan.walls)
-    // interior of the room is below the bottom wall in screen coords: side +1
-    // (the same convention faceLength uses)
+    // screen coords: the interior is below the bottom wall, so side +1
     expect(interiorSide(rooms, bottom)).toBe(1)
     expect(interiorSide(rooms, right)).toBe(1)
     expect(interiorSide(rooms, top)).toBe(1)
@@ -486,7 +482,7 @@ describe('roomAt', () => {
 })
 
 describe('reconcileRoomLabels', () => {
-  // 4×4 m square room; returns the plan plus the ids needed to reshape it
+  // 4×4 m square room
   const labeledSquare = (labelX: number, labelY: number) => {
     let ids = { right: ['', ''], wall: '', label: '' }
     const plan = buildPlan((b) => {
@@ -522,8 +518,6 @@ describe('reconcileRoomLabels', () => {
     expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({})
   })
 
-  // Two stacked rooms sharing a wall; returns the plan plus the ids needed
-  // to drag the shared wall.
   const stackedRooms = () => {
     let ids = { shared: ['', ''], top: '', bottom: '' }
     const plan = buildPlan((b) => {
@@ -536,7 +530,7 @@ describe('reconcileRoomLabels', () => {
       b.wall(tl, tr)
       b.wall(tl, ml)
       b.wall(tr, mr)
-      b.wall(ml, mr) // the shared wall
+      b.wall(ml, mr)
       b.wall(ml, bl)
       b.wall(mr, br)
       b.wall(bl, br)
@@ -560,8 +554,7 @@ describe('reconcileRoomLabels', () => {
 
   it('keeps a label whose room loop changed but still contains it (position fallback)', () => {
     const { plan, label } = labeledSquare(200, 200)
-    // draw a dangling wall from the left wall inward: planar insertion splits
-    // the boundary wall, so the room loop gains a point
+    // planar insertion splits the left wall: the room loop gains a point
     const left = Object.values(plan.walls).find(
       (w) => plan.points[w.startPointId].x === 0 && plan.points[w.endPointId].x === 0,
     )!

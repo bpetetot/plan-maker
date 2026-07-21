@@ -1,6 +1,5 @@
-// The keyboard help, rendered *from* the shortcut registry (ADR 0011) — this
-// file states a layout and nothing else. Adding a shortcut here is not a thing
-// one can do: it is done in useAppHotkeys, and shows up on its own.
+// Rendered from the shortcut registry (ADR 0011): layout only.
+// Shortcuts are added in useAppHotkeys, never here.
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { X } from 'lucide-react'
 import { closeHelp, useHelpDialog } from './helpStore'
@@ -26,8 +25,6 @@ export default function ShortcutsDialog() {
                 {helpRows(id).map(({ keys, label }) => (
                   <div key={label} className="help-row">
                     <span className="help-label">{label}</span>
-                    {/* one badge for keys and gestures alike — the reader is
-                        after the way to do something, not after a key */}
                     <span className="help-keys">
                       {keys.map((k, i) => (
                         <span key={k}>

@@ -3,7 +3,6 @@ import { render } from 'vitest-browser-react'
 import type { Opening, Plan, Wall } from '../model/types'
 import { OpeningGlyph } from './render'
 
-// A single horizontal wall carrying the given opening.
 function planWith(opening: Opening): Plan {
   const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness: 10 }
   return {
@@ -29,9 +28,8 @@ const door: Opening = {
 
 const win: Opening = { id: 'n', wallId: 'w', type: 'window', offset: 200, width: 100 }
 
-// Openings sit in the fine-line register of the drawing, clearly under the
-// wall mass: thin leaf, hairline solid swing arc (dashed means "above the cut
-// plane" in section convention — not the case here), thin window strokes.
+// Swing arc solid, not dashed: dashed means "above the cut plane" in section
+// convention.
 describe('opening glyph line weights', () => {
   it('draws the door leaf as a thin stroke', async () => {
     const { container } = await render(
@@ -65,9 +63,6 @@ describe('opening glyph line weights', () => {
   })
 
   it('paints the jamb bars in the glyph register, over the wall strips', async () => {
-    // the uncut wall strips under the bars guarantee registration with the
-    // faces; the bars themselves carry the glyph's tint (dark on a selected
-    // wall, accent on a selected window)
     const { container } = await render(
       <svg>
         <OpeningGlyph plan={planWith(win)} opening={win} />

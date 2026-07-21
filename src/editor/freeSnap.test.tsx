@@ -1,7 +1,5 @@
-// A free move (Alt) filters the snap ladder instead of short-circuiting it
-// (issue 13): the alignment targets — 45° axes, grid — are suspended, the
-// connection ones — existing points, wall bodies — survive, so a freely drawn
-// wall still joins the plan's topology.
+// Issue 13: a free move (Alt) suspends the alignment snaps (45° axes, grid)
+// and keeps the connection ones (existing points, wall bodies).
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { Plan } from '../model/types'
@@ -13,7 +11,6 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-// A single horizontal wall to draw against.
 function hostPlan(): Plan {
   return {
     points: {
@@ -56,7 +53,6 @@ describe('drawing a wall during a free move', () => {
       (w) => w.startPointId === junction!.id || w.endPointId === junction!.id,
     )
     expect(atJunction).toHaveLength(3)
-    // the start, snapped by nothing, kept the raw cursor position
     expect(Object.values(plan().points).some((p) => p.x === 203 && p.y === 187)).toBe(true)
   })
 })
@@ -84,7 +80,7 @@ describe('dragging a point during a free move', () => {
     const { container } = await render(<EditorWithHotkeys />)
     const svg = container.querySelector('svg')!
 
-    // select w2 to reveal its point handles, then drag d onto b with Alt held
+    // marquee over w2 to reveal its point handles
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 150, 250) })
     await pointer(svg, 'pointermove', clientAt(svg, 450, 350))
     await pointer(svg, 'pointerup')

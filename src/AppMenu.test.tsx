@@ -5,8 +5,7 @@ import AppMenu, { type AppMenuProps } from './AppMenu'
 import { mouse, pointer } from './editor/testKit'
 import { useThemePreference } from './theme/useThemePreference'
 
-// The browser has a real matchMedia, reporting whatever the machine running
-// the suite prefers; pin it so the system option has a known answer.
+// Browser mode has a real matchMedia, answering for the host machine.
 const stubMatchMedia = (systemDark: boolean) => {
   window.matchMedia = ((query: string) =>
     ({
@@ -19,10 +18,8 @@ const stubMatchMedia = (systemDark: boolean) => {
 
 const noop = () => {}
 
-// The theme preference is App's now — the shortcut and these three buttons set
-// one value, so one owner holds it (ADR 0012). The menu is passed it. This
-// harness plays that owner, which keeps the assertions below about what a user
-// sees when they pick a theme, rather than about where the state sits.
+// ADR 0012: the theme preference is App's, the menu is passed it.
+// This harness stands in for that owner.
 function MenuWithTheme(props: Partial<AppMenuProps>) {
   const [themePreference, setThemePreference] = useThemePreference()
   return (
@@ -43,16 +40,10 @@ const renderMenu = (props: Partial<AppMenuProps> = {}) => render(<MenuWithTheme 
 
 const openMenu = () => userEvent.click(page.getByTitle('Menu'))
 const themeOption = (title: string) => page.getByTitle(title)
-// By accessible name, which is the label alone: each item now also carries its
-// shortcut, and that hint is aria-hidden precisely so the name a user would say
-// stays the name the item answers to. `button` is not the role the ARIA menu
-// pattern would impose — it is what these are, and what the move to a Popover
-// was made to keep.
+// Accessible name is the label alone: the shortcut hint is aria-hidden.
+// Role is `button`, not the ARIA menu pattern's `menuitem`.
 const action = (name: string) => page.getByRole('button', { name, exact: true })
 
-// Dismissing by clicking away lands on the page background, not on anything a
-// user could name — dispatched by hand, as a full press/release so it reads as
-// a click to whoever is listening.
 const clickOutside = async () => {
   await pointer(document.body, 'pointerdown')
   await pointer(document.body, 'pointerup')
@@ -65,8 +56,6 @@ beforeEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-// The contract of the menu itself — what opens it, what shuts it, what runs.
-// Stated in terms a user would use, so it holds whoever implements it.
 describe('the burger menu', () => {
   it('stays shut until the burger is pressed', async () => {
     await renderMenu()
@@ -103,9 +92,8 @@ describe('the burger menu', () => {
     await expect.element(action('Open')).not.toBeInTheDocument()
   })
 
-  // floating-ui anchors on the button, while the design lines the dropdown up
-  // with the card around it — the --anchor-offset reconciling the two reads as
-  // dead weight without this. Positioning lands after the commit, hence poll.
+  // floating-ui anchors on the button, the design on the card around it;
+  // --anchor-offset reconciles the two. Positioning lands post-commit, hence poll.
   it('lines its left edge up with the burger card', async () => {
     await renderMenu()
     await openMenu()

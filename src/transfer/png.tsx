@@ -5,9 +5,7 @@ import { detectRooms } from '../model/rooms'
 import type { Plan } from '../model/types'
 import { MEASURE_FONT_DATA_URI } from './measureFont'
 
-// PNG export (spec §7): WYSIWYG, no options. Framed on the plan's bounding box
-// plus a fixed 50 cm margin, rasterized at 2 px/cm capped at 4096 px on the
-// long side — independent of current zoom/pan.
+// PNG export (spec §7): frames the plan bbox, independent of current zoom/pan.
 
 const MARGIN_CM = 50
 const PX_PER_CM = 2
@@ -43,14 +41,8 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
   }
 }
 
-// Styles inlined so the standalone SVG renders identically to the editor.
-// The scene paints with theme variables; pinning their light values here keeps
-// the export light whatever theme the editor is in (Theme, CONTEXT.md). Any
-// new variable PlanScene starts consuming must be pinned here too, or it would
-// fall back to black in the standalone SVG.
-// The measure font travels inside the SVG: rasterization goes through an
-// <img>, which loads no external resource — a subset woff2 data URI
-// (scripts/generate-measure-font.mjs) keeps the export WYSIWYG.
+// Every var PlanScene consumes must be pinned here, or it falls back to black.
+// Font inlined: rasterization goes through an <img>, which loads no external resource.
 const EXPORT_STYLE = `
   @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
   svg { --wall: #1e293b; --sheet: #ffffff; --dim-line: #93c9c3; }
@@ -59,9 +51,7 @@ const EXPORT_STYLE = `
   text.room-area { font: 9px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
 `
 
-// What the editor shows is what the export prints, measures included: hiding
-// them is how you get a clean sheet to share (ADR 0008). The caller passes the
-// preference in — this module never reads it.
+// Measures mirror the editor (ADR 0008).
 export interface ExportOptions {
   measuresVisible: boolean
 }
@@ -78,16 +68,13 @@ export function buildExportSvg(plan: Plan, { measuresVisible }: ExportOptions): 
       viewBox={`${frame.x} ${frame.y} ${frame.widthCm} ${frame.heightCm}`}
     >
       <style>{EXPORT_STYLE}</style>
-      {/* opaque white background (spec §7) */}
       <rect x={frame.x} y={frame.y} width={frame.widthCm} height={frame.heightCm} fill="#ffffff" />
-      {/* dimension text a notch above the editor's 8px — the export
-          rasterizes small, the plate follows the size via PlanScene */}
+      {/* 10px, not the editor's 8px: the export rasterizes small */}
       <PlanScene plan={plan} rooms={rooms} measuresVisible={measuresVisible} dimFontPx={10} />
     </svg>,
   )
 }
 
-// Rasterizes the standalone SVG onto a canvas and resolves with the PNG blob.
 export function renderPlanPng(plan: Plan, options: ExportOptions): Promise<Blob | null> {
   const svg = buildExportSvg(plan, options)
   const frame = computeExportFrame(plan)

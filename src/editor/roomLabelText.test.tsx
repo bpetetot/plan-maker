@@ -1,6 +1,3 @@
-// Room text block UX: drag the area text without naming the room, inline
-// Excalidraw-style name editing on double-click, empty text clears the name
-// only, and the block never leaves its room — the drag clamps to its polygon.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -38,8 +35,7 @@ const plan = () => usePlanStore.getState().plan
 const labels = () => Object.values(plan().roomLabels)
 const undoDepth = () => usePlanStore.temporal.getState().pastStates.length
 
-// The inline editor is the only text field in the app, and it carries no
-// accessible name of its own — the role is how a user would point at it.
+// Role, not label: the inline editor carries no accessible name.
 const nameInput = () => page.getByRole('textbox')
 const isEditing = () => nameInput().elements().length === 1
 

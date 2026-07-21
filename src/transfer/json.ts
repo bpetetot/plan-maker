@@ -1,8 +1,8 @@
 import type { Plan } from '../model/types'
 import { decodePlanPayload, SCHEMA_VERSION } from '../persistence/schema'
 
-// JSON transfer file (spec §7): persisted model + envelope. `format` cleanly
-// rejects foreign JSON; `version` replays the same migration chain as storage.
+// Transfer envelope, spec §7: `format` rejects foreign JSON, `version` replays
+// the storage migration chain.
 
 export const FILE_FORMAT = 'plan-maker'
 
@@ -31,7 +31,7 @@ export function parsePlanFile(text: string): ParseResult {
   try {
     decoded = decodePlanPayload(version, plan)
   } catch {
-    // an old version with no registered migration path is unreadable, not "newer"
+    // old version, no migration path: unreadable, not "newer"
     decoded = null
   }
   if (!decoded) return { ok: false, reason: 'invalid-plan' }

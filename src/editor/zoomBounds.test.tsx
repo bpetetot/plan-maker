@@ -14,10 +14,8 @@ beforeEach(() => {
 
 const zoomOut = () => page.getByLabelText('Zoom out')
 const zoomIn = () => page.getByLabelText('Zoom in')
-// Each click divides or multiplies the view by 1.25, so the floor sits 11
-// clicks below 100% (1.25^10 = 10.7%, 1.25^11 would be 8.6%) and the ceiling
-// 16 clicks above (1.25^15 = 2842%, 1.25^16 would be 3553%). The last click of
-// each run is the short, clamped one.
+// 1.25 per click: floor 11 clicks below 100% (1.25^10 = 10.7%), ceiling 16
+// above (1.25^15 = 2842%). Last click of each run is clamped.
 const CLICKS_TO_FLOOR = 11
 const CLICKS_TO_CEILING = 16
 
@@ -25,8 +23,7 @@ const clickTimes = async (btn: ReturnType<typeof zoomOut>, n: number) => {
   for (let i = 0; i < n; i++) await userEvent.click(btn)
 }
 
-// A plan far wider than the default 820×620 framing: fitting it lands near 7%,
-// below the floor.
+// Far wider than the default 820×620 framing: Fit lands near 7%, below the floor.
 const hugePlan = (): Plan => ({
   points: {
     a: { id: 'a', x: 0, y: 0 },
@@ -85,7 +82,7 @@ describe('zoom bounds', () => {
   it('lets Fit frame a plan below the floor', async () => {
     await render(<Editor />)
     replacePlan(hugePlan())
-    // Fit reframes outside any dispatched event, so the read has to retry
+    // Fit reframes outside any dispatched event: the read must retry.
     await expect.poll(() => zoomLabel()).toBe('7%')
     await expect.element(zoomOut()).toBeDisabled()
     await expect.element(zoomIn()).not.toBeDisabled()

@@ -1,6 +1,6 @@
 import type { Cm } from './types'
 
-// Spec §2: meters with 2 decimals ("3,50 m") when ≥ 1 m, else cm.
+// Spec §2: meters with 2 decimals from 1 m up, else cm.
 export function formatLength(cm: Cm): string {
   const rounded = Math.round(cm)
   if (rounded < 100) return `${rounded} cm`

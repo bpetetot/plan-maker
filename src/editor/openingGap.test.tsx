@@ -3,7 +3,6 @@ import { render } from 'vitest-browser-react'
 import type { Opening, Plan, Wall } from '../model/types'
 import { OpeningGlyph, WallLine } from './render'
 
-// A single horizontal wall with a window in the middle.
 function planWithWindow(): { plan: Plan; wall: Wall; opening: Opening } {
   const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness: 10 }
   const opening: Opening = { id: 'o', wallId: 'w', type: 'window', offset: 200, width: 100 }
@@ -19,8 +18,7 @@ function planWithWindow(): { plan: Plan; wall: Wall; opening: Opening } {
   return { plan, wall, opening }
 }
 
-// The gap is a real hole in the wall (SVG mask), not a sheet-colored patch —
-// whatever sits beneath (the Grid) stays visible through the opening.
+// SVG mask, not a sheet-colored patch: the Grid stays visible through the hole.
 describe('opening gap in the wall', () => {
   it('cuts the opening out of the wall body with a mask', async () => {
     const { plan, wall } = planWithWindow()
@@ -32,8 +30,7 @@ describe('opening gap in the wall', () => {
     const polygon = container.querySelector('polygon')!
     expect(polygon.getAttribute('mask')).toBe('url(#wall-gaps-w)')
     const hole = container.querySelector('mask#wall-gaps-w rect[fill="#000"]')!
-    // a window's cut is inset by half a jamb bar at each end: the uncut strips
-    // ARE the jambs, so they stay one polygon with the wall body
+    // 100 inset by half a jamb bar each end; the uncut strips are the jambs
     expect(hole.getAttribute('width')).toBe('98.5')
     expect(hole.getAttribute('height')).toBe('12') // thickness + 1 cm each side
   })
@@ -81,8 +78,7 @@ describe('opening gap in the wall', () => {
   })
 
   it('keeps the sheet-colored patch on the placement ghost', async () => {
-    // the ghost is not in the plan, so no wall mask can cut its gap — the
-    // patch is how the preview shows the future hole
+    // ghost is not in the plan: no wall mask cuts its gap, so the patch previews it
     const { plan, opening } = planWithWindow()
     const ghost = { ...opening, id: '__ghost' }
     const { container } = await render(

@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { GridLines, gridLevels, loadGridVisible, saveGridVisible } from './grid'
 
-// Fade ramp (CONTEXT.md: Grid — "minor lines fade out when their cells get
-// too small on screen"): a line family is fully opaque while its cells are
-// 8 px or wider on screen, gone at 4 px or below, linear in between.
+// CONTEXT.md: Grid — fade ramp. Opaque at 8 px cells, gone at 4 px,
+// linear between.
 describe('gridLevels', () => {
   it('shows both families fully at 100% zoom (10 cm = 10 px, 50 cm = 50 px)', () => {
     expect(gridLevels(1)).toEqual({ minor: 1, major: 1 })

@@ -38,16 +38,15 @@ describe('snapPoint', () => {
   it('lands a diagonal on a grid line crossing from an off-grid anchor', () => {
     const anchor = { x: 3, y: 7 }
     const s = snapPoint(plan, anchor.x + 137, anchor.y + 131, { tolerance: 5, anchor })
-    // the two crossing families interleave (t ≡ 7 aligns x, t ≡ 3 aligns y);
-    // the nearest to the cursor wins — here t = 133, which aligns y
+    // crossing families interleave (t ≡ 7 aligns x, t ≡ 3 aligns y); nearest
+    // wins — t = 133, aligning y
     expect(s).toMatchObject({ x: 136, y: 140, kind: 'axis' })
-    expect(s.x - anchor.x).toBe(s.y - anchor.y) // still exactly 45°
+    expect(s.x - anchor.x).toBe(s.y - anchor.y)
   })
 
   it('lands on a real intersection when the anchor offsets are equal', () => {
     const anchor = { x: 3, y: 3 }
     const s = snapPoint(plan, anchor.x + 137, anchor.y + 131, { tolerance: 5, anchor })
-    // both families coincide: the diagonal does cross grid intersections
     expect(s).toMatchObject({ x: 140, y: 140, kind: 'axis' })
   })
 
@@ -110,8 +109,7 @@ describe('snapPoint', () => {
 
 describe('realignDelta', () => {
   it('lands the reference point on a grid intersection', () => {
-    // ref is off-grid by (3, -4): the delta absorbs the offset instead of
-    // carrying it along
+    // ref off-grid by (3, -4); the delta absorbs it
     expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, false)).toEqual({ dx: 147, dy: -66 })
   })
 
@@ -160,8 +158,7 @@ describe('snapPoint on wall bodies', () => {
       const p2 = b.point(400, 200)
       b.wall(p1, p2)
     })
-    // cursor drifts 6 cm off the horizontal while reaching the wall: the snap
-    // corrects to the axis ∩ wall point, not the cursor's raw projection
+    // cursor drifts 6 cm off the horizontal while reaching the wall
     const s = snapPoint(target, 395, 6, { tolerance: 15, walls: true, anchor: { x: 0, y: 0 } })
     expect(s).toMatchObject({ x: 400, y: 0, kind: 'wall' })
     expect(s.wallId).toBe(Object.keys(target.walls)[0])
@@ -174,8 +171,7 @@ describe('snapPoint on wall bodies', () => {
       const p2 = b.point(400, 200)
       b.wall(p1, p2)
     })
-    // the horizontal axis from the anchor meets the wall at (400, 0), below
-    // the wall's start — no junction possible there
+    // horizontal axis meets the wall at (400, 0), below its start at y = 20
     const s = snapPoint(target, 395, 40, { tolerance: 15, walls: true, anchor: { x: 0, y: 0 } })
     expect(s).toMatchObject({ x: 400, y: 40, kind: 'wall' })
     expect(s.axisFrom).toBeUndefined()
@@ -187,8 +183,7 @@ describe('snapPoint on wall bodies', () => {
       const p2 = b.point(1000, 276) // ~10° off horizontal
       b.wall(p1, p2)
     })
-    // horizontal axis from the anchor meets the near-parallel wall ~68 cm away
-    // from the cursor — far beyond 2× tolerance, not what the eye is aiming at
+    // axis meets the near-parallel wall ~68 cm from the cursor — past 2× tolerance
     const s = snapPoint(target, 500, 195, { tolerance: 15, walls: true, anchor: { x: 0, y: 200 } })
     expect(s).toMatchObject({ x: 501, y: 188, kind: 'wall' })
     expect(s.axisFrom).toBeUndefined()
@@ -200,8 +195,7 @@ describe('snapPoint on wall bodies', () => {
       const p2 = b.point(0, 100)
       b.wall(p1, p2)
     })
-    // anchor sits just in front of the wall, cursor points away from it: the
-    // locked +x axis crosses the wall behind the anchor — not a valid target
+    // anchor at x = 2, cursor at x = 14: the +x axis crosses the wall behind it
     const s = snapPoint(target, 14, 1, { tolerance: 15, walls: true, anchor: { x: 2, y: 0 } })
     expect(s).toMatchObject({ x: 0, y: 1, kind: 'wall' })
     expect(s.axisFrom).toBeUndefined()
@@ -224,8 +218,7 @@ describe('snapPoint on wall bodies', () => {
       const p2 = b.point(400, 200)
       b.wall(p1, p2)
     })
-    // same cursor as the axis ∩ wall case above: with Alt held no axis locks,
-    // so the 6 cm drift is kept instead of being corrected to y = 0
+    // same cursor as the axis ∩ wall case above; the 6 cm drift is kept
     const s = snapPoint(target, 395, 6, {
       tolerance: 15,
       walls: true,

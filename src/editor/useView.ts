@@ -10,42 +10,33 @@ export interface View {
   h: number
 }
 
-// The framing an empty plan opens with, in plan cm.
 const DEFAULT_FRAME: View = { x: -80, y: -80, w: 820, h: 620 }
 
-// The camera is the stable view state, Excalidraw-style: the plan point at the
-// screen's top-left corner plus the scale (screen px per plan cm). The viewBox
-// is derived from camera + measured screen size, so resizing the window is a
-// state no-op: it reveals or hides plan, never pans or rescales it.
+// Camera (plan point at screen top-left + scale), not a stored viewBox: a
+// resize then reveals plan instead of panning or rescaling it.
 interface Camera {
   x: number
   y: number
   scale: number
 }
 
-// Zoom bounds, as ratios of the reference framing — the same quantity the
-// indicator shows (glossary: Zoom), so a bound is reached exactly when the
-// button reads 10% or 3000%. Fit is deliberately exempt (ADR 0013).
+// Ratios of the reference framing (glossary: Zoom): a bound is reached exactly
+// when the indicator reads 10% or 3000%. Fit is exempt (ADR 0013).
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 30
 
-// Comparing a clamped scale back against its own bound is a float round-trip:
-// ZOOM_MIN * ref / ref need not be exactly ZOOM_MIN. Every bound test goes
-// through these two, so the clamp and the greyed-out state cannot disagree.
+// Float round-trip: ZOOM_MIN * ref / ref need not be exactly ZOOM_MIN. Single
+// path, so the clamp and the greyed-out state cannot disagree.
 const atOrBelowFloor = (scale: number, ref: number) => scale <= ZOOM_MIN * ref * (1 + 1e-9)
 const atOrAboveCeiling = (scale: number, ref: number) => scale >= ZOOM_MAX * ref * (1 - 1e-9)
 
-// A bound stops a step, it never pushes one: starting outside the range (Fit
-// framed a huge plan at 7%) a zoom in still moves by its own factor to 8.75%
-// instead of snapping to 10%. So each side of the clamp yields to `from`
-// whenever `from` is already past it.
+// Each side yields to `from` when `from` is already past it: a bound stops a
+// step, never pushes one.
 const clampScale = (scale: number, ref: number, from: number) =>
   Math.min(Math.max(scale, Math.min(ZOOM_MIN * ref, from)), Math.max(ZOOM_MAX * ref, from))
 
-// The "meet" scale framing `rect` on a w×h screen (screen px per plan cm).
 const frameScale = (rect: View, w: number, h: number) => Math.min(w / rect.w, h / rect.h)
 
-// The camera centering `rect` on a w×h screen at that scale.
 function frameCamera(rect: View, w: number, h: number): Camera {
   const scale = frameScale(rect, w, h)
   if (!(scale > 0)) return { x: rect.x, y: rect.y, scale: 1 }
@@ -56,18 +47,14 @@ function frameCamera(rect: View, w: number, h: number): Camera {
   }
 }
 
-// Zoom/pan via the SVG viewBox (spec §3): scroll zooms toward the cursor,
-// callers pan by screen pixels, Fit frames the plan's bounding box.
+// Zoom/pan via the SVG viewBox (spec §3).
 export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
   const [camera, setCamera] = useState<Camera>({ x: DEFAULT_FRAME.x, y: DEFAULT_FRAME.y, scale: 1 })
-  // Scale of the default framing at the last framing event (mount, Fit) — the
-  // Zoom reference (glossary: Zoom). Captured, not derived from the live
-  // window size, so a resize changes neither the view nor the percentage.
+  // Captured at the last framing event, not derived from the live window size:
+  // a resize must change neither the view nor the percentage (glossary: Zoom).
   const [refScale, setRefScale] = useState(1)
-  // The wheel listener subscribes once, so the clamp inside it cannot read
-  // `refScale` from the closure — a Fit would leave it stale and the wheel
-  // would enforce the bounds of a framing two loads old. The ref is the value
-  // the clamp reads; the state is the value the render reads.
+  // The wheel listener subscribes once, so a closure `refScale` would go stale
+  // on Fit. Ref for the clamp, state for the render.
   const refScaleRef = useRef(1)
   const setReference = (scale: number) => {
     refScaleRef.current = scale
@@ -82,20 +69,18 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     return { x: p.x, y: p.y }
   }
 
-  // screen pixels per plan cm at the current zoom
   const pxPerCm = () => camera.scale
 
   const zoomAt = (clientX: number, clientY: number, factor: number) => {
     const r = svgRef.current?.getBoundingClientRect()
     if (!r) return
     setCamera((c) => {
-      // clamped first: the anchor math has to run on the scale that will be
-      // committed, or the last step of a run drags the plan under the cursor
+      // Clamp before the anchor math, or the last step of a run drags the plan
+      // under the cursor.
       const scale = clampScale(c.scale / factor, refScaleRef.current, c.scale)
       if (scale === c.scale) return c
       const px = clientX - r.left
       const py = clientY - r.top
-      // the plan point under the cursor stays under the cursor
       return { x: c.x + px / c.scale - px / scale, y: c.y + py / c.scale - py / scale, scale }
     })
   }
@@ -119,21 +104,15 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     const target = box
       ? { x: box.x - margin, y: box.y - margin, w: box.width + 2 * margin, h: box.height + 2 * margin }
       : DEFAULT_FRAME
-    // No clamp here: Fit's promise is that the whole plan is framed, and it
-    // outranks the zoom bounds (ADR 0013). A plan wider than ten default
-    // framings lands below 10%, with Zoom out greyed out — still true, since
-    // from there the view cannot go further out.
+    // No clamp: Fit's framing outranks the zoom bounds (ADR 0013).
     setCamera(frameCamera(target, w, h))
-    // unmeasurable screen: frameCamera fell back to scale 1, keep 100% coherent
+    // Unmeasurable screen: frameCamera fell back to scale 1, keep 100% coherent.
     const ref = frameScale(DEFAULT_FRAME, w, h)
     setReference(ref > 0 ? ref : 1)
   }
 
-  // On-screen size of the SVG, tracked as state so the viewBox and the zoom
-  // percentage derive from it during render. A size change re-renders with the
-  // same camera: that is the whole resize behavior. Layout effect: the first
-  // measure must commit before the first paint, or the unmeasured fallback
-  // frame flashes for one frame.
+  // Layout effect: the first measure must commit before the first paint, or the
+  // unmeasured fallback frame flashes.
   const [size, setSize] = useState({ w: 0, h: 0 })
   useLayoutEffect(() => {
     const svg = svgRef.current
@@ -143,19 +122,15 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
       setSize((s) => (s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height }))
     }
     measure()
-    // ResizeObserver fires after layout, before paint. Committing synchronously
-    // paints the new size and its viewBox in the same frame; an async commit
-    // paints one frame with the old viewBox — "meet" recenters it, which reads
-    // as jitter while the window edge is dragged.
+    // flushSync, not an async commit: ResizeObserver fires before paint, and one
+    // frame of the old viewBox reads as jitter while the window edge is dragged.
     const ro = new ResizeObserver(() => flushSync(measure))
     ro.observe(svg)
     return () => ro.disconnect()
-    // svgRef is stable; the ref is filled by the time effects run
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // The viewBox always matches the screen's aspect ratio, so "meet" leaves no
-  // slack: what the viewBox frames is exactly what is on screen.
+  // The viewBox matches the screen's aspect ratio, so "meet" leaves no slack.
   const view: View =
     size.w > 0 && size.h > 0
       ? { x: camera.x, y: camera.y, w: size.w / camera.scale, h: size.h / camera.scale }
@@ -175,7 +150,6 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
-    // zoomAt reads refs and functional state only; subscribing once is intended
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -209,9 +183,8 @@ export function useSpaceHeld() {
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') setHeld(false)
     }
-    // Pan is a mode, so a keyup the window never receives (Alt+Tab away while
-    // holding) would strand the editor in it — the tool would stay suspended
-    // with no key left to release.
+    // Pan is a mode: a keyup the window never receives (Alt+Tab while holding)
+    // would strand the editor in it.
     const clear = () => setHeld(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)

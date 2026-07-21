@@ -29,7 +29,7 @@ idb-keyval (autosave), vite-plugin-pwa.
 - Not in production yet: the stored plan model can change freely — no schema
   migrations for existing plans are required until production
 - All code, comments, and documentation should be written in English
-- Add comments to the code only when necessary and when they add value
+- Comments: max 2 lines, five justified cases only — see `docs/agents/comments.md`
 - UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
   Unicode glyphs (exception: the zoom-percentage button, which is a text
   indicator)

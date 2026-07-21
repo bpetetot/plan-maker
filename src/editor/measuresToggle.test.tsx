@@ -1,5 +1,4 @@
-// The Measure toggle hides what the plan states about itself — wall
-// dimensions and room areas — and nothing else (CONTEXT.md: Measure).
+// CONTEXT.md: Measure — hides wall dimensions and room areas, nothing else.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { cleanup, render } from 'vitest-browser-react'
@@ -12,8 +11,7 @@ import { clientAt, pointer } from './testKit'
 
 beforeEach(() => {
   localStorage.clear()
-  // the preference is session state now, so an empty storage is only half of a
-  // fresh device — this is the other half
+  // the preference is session state: clearing storage alone is not a fresh device
   reloadPreferences()
   usePlanStore.setState({ plan: emptyPlan(), planEpoch: 0 })
   usePlanStore.temporal.getState().clear()
@@ -98,8 +96,6 @@ describe('measure visibility toggle', () => {
     expect(dims(svg)).toHaveLength(0)
   })
 
-  // its text block held nothing but the area, and a block that renders nothing
-  // must not linger as an invisible drag target
   it('leaves an unlabeled room blank, with no drag target behind', async () => {
     const { svg } = await setup({ ...namedRoomPlan(), roomLabels: {} })
     expect(areas(svg)).toHaveLength(1)
@@ -118,8 +114,7 @@ describe('measure visibility toggle', () => {
     expect(localStorage.getItem('plan-maker:measures')).toBe('hidden')
     await cleanup()
 
-    // a reload, not just a remount: the point is that the choice came back from
-    // storage, which a surviving session value would hide
+    // reload, not remount: a surviving session value would hide the storage read
     reloadPreferences()
     const { svg } = await setup()
     expect(dims(svg)).toHaveLength(0)
@@ -133,8 +128,6 @@ describe('measure visibility toggle', () => {
     expect(localStorage.getItem('plan-maker:measures')).toBeNull()
   })
 
-  // the editor draws with the preference and the export prints with it, so the
-  // two must never disagree — including when storage refuses the write
   it('still reports hidden to the export when storage is unavailable', async () => {
     const { svg } = await setup()
     const setItem = Storage.prototype.setItem

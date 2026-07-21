@@ -1,7 +1,4 @@
-// Room text blocks (CONTEXT.md: Room label) — a default-placement label
-// renders at its room's live centroid; a custom placement renders where it
-// was dragged; default labels of one room stack in a single block, oldest
-// first; the room's oldest label carries the area.
+// CONTEXT.md: Room label
 import { describe, expect, it } from 'vitest'
 import { detectRooms } from '../model/rooms'
 import type { Plan, RoomLabel } from '../model/types'

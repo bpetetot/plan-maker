@@ -19,8 +19,6 @@ async function setup(plan = squareRoomPlan()) {
   return { svg }
 }
 
-// Marquee selection over plan coordinates — containment capture, no element
-// hit-testing needed.
 async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b: { x: number; y: number }) {
   await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, a.x, a.y) })
   await pointer(svg, 'pointermove', clientAt(svg, b.x, b.y))
@@ -29,16 +27,14 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
 
 const panel = () => document.querySelector('.panel')
 
-// The panel rows are read, not operated: a label and its value are two spans
-// side by side, which no locator can navigate between.
+// DOM query, not a locator: label and value are sibling spans, unnavigable.
 function rowValue(label: string) {
   const rows = [...document.querySelectorAll('.panel-row')]
   const row = rows.find((r) => r.querySelector('.panel-row-label')?.textContent === label)
   return row?.querySelector('.panel-row-value')?.textContent
 }
 
-// The panel shows at most one preset dropdown — wall thickness or opening
-// width, never both.
+// At most one preset dropdown: wall thickness or opening width, never both.
 const presets = () => page.getByRole('combobox')
 const presetValue = () => document.querySelector<HTMLSelectElement>('.panel select')!.value
 
@@ -78,7 +74,6 @@ describe('tool panel on a selected wall', () => {
     const { svg } = await setup(standalonePlan())
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 })
     expect(rowValue('Length')).toBe('4,10 m')
-    // drag the end-point handle from (400,0) to (500,0)
     const handles = svg.querySelectorAll('circle')
     await pointer(handles[handles.length - 1], 'pointerdown', { button: 0, ...clientAt(svg, 400, 0) })
     await pointer(svg, 'pointermove', clientAt(svg, 500, 0))

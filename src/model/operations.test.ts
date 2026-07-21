@@ -64,7 +64,6 @@ describe('splitWall', () => {
     const wallId = Object.keys(plan.walls)[0]
     const next = splitWall(plan, wallId, mid)
     expect(Object.keys(next.walls)).toHaveLength(2)
-    // the start-side half keeps the original wall id and thickness
     expect(next.walls[wallId]).toMatchObject({ startPointId: p1, endPointId: mid, thickness: 10 })
     const other = Object.values(next.walls).find((w) => w.id !== wallId)!
     expect(other).toMatchObject({ startPointId: mid, endPointId: p2, thickness: 10 })
@@ -91,7 +90,6 @@ describe('splitWall', () => {
     const wallId = Object.keys(plan.walls)[0]
     const [doorId, windowId] = Object.keys(plan.openings)
     const next = splitWall(plan, wallId, mid)
-    // start-side opening untouched
     expect(next.openings[doorId]).toMatchObject({ wallId, offset: 60 })
     // end-side opening rebased on the new half: 320 − 200 = 120
     const endHalf = Object.values(next.walls).find((w) => w.id !== wallId)!
@@ -199,8 +197,6 @@ describe('commitPoint', () => {
   })
 
   it('reuses a coincident existing point on a grid snap instead of duplicating it', () => {
-    // The grid rounding can land exactly on a point that sat just outside the
-    // snap-to-point tolerance: the commit must not mint a coincident twin.
     const plan = rectPlan()
     const endId = plan.walls[Object.keys(plan.walls)[0]].endPointId // (400, 0)
     const [next, id] = commitPoint(plan, { x: 400, y: 0, kind: 'grid' })
@@ -212,8 +208,7 @@ describe('commitPoint', () => {
     const plan = rectPlan()
     const endId = plan.walls[Object.keys(plan.walls)[0]].endPointId // (400, 0)
     expect(commitPoint(plan, { x: 400, y: 0, kind: 'axis', axisFrom: { x: 0, y: 0 } })[1]).toBe(endId)
-    // Alt suspends snapping, not the invariant: within the 1 cm junction
-    // tolerance the placement still lands on the existing point.
+    // 400.4/0.4: within the 1 cm junction tolerance of the existing point
     expect(commitPoint(plan, { x: 400.4, y: 0.4, kind: 'free' })[1]).toBe(endId)
   })
 
@@ -221,7 +216,7 @@ describe('commitPoint', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0)
       const p2 = b.point(400, 0)
-      // a stray point a hair off the wall's body, from another wall
+      // (200, 1): a hair off the wall's body
       const stray = b.point(200, 1)
       const top = b.point(200, 300)
       b.wall(p1, p2)
@@ -231,7 +226,6 @@ describe('commitPoint', () => {
     const wallId = Object.keys(plan.walls)[0]
     const [next, id] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId })
     expect(id).toBe(strayId)
-    // the host was split at the reused point: T junction, not a dangling contact
     expect(Object.keys(next.walls)).toHaveLength(3)
     const touching = Object.values(next.walls).filter((w) => w.startPointId === id || w.endPointId === id)
     expect(touching).toHaveLength(3)
@@ -251,7 +245,6 @@ describe('commitWall', () => {
     expect(Object.keys(next.points)).toHaveLength(4)
     const junction = next.points[endId]
     expect(junction).toMatchObject({ x: 200, y: 0 })
-    // the junction point is shared by all three walls
     const touching = Object.values(next.walls).filter(
       (w) => w.startPointId === endId || w.endPointId === endId,
     )
@@ -398,9 +391,8 @@ describe('mergeCoincidentPoints', () => {
     const doorId = Object.keys(plan.openings)[0]
     const next = mergeCoincidentPoints(plan)
     expect(next.walls[w2]).toBeUndefined()
-    // 100 cm from the twin's start = 100 cm from the survivor's end; hinge
-    // and swing are wall-relative, so the reversed frame flips both to keep
-    // the door physically identical
+    // 100 from the twin's start = 300 from the survivor's end; hinge and swing
+    // are wall-relative, so the reversed frame flips both
     expect(next.openings[doorId]).toMatchObject({
       wallId: w1,
       offset: 300,
@@ -575,8 +567,7 @@ describe('openings', () => {
 
   it('lands exactly on a rail end that is not a whole centimetre', () => {
     // a 45° corner miters the rail end to an irrational offset: rounding to
-    // whole centimetres must never push the opening off its bound, or the
-    // measure that reads it would no longer reach zero
+    // whole centimetres must not push the opening off its bound
     const plan = buildPlan((b) => {
       const a = b.point(0, 0)
       const corner = b.point(400, 0)
@@ -648,7 +639,7 @@ describe('openings', () => {
     // door, where it spans 35 → 155
     const wider = setOpeningWidth(plan, id!, 120)
     expect(wider.openings[id!]).toMatchObject({ width: 120, offset: 95 })
-    // 200 cannot fit in a 160-wide rail at all: the plan is left untouched
+    // 200 cannot fit in a 160-wide rail at all
     expect(setOpeningWidth(plan, id!, 200)).toBe(plan)
   })
 

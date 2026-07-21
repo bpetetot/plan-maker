@@ -1,7 +1,5 @@
-// Room label lifecycle on wall gestures (CONTEXT.md: Room label) — an orphan
-// label never exists: a wall drag that deforms the room away from its label
-// snaps the label to the room's centroid at the end of the gesture, and a
-// rigid group move carries a custom-placed label along.
+// CONTEXT.md: Room label — no orphan label: a deforming drag re-snaps it to the
+// centroid, a group move carries a custom-placed one.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -58,14 +56,12 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
 describe('label reconciliation at the end of a wall gesture', () => {
   it('snaps the label to the room centroid when a point drag deforms the room away from it', async () => {
     const { svg } = await setup()
-    // select the right wall to reveal its point handles
     await marqueeSelect(svg, { x: 450, y: 50 }, { x: 550, y: 550 })
     const handles = svg.querySelectorAll('circle')
     expect(handles).toHaveLength(2)
     // drag the corner (500,500) to (300,300): the label at (480,250) leaves the room
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 500) })
     await pointer(svg, 'pointermove', clientAt(svg, 300, 300))
-    // mid-gesture the label is untouched
     expect(label()).toMatchObject({ x: 480, y: 250 })
     await pointer(svg, 'pointerup')
     // centroid of (100,100) (500,100) (300,300) (100,500), rounded
@@ -100,7 +96,6 @@ describe('default placement follows the live centroid', () => {
 
   it('naming a room does not freeze its block: it tracks the centroid through a wall drag', async () => {
     const { container, svg } = await setupUnlabeled()
-    // name the room: the label is created with default placement
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300))
     await userEvent.fill(page.getByRole('textbox'), 'Kitchen')
     await userEvent.keyboard('{Enter}')
@@ -110,11 +105,9 @@ describe('default placement follows the live centroid', () => {
     const wallHits = svg.querySelectorAll('line[stroke="transparent"]')
     await pointer(wallHits[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 300) })
     await pointer(svg, 'pointermove', clientAt(svg, 250, 300))
-    // mid-gesture the block already sits at the live centroid
     expect(blockTransform(container)).toBe('translate(175,300)')
     await pointer(svg, 'pointerup')
     expect(blockTransform(container)).toBe('translate(175,300)')
-    // the anchor was reconciled inside the room, still default placement
     const created = Object.values(usePlanStore.getState().plan.roomLabels)[0]
     expect(created).toMatchObject({ name: 'Kitchen', x: 175, y: 300 })
     expect(created.placed).toBeUndefined()

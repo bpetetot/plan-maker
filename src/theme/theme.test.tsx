@@ -29,9 +29,6 @@ describe('toggledTheme', () => {
     expect(toggledTheme('dark', true)).toBe('light')
   })
 
-  // The point of resolving first: from 'system' the only honest opposite is the
-  // opposite of what is *on screen*. Returning 'light' while the system is
-  // already light would be a keystroke that changes nothing.
   it('leaves system for the opposite of what the system resolves to', () => {
     expect(toggledTheme('system', true)).toBe('light')
     expect(toggledTheme('system', false)).toBe('dark')

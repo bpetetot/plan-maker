@@ -11,8 +11,7 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear()
 })
 
-// A horizontal wall from (100,100) to (500,100), thickness 10, carrying one
-// window (width 120) centered at offset 150.
+// Horizontal wall (100,100)–(500,100), thickness 10; one window width 120 at offset 150.
 const openingPlan = (): Plan => ({
   points: {
     a: { id: 'a', x: 100, y: 100 },
@@ -30,8 +29,7 @@ const renderEditor = async (plan: Plan) => {
   return { container, svg }
 }
 
-// The grab zones under test: the opening's transparent rect spans its width,
-// the dimension text's is the fixed 60×16 hit rect.
+// Grab zones: the opening rect spans its width (120), the dim text a fixed 60×16.
 const openingGrab = (container: HTMLElement) =>
   container.querySelector('rect[width="120"][fill="transparent"]')!
 const dimTextGrab = (container: HTMLElement) =>
@@ -40,26 +38,22 @@ const dimTextGrab = (container: HTMLElement) =>
 describe('dragging an opening keeps the grab point under the cursor', () => {
   it('moves by the cursor travel, not to the cursor — no jump on an off-center grab', async () => {
     const { container, svg } = await renderEditor(openingPlan())
-    // grab the window 30 cm right of its center (edges span 90–210 on the wall)
+    // 280: 30 cm right of center (edges 90–210)
     const grab = openingGrab(container)
     await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 280, 100) })
     await pointer(svg, 'pointermove', clientAt(svg, 380, 100))
-    // the cursor travelled +100 along the wall: the center follows by +100,
-    // it never recenters on the cursor (which would read 280)
+    // cursor +100 → center +100; recentering on the cursor would read 280
     expect(usePlanStore.getState().plan.openings.o1.offset).toBe(250)
   })
 
   it('keeps the delta absolute across a clamp — no ratchet after hitting the wall end', async () => {
     const { container, svg } = await renderEditor(openingPlan())
-    // grab 30 cm right of center: delta is −30 for the whole gesture
+    // 280: 30 cm right of center, delta −30 for the whole gesture
     const grab = openingGrab(container)
     await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 280, 100) })
-    // way past the wall end: the center stops at 345, flush against the rail's
-    // far end (the free end's overhang at 405, less half the 120 width)
+    // 345: rail's far end (overhang 405) less half the 120 width
     await pointer(svg, 'pointermove', clientAt(svg, 600, 100))
     expect(usePlanStore.getState().plan.openings.o1.offset).toBe(345)
-    // coming back, the opening re-sticks to cursor+delta exactly — the clamp
-    // never re-based the grab point
     await pointer(svg, 'pointermove', clientAt(svg, 430, 100))
     expect(usePlanStore.getState().plan.openings.o1.offset).toBe(300)
   })
@@ -76,7 +70,7 @@ describe('dragging an opening keeps the grab point under the cursor', () => {
   })
 })
 
-// A closed square room (100,100)-(500,500) with a custom-placed label at its center.
+// Closed square room (100,100)–(500,500), placed label at its center.
 const labeledRoomPlan = (): Plan => ({
   points: {
     a: { id: 'a', x: 100, y: 100 },
@@ -97,11 +91,11 @@ const labeledRoomPlan = (): Plan => ({
 describe('dragging a room label keeps the grab point under the cursor', () => {
   it('moves the block by the cursor travel, not onto the cursor', async () => {
     const { container, svg } = await renderEditor(labeledRoomPlan())
-    // grab the name line off-center: 20 right and 5 above the block position
+    // (320,295): 20 right, 5 above the block position
     const hit = container.querySelector('rect.room-name-hit')!
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 295) })
     await pointer(svg, 'pointermove', clientAt(svg, 400, 400))
-    // the cursor travelled (+80,+105): the block follows, it never recenters
+    // cursor +80,+105 → block 380,405
     expect(usePlanStore.getState().plan.roomLabels.l1).toMatchObject({ x: 380, y: 405 })
   })
 })
@@ -111,11 +105,11 @@ describe('dragging an unlabeled room block keeps the grab point under the cursor
     const plan = labeledRoomPlan()
     plan.roomLabels = {}
     const { container, svg } = await renderEditor(plan)
-    // the bare area block sits at the room anchor (300,300); grab it 20 left
+    // bare area block at the room anchor (300,300); 280 grabs it 20 left
     const hit = container.querySelector('rect.room-area-hit')!
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 280, 300) })
     await pointer(svg, 'pointermove', clientAt(svg, 400, 350))
-    // the cursor travelled (+120,+50): the block follows from its anchor
+    // cursor +120,+50 from the anchor → 420,350
     const created = Object.values(usePlanStore.getState().plan.roomLabels)[0]
     expect(created).toMatchObject({ x: 420, y: 350 })
   })
@@ -126,13 +120,11 @@ describe('dragging a dimension text keeps the grab point under the cursor', () =
     const plan = openingPlan()
     plan.openings = {}
     const { container, svg } = await renderEditor(plan)
-    // default placement: text centered at t=0.5 (200 cm, plan x=300); grab it
-    // 20 cm right of its center
+    // default placement t=0.5 (200 cm, plan x=300); 320 grabs it 20 cm right
     const hit = dimTextGrab(container)
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 80) })
     await pointer(svg, 'pointermove', clientAt(svg, 420, 80))
-    // the cursor travelled +100 along the axis: 200 → 300 cm, ratio 0.75 —
-    // never the raw cursor projection (which would read 0.8)
+    // cursor +100: 200 → 300 cm, t=0.75; the raw projection would read 0.8
     expect(usePlanStore.getState().plan.walls.w1.dimPlacement?.t).toBe(0.75)
   })
 
@@ -142,7 +134,7 @@ describe('dragging a dimension text keeps the grab point under the cursor', () =
     const { container, svg } = await renderEditor(plan)
     const hit = dimTextGrab(container)
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 80) })
-    // crossing under the wall flips the side while the text follows the delta
+    // y 130 crosses under the wall (y=100) → side flips
     await pointer(svg, 'pointermove', clientAt(svg, 420, 130))
     expect(usePlanStore.getState().plan.walls.w1.dimPlacement).toMatchObject({ t: 0.75, side: 1 })
   })
