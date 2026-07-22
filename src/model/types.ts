@@ -61,11 +61,10 @@ export interface Plan {
 }
 
 export const WALL_THICKNESS: Cm = 10;
+export const WALL_THICKNESS_MAX: Cm = 100;
 export const GRID: Cm = 10;
 export const DOOR_WIDTH: Cm = 90;
 export const WINDOW_WIDTH: Cm = 120;
-export const OPENING_WIDTHS: Cm[] = [60, 70, 80, 90, 100, 120, 140, 160];
-export const WALL_THICKNESSES: Cm[] = [5, 10, 15, 20, 25, 30, 40];
 
 export const defaultOpeningWidth = (type: Opening['type']): Cm =>
   type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH;

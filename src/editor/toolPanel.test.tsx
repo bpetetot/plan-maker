@@ -34,9 +34,15 @@ function rowValue(label: string) {
   return row?.querySelector('.panel-row-value')?.textContent;
 }
 
-// At most one preset dropdown: wall thickness or opening width, never both.
-const presets = () => page.getByRole('combobox');
-const presetValue = () => document.querySelector<HTMLSelectElement>('.panel select')!.value;
+// At most one number field: wall thickness or opening width, never both.
+const field = () => page.getByRole('spinbutton');
+const fieldValue = () => document.querySelector<HTMLInputElement>('.panel-number-input')!.value;
+
+// A commit happens on blur or Enter, not per keystroke — the helper does both.
+async function setField(value: string) {
+  await field().fill(value);
+  await key('Enter');
+}
 
 const standalonePlan = () =>
   buildPlan((b) => {
@@ -58,14 +64,14 @@ describe('tool panel on a selected wall', () => {
     await expect.element(page.getByText('Wall', { exact: true })).toBeInTheDocument();
     expect(rowValue('Interior')).toBe('3,90 m');
     expect(rowValue('Exterior')).toBe('4,10 m');
-    expect(presetValue()).toBe('10');
+    expect(fieldValue()).toBe('10');
   });
 
   it('shows a single hors-tout Length when no orientation is claimed', async () => {
     const { svg } = await setup(standalonePlan());
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 });
     expect(rowValue('Length')).toBe('4,10 m');
-    expect(presetValue()).toBe('10');
+    expect(fieldValue()).toBe('10');
     expect(rowValue('Interior')).toBeUndefined();
     expect(rowValue('Exterior')).toBeUndefined();
   });
@@ -87,10 +93,10 @@ describe('tool panel on selected openings', () => {
     const { svg } = await setup(doorPlan());
     await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
     await expect.element(page.getByText('Door', { exact: true })).toBeInTheDocument();
-    expect(presetValue()).toBe('90');
+    expect(fieldValue()).toBe('90');
     await expect.element(page.getByText('Hinge')).toBeInTheDocument();
     await expect.element(page.getByText('Swing')).toBeInTheDocument();
-    await userEvent.selectOptions(presets(), '80');
+    await setField('80');
     expect(Object.values(usePlanStore.getState().plan.openings)[0].width).toBe(80);
   });
 
@@ -102,7 +108,7 @@ describe('tool panel on selected openings', () => {
     const { svg } = await setup(plan);
     await marqueeSelect(svg, { x: 230, y: 60 }, { x: 370, y: 140 });
     await expect.element(page.getByText('Window', { exact: true })).toBeInTheDocument();
-    expect(document.querySelector('.panel select')).toBeTruthy();
+    expect(document.querySelector('.panel-number-input')).toBeTruthy();
     await expect.element(page.getByText('Hinge')).not.toBeInTheDocument();
     await userEvent.click(page.getByLabelText('Delete'));
     expect(Object.values(usePlanStore.getState().plan.openings)).toHaveLength(0);
@@ -117,15 +123,15 @@ describe('tool defaults facet', () => {
     await key('2');
     expect(panel()).toBeTruthy();
     await expect.element(page.getByText('Wall', { exact: true })).toBeInTheDocument();
-    expect(presetValue()).toBe('10');
+    expect(fieldValue()).toBe('10');
     await expect.element(page.getByLabelText('Delete')).not.toBeInTheDocument();
     await key('3');
     await expect.element(page.getByText('Door', { exact: true })).toBeInTheDocument();
-    expect(presetValue()).toBe('90');
+    expect(fieldValue()).toBe('90');
     await expect.element(page.getByText('Hinge')).toBeInTheDocument();
     await key('4');
     await expect.element(page.getByText('Window', { exact: true })).toBeInTheDocument();
-    expect(presetValue()).toBe('120');
+    expect(fieldValue()).toBe('120');
     await expect.element(page.getByText('Hinge')).not.toBeInTheDocument();
     await key('1');
     expect(panel()).toBeNull();
@@ -134,7 +140,7 @@ describe('tool defaults facet', () => {
   it('draws walls with the preconfigured thickness', async () => {
     const { svg } = await setup(emptyPlan());
     await key('2');
-    await userEvent.selectOptions(presets(), '20');
+    await setField('20');
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 0, 0) });
     await pointer(svg, 'pointerup');
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 200, 0) });
@@ -147,7 +153,7 @@ describe('tool defaults facet', () => {
   it('places doors with the preconfigured width, hinge and swing', async () => {
     const { svg } = await setup(standalonePlan());
     await key('3');
-    await userEvent.selectOptions(presets(), '80');
+    await setField('80');
     await userEvent.click(page.getByText('Hinge'));
     await userEvent.click(page.getByText('Swing'));
     await pointer(svg, 'pointermove', clientAt(svg, 200, 0));
@@ -160,21 +166,87 @@ describe('tool defaults facet', () => {
   it('adopts the width of an edited selected opening as the tool default (sticky)', async () => {
     const { svg } = await setup(doorPlan());
     await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
-    await userEvent.selectOptions(presets(), '100');
+    await setField('100');
     await key('3');
-    expect(presetValue()).toBe('100');
+    expect(fieldValue()).toBe('100');
   });
 
   it('edits a selected wall thickness and makes it the tool default (sticky)', async () => {
     const { svg } = await setup(standalonePlan());
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 });
-    await userEvent.selectOptions(presets(), '25');
+    await setField('25');
     const wall = Object.values(usePlanStore.getState().plan.walls)[0];
     expect(wall.thickness).toBe(25);
     // hors-tout follows the new thickness
     expect(rowValue('Length')).toBe('4,25 m');
     await key('2');
-    expect(presetValue()).toBe('25');
+    expect(fieldValue()).toBe('25');
+  });
+});
+
+describe('the dimension number field', () => {
+  const wallThickness = () => Object.values(usePlanStore.getState().plan.walls)[0].thickness;
+  const openingWidth = () => Object.values(usePlanStore.getState().plan.openings)[0].width;
+
+  async function selectStandaloneWall() {
+    const { svg } = await setup(standalonePlan());
+    await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 });
+    return svg;
+  }
+
+  it('commits on blur, not per keystroke', async () => {
+    const { svg } = await setup(doorPlan());
+    await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
+    await field().fill('75');
+    expect(openingWidth()).toBe(90); // untouched until the field is committed
+    await userEvent.tab(); // focus leaves the field, no Enter
+    expect(openingWidth()).toBe(75);
+  });
+
+  it('reverts the draft and the plan on Escape', async () => {
+    await selectStandaloneWall();
+    await field().fill('55');
+    await key('Escape');
+    expect(fieldValue()).toBe('10');
+    expect(wallThickness()).toBe(10);
+  });
+
+  it('reverts an emptied field to the live value', async () => {
+    await selectStandaloneWall();
+    await field().fill('');
+    await key('Enter');
+    expect(fieldValue()).toBe('10');
+    expect(wallThickness()).toBe(10);
+  });
+
+  it('rounds a decimal entry to the nearest centimetre', async () => {
+    await selectStandaloneWall();
+    await setField('12.4');
+    expect(wallThickness()).toBe(12);
+  });
+
+  it('clamps a below-minimum entry up to 1', async () => {
+    await selectStandaloneWall();
+    await setField('0');
+    expect(wallThickness()).toBe(1);
+  });
+
+  it('clamps a wall thickness above the maximum down to it', async () => {
+    await selectStandaloneWall();
+    await setField('500');
+    expect(wallThickness()).toBe(100);
+  });
+
+  it('reverts an opening width that will not fit the wall', async () => {
+    const { svg } = await setup(doorPlan());
+    await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
+    await setField('9000');
+    expect(fieldValue()).toBe('90');
+    expect(openingWidth()).toBe(90);
+    // the rejected width must not leak into the sticky tool default either
+    await key('Escape');
+    await key('3');
+    expect(fieldValue()).toBe('90');
   });
 });
 

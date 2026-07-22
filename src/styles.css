@@ -472,19 +472,43 @@ svg text.room-area {
 .panel-row-value {
   font-variant-numeric: tabular-nums;
 }
-.panel-select {
-  font: inherit;
+.panel-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 5px 8px;
+}
+.panel-number.inline {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  margin-left: 12px;
+}
+.panel-number-input {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
   background: transparent;
   color: inherit;
-}
-.panel-select.inline {
-  width: auto;
-  padding: 3px 6px;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+}
+.panel-number-input::-webkit-outer-spin-button,
+.panel-number-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.panel-number-input:focus {
+  outline: none;
+}
+.panel-number-unit {
+  color: var(--text-faint);
 }
 .panel-flips {
   display: flex;

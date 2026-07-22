@@ -2,13 +2,14 @@
 // the panel cannot disagree with the canvas, drags included.
 import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { formatLength } from '../model/format';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
 import { wallMeasures } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
-import { OPENING_WIDTHS, WALL_THICKNESSES } from '../model/types';
+import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
 
 const ELEMENT_META: Record<'wall' | 'door' | 'window', [LucideIcon, string]> = {
@@ -60,11 +61,11 @@ export function ToolPanel({
           <WallRows plan={plan} rooms={rooms} wall={wall} />
           <div className="panel-row">
             <span className="panel-row-label">Thickness</span>
-            <PresetSelect
+            <NumberField
               inline
-              presets={WALL_THICKNESSES}
+              max={WALL_THICKNESS_MAX}
               value={wall.thickness}
-              onChange={(thickness) => {
+              onCommit={(thickness) => {
                 setPlan((p) => setWallThickness(p, wall.id, thickness));
                 // sticky measure (CONTEXT.md: Tool defaults) — last used wins
                 setDefaults((d) => ({ ...d, wallThickness: thickness }));
@@ -76,14 +77,16 @@ export function ToolPanel({
       {opening && (
         <section>
           <div className="panel-section-label">Width</div>
-          <PresetSelect
-            presets={OPENING_WIDTHS}
+          <NumberField
             value={opening.width}
-            onChange={(width) => {
-              setPlan((p) => setOpeningWidth(p, opening.id, width));
-              // sticky measure (CONTEXT.md: Tool defaults) — last used wins
+            onCommit={(width) => {
+              const next = setOpeningWidth(plan, opening.id, width);
+              setPlan(() => next);
+              // sticky measure (CONTEXT.md: Tool defaults) — a width that will not
+              // fit is rejected, so adopt what applied, never the raw entry
+              const applied = next.openings[opening.id].width;
               setDefaults((d) =>
-                opening.type === 'door' ? { ...d, doorWidth: width } : { ...d, windowWidth: width },
+                opening.type === 'door' ? { ...d, doorWidth: applied } : { ...d, windowWidth: applied },
               );
             }}
           />
@@ -121,19 +124,18 @@ function ToolDefaultsFacet({
       {tool === 'wall' ? (
         <section>
           <div className="panel-section-label">Thickness</div>
-          <PresetSelect
-            presets={WALL_THICKNESSES}
+          <NumberField
+            max={WALL_THICKNESS_MAX}
             value={defaults.wallThickness}
-            onChange={(thickness) => setDefaults((d) => ({ ...d, wallThickness: thickness }))}
+            onCommit={(thickness) => setDefaults((d) => ({ ...d, wallThickness: thickness }))}
           />
         </section>
       ) : (
         <section>
           <div className="panel-section-label">Width</div>
-          <PresetSelect
-            presets={OPENING_WIDTHS}
+          <NumberField
             value={defaults[widthKey]}
-            onChange={(width) => setDefaults((d) => ({ ...d, [widthKey]: width }))}
+            onCommit={(width) => setDefaults((d) => ({ ...d, [widthKey]: width }))}
           />
         </section>
       )}
@@ -158,32 +160,60 @@ function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
   );
 }
 
-// An imported value outside the presets is kept as an extra option, not
-// dropped — the select would lie about the element.
-function PresetSelect({
-  presets,
+// draft is null while idle so the field mirrors the live value; while editing it
+// holds the keystrokes, reaching the plan only on commit — never mid-entry.
+function NumberField({
   value,
-  onChange,
+  onCommit,
   inline,
+  max,
 }: {
-  presets: number[];
   value: number;
-  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
   inline?: boolean;
+  max?: number;
 }) {
-  const values = presets.includes(value) ? presets : [...presets, value].sort((a, b) => a - b);
+  const [draft, setDraft] = useState<string | null>(null);
+  const reverting = useRef(false);
+
+  const commit = () => {
+    const text = draft;
+    setDraft(null);
+    const n = Number(text);
+    // Empty or non-numeric reverts, like Escape; a decimal rounds to the cm grid.
+    if (text === null || text.trim() === '' || !Number.isFinite(n)) return;
+    const rounded = Math.max(1, Math.round(n));
+    onCommit(max === undefined ? rounded : Math.min(max, rounded));
+  };
+
   return (
-    <select
-      className={inline ? 'panel-select inline' : 'panel-select'}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-    >
-      {values.map((v) => (
-        <option key={v} value={v}>
-          {v} cm
-        </option>
-      ))}
-    </select>
+    <span className={inline ? 'panel-number inline' : 'panel-number'}>
+      <input
+        type="number"
+        min={1}
+        max={max}
+        step={1}
+        className="panel-number-input"
+        value={draft ?? String(value)}
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (reverting.current) {
+            reverting.current = false;
+            return setDraft(null);
+          }
+          commit();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          else if (e.key === 'Escape') {
+            reverting.current = true;
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      <span className="panel-number-unit">cm</span>
+    </span>
   );
 }
 
