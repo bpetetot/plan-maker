@@ -582,6 +582,10 @@ export const BLOCK_LINE_HEIGHT = 13;
 export const blockNameSlots = (block: RoomTextBlock, editingKey?: string) =>
   block.labels.filter((label) => label.name || label.id === editingKey);
 
+/** Marks the blocks a click selects the room by, so the room tint can tell
+ *  them from the grab zones that outrank the room (ADR 0014). */
+export const ROOM_TEXT_HIT = 'room-text-hit';
+
 // Room labels are never selected; lines are dragged and edited directly
 // (CONTEXT.md: Selection). Only the area line is a Measure (CONTEXT.md).
 export function RoomOverlay({
@@ -609,7 +613,7 @@ export function RoomOverlay({
   ) => (
     <rect
       key={key}
-      className={className}
+      className={`${ROOM_TEXT_HIT} ${className}`}
       x={-50}
       y={y - 10}
       width={100}

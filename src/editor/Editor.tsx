@@ -67,6 +67,7 @@ import {
   PlacementDims,
   RoomFill,
   RoomOverlay,
+  ROOM_TEXT_HIT,
   roomTextBlocks,
   RubberWall,
   SnapMarker,
@@ -458,9 +459,12 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
     } else if (tool === 'select') {
-      // Same value bails React out, so tracking the pointer costs a render
-      // only when the room under it actually changes.
-      const room = roomAt(rooms, c.x, c.y);
+      // The browser's hit test decides what a click takes: anything above the
+      // sheet outranks the room, except the block the room is clicked by.
+      const target = e.target as Element;
+      const onSheet = target === svgRef.current || target.classList?.contains(ROOM_TEXT_HIT);
+      const room = onSheet ? roomAt(rooms, c.x, c.y) : null;
+      // Same value bails React out: tracking costs a render only on a change.
       setHoverRoom(room ? roomKey(room) : null);
     } else if (tool === 'door' || tool === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS);

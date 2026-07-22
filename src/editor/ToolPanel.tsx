@@ -68,17 +68,17 @@ export function ToolPanel({
       ? [Layers, `${sel.length} elements`]
       : ELEMENT_META[wall ? 'wall' : opening!.type];
 
-  // Thickness reaches every selected wall, so a room and a marquee over the
-  // same walls offer the same power. undefined: no wall to retype.
+  // Retyping every boundary wall is a wall action, so a Selection read as a
+  // room offers none. undefined: no wall to retype.
   const selWalls = sel
     .map((ref) => (ref.type === 'wall' ? plan.walls[ref.id] : undefined))
     .filter((w) => w !== undefined);
-  const thickness = selWalls.length === 0 ? undefined : sharedThickness(selWalls);
+  const thickness = room || selWalls.length === 0 ? undefined : sharedThickness(selWalls);
 
   return (
     <div className="panel">
       <PanelHeader Icon={Icon} title={title} />
-      {thickness !== undefined && (
+      {(room || thickness !== undefined) && (
         <section>
           <div className="panel-section-label">Dimensions</div>
           {room && (
@@ -88,19 +88,21 @@ export function ToolPanel({
             </div>
           )}
           {wall && <WallRows plan={plan} rooms={rooms} wall={wall} />}
-          <div className="panel-row">
-            <span className="panel-row-label">Thickness</span>
-            <NumberField
-              inline
-              max={WALL_THICKNESS_MAX}
-              value={thickness}
-              onCommit={(value) => {
-                setPlan((p) => selWalls.reduce((next, w) => setWallThickness(next, w.id, value), p));
-                // sticky measure (CONTEXT.md: Tool defaults) — last used wins
-                setDefaults((d) => ({ ...d, wallThickness: value }));
-              }}
-            />
-          </div>
+          {thickness !== undefined && (
+            <div className="panel-row">
+              <span className="panel-row-label">Thickness</span>
+              <NumberField
+                inline
+                max={WALL_THICKNESS_MAX}
+                value={thickness}
+                onCommit={(value) => {
+                  setPlan((p) => selWalls.reduce((next, w) => setWallThickness(next, w.id, value), p));
+                  // sticky measure (CONTEXT.md: Tool defaults) — last used wins
+                  setDefaults((d) => ({ ...d, wallThickness: value }));
+                }}
+              />
+            </div>
+          )}
         </section>
       )}
       {opening && (

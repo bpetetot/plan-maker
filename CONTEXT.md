@@ -170,10 +170,11 @@ so the next element is configured before it is placed. Hidden only when the
 Selection is empty and the Select tool is active. Selection values are
 derived on render from the same silhouette readings as the Dimensions, never
 stored. A Selection read as a Room takes that room's name as its title — or
-"Room" while it has none — and states its Room area. Thickness reaches every
-selected wall at once, whether the Selection reads as a room or not, and shows
-nothing at all while those walls disagree: a field that named one wall's value
-would speak for the others.
+"Room" while it has none — and states its Room area, nothing else: retyping
+every boundary wall is a wall action, not something a room states about
+itself. Every other Selection holding walls offers their common Thickness,
+which reaches all of them at once and shows nothing at all while they
+disagree — a field that named one wall's value would speak for the others.
 _Avoid_: Selection panel, popover, inspector, properties dialog
 
 **Tool defaults**:

@@ -187,6 +187,42 @@ describe('the room tint', () => {
     expect(tinted(svg)).toHaveLength(1);
   });
 
+  // The tint promises what a click would take, so anything above the sheet
+  // outranks the room.
+  it('drops over a wall, where a click would take the wall instead', async () => {
+    const { svg } = await setup();
+    await pointer(svg, 'pointermove', clientAt(svg, 200, 200));
+    expect(hovered(svg)).toHaveLength(1);
+    const zone = svg.querySelectorAll('line[stroke="transparent"]')[0];
+    await pointer(zone, 'pointermove', clientAt(svg, 200, 0));
+    expect(hovered(svg)).toHaveLength(0);
+  });
+
+  it('drops over an opening, which a click would take instead', async () => {
+    const plan = squareRoomPlan();
+    const top = Object.values(plan.walls)[0];
+    plan.openings.o1 = {
+      id: 'o1',
+      wallId: top.id,
+      type: 'door',
+      offset: 200,
+      width: 90,
+      hingeSide: 'start',
+      swing: 'in',
+    };
+    const { svg } = await setup(plan);
+    // the grab zone spans the door's 90 cm width
+    const zone = svg.querySelector('rect[width="90"]')!;
+    await pointer(zone, 'pointermove', clientAt(svg, 200, 0));
+    expect(hovered(svg)).toHaveLength(0);
+  });
+
+  it('holds over the room text, which a click would take the room by', async () => {
+    const { svg } = await setup(namedRoomPlan('Kitchen'));
+    await pointer(document.querySelector('.room-name-hit')!, 'pointermove', clientAt(svg, 200, 148));
+    expect(hovered(svg)).toHaveLength(1);
+  });
+
   it('stays away while a tool other than Select is active', async () => {
     const { svg } = await setup();
     await key('2');
@@ -245,36 +281,45 @@ describe('clicking the room text block', () => {
 });
 
 describe('thickness across a multi-selection', () => {
-  it('retypes every wall of the selected room at once', async () => {
+  // Retyping every boundary wall is a wall action; a Room facet states what
+  // the room is. A marquee that reads as the room is bare for the same reason.
+  it('is absent from a room, however the room was selected', async () => {
     const { svg } = await setup();
     await clickAt(svg, 200, 200);
-    expect(fieldValue()).toBe('10');
-    await setField('20');
-    expect(walls().map((w) => w.thickness)).toEqual([20, 20, 20, 20]);
+    expect(document.querySelector('.panel-number-input')).toBeNull();
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
+    await pointer(svg, 'pointermove', clientAt(svg, 450, 450));
+    await pointer(svg, 'pointerup');
+    expect(document.querySelector('.panel-number-input')).toBeNull();
   });
 
-  it('reaches a marquee selection too, room or not', async () => {
+  it('retypes every wall a marquee took when they close no room', async () => {
     const { svg } = await setup(twoRoomPlan());
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
     await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
     await pointer(svg, 'pointerup');
+    expect(fieldValue()).toBe('10');
     await setField('16');
     expect(walls().every((w) => w.thickness === 16)).toBe(true);
   });
 
   it('stays blank while the selected walls disagree, then levels them', async () => {
-    const plan = squareRoomPlan();
+    const plan = twoRoomPlan();
     Object.values(plan.walls)[0].thickness = 30;
     const { svg } = await setup(plan);
-    await clickAt(svg, 200, 200);
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
+    await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
+    await pointer(svg, 'pointerup');
     expect(fieldValue()).toBe('');
     await setField('12');
-    expect(walls().map((w) => w.thickness)).toEqual([12, 12, 12, 12]);
+    expect(walls().every((w) => w.thickness === 12)).toBe(true);
   });
 
   it('makes the retyped thickness the wall tool default (sticky)', async () => {
-    const { svg } = await setup();
-    await clickAt(svg, 200, 200);
+    const { svg } = await setup(twoRoomPlan());
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
+    await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
+    await pointer(svg, 'pointerup');
     await setField('22');
     // Enter blurs the field: the shortcuts below only reach the registry
     // because the typing guard no longer silences them.

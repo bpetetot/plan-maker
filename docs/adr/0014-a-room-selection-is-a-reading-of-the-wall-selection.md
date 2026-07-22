@@ -60,5 +60,11 @@ shred both.
   element, and neither is ever in the Selection.
 - Clicking inside a room no longer clears the Selection. Escape and a click
   outside every room remain.
-- The tint is editor chrome pinned to the screen (ADR 0005): it is drawn under
-  the walls, takes no pointer events, and the export never sees it.
+- The tint is editor chrome, not drawing (ADR 0005): it is drawn under the
+  walls, takes no pointer events, and the export never sees it. It follows the
+  browser's own hit test rather than the room under the pointer, so it promises
+  only what a click would actually take — a grab zone outranks the room, the
+  block the room is clicked by does not.
+- Because the reading is a state, the Tool panel's facets follow it wherever it
+  lands: a marquee that reads as a room offers no grouped Thickness either.
+  Two paths to one Selection cannot offer different powers.
