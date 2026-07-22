@@ -472,19 +472,39 @@ svg text.room-area {
 .panel-row-value {
   font-variant-numeric: tabular-nums;
 }
-.panel-select {
-  font: inherit;
+.panel-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 5px 8px;
-  background: transparent;
-  color: inherit;
 }
-.panel-select.inline {
+.panel-number.inline {
   width: auto;
   padding: 3px 6px;
+}
+.panel-number-input {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: inherit;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.panel-number.inline .panel-number-input {
+  width: 3ch;
+  flex: none;
+}
+.panel-number-input:focus {
+  outline: none;
+}
+.panel-number-unit {
+  color: var(--text-faint);
 }
 .panel-flips {
   display: flex;
