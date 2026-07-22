@@ -1,10 +1,11 @@
 import { faceSpan, junctionPatches, wallOutline } from '../model/faces';
+import type { Vec } from '../model/geometry';
 import { wallLength, wallPoints } from '../model/geometry';
 import { formatArea, formatLength } from '../model/format';
 import { openingPlacement, openingRail } from '../model/openings';
 import type { Room } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
-import { roomAt } from '../model/rooms';
+import { roomAt, roomKey } from '../model/rooms';
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types';
 import type { Snap } from '../model/snap';
 
@@ -562,7 +563,7 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
     const oldest = oldestByRoom.get(room);
     if (defaults.length === 0 && oldest) continue;
     blocks.push({
-      key: defaults[0]?.id ?? `room-${room.pointIds.join(':')}`,
+      key: defaults[0]?.id ?? `room-${roomKey(room)}`,
       x: room.anchor.x,
       y: room.anchor.y,
       labels: defaults,
@@ -656,6 +657,20 @@ export function RoomOverlay({
         );
       })}
     </g>
+  );
+}
+
+// Interaction chrome, not drawing (ADR 0005), so the export never prints it.
+// evenodd: an island's footprint is not this room's floor (CONTEXT.md: Room).
+export function RoomFill({ room, variant }: { room: Room; variant: 'hover' | 'selected' }) {
+  const loop = (points: Vec[]) => `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')} Z`;
+  return (
+    <path
+      className={`room-fill-${variant}`}
+      d={[room.polygon, ...room.holes].map(loop).join(' ')}
+      fillRule="evenodd"
+      pointerEvents="none"
+    />
   );
 }
 

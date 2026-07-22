@@ -269,10 +269,17 @@ describe('tool panel visibility', () => {
 });
 
 describe('tool panel on a multi-selection', () => {
+  // Two parallel walls: closing a loop would make the selection read as a room.
+  const twoWallPlan = () =>
+    buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(0, 200), b.point(400, 200));
+    });
+
   it('shows the element count and Delete removes everything', async () => {
-    const { svg } = await setup();
+    const { svg } = await setup(twoWallPlan());
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 450 });
-    await expect.element(page.getByText('4 elements')).toBeInTheDocument();
+    await expect.element(page.getByText('2 elements')).toBeInTheDocument();
     await userEvent.click(page.getByLabelText('Delete'));
     expect(Object.values(usePlanStore.getState().plan.walls)).toHaveLength(0);
     expect(panel()).toBeNull();

@@ -58,7 +58,12 @@ walls, never drawn or stored; they appear as soon as walls close a loop. A room
 fully contained in another is excluded from it: the island's whole footprint —
 floor and walls — punches a hole in the containing room, so a position inside
 the island belongs to the island's room only, and an island wall separates two
-rooms exactly like any party wall.
+rooms exactly like any party wall. A room's boundary is every wall of its
+outline *and* of the islands it holes: the footprint that shapes the room
+belongs to it, so a room moves whole or it breaks its own geometry. Because a
+room is derived, its loop of Points is the only identity it has — it lasts
+exactly as long as that loop does, and a split or a merge ends it, which is why
+a room is read from a Selection rather than held in one (ADR 0014).
 _Avoid_: Zone, area, space
 
 **Room label**:
@@ -145,7 +150,16 @@ it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. A junction reads as selected — never
 selectable itself, never in the set — as soon as it sits between selected
 walls: at least two of the walls meeting at its Point are in the Selection.
-Never part of the plan.
+A Room is never in the Selection either — it is *read from* it: a Selection
+that is exactly the boundary walls of a detected Room is that Room, and the
+editor names and tints it accordingly (ADR 0014). The reading is a state, not
+a memory of the gesture that produced it: clicking a room's interior, clicking
+its text block, and marqueeing its walls all read as the same Room, and are
+indistinguishable afterwards — a marquee also sweeps up the Openings those
+walls carry, and an Opening riding with its own wall never breaks the
+reading. Clicking a room's interior
+selects its boundary; Shift adds it, following the marquee's rule — a room
+joins the set, never leaves it. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
 **Tool panel**:
@@ -155,7 +169,11 @@ opening options, delete; otherwise it shows the active Tool's Tool defaults,
 so the next element is configured before it is placed. Hidden only when the
 Selection is empty and the Select tool is active. Selection values are
 derived on render from the same silhouette readings as the Dimensions, never
-stored.
+stored. A Selection read as a Room takes that room's name as its title — or
+"Room" while it has none — and states its Room area. Thickness reaches every
+selected wall at once, whether the Selection reads as a room or not, and shows
+nothing at all while those walls disagree: a field that named one wall's value
+would speak for the others.
 _Avoid_: Selection panel, popover, inspector, properties dialog
 
 **Tool defaults**:

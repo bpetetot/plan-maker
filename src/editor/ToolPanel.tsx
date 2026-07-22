@@ -1,13 +1,23 @@
 // CONTEXT.md: Tool panel. Selection values derived on render, never stored —
 // the panel cannot disagree with the canvas, drags included.
-import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react';
+import {
+  BrickWall,
+  DoorClosed,
+  FlipHorizontal2,
+  FlipVertical2,
+  Grid2x2,
+  Layers,
+  Scan,
+  Trash2,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { formatLength } from '../model/format';
+import { formatArea, formatLength } from '../model/format';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { wallMeasures } from '../model/rooms';
+import { roomLabelAt, wallMeasures } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
+import { selectedRoom } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
@@ -48,27 +58,46 @@ export function ToolPanel({
   const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null;
   if (only && !wall && !opening) return null;
 
-  const [Icon, title]: [LucideIcon, string] = !only
-    ? [Layers, `${sel.length} elements`]
-    : ELEMENT_META[wall ? 'wall' : opening!.type];
+  // The room is read from the selection, not held in it (ADR 0014), so a
+  // marquee over the same walls reads the same room.
+  const room = selectedRoom(plan, rooms, sel);
+
+  const [Icon, title]: [LucideIcon, string] = room
+    ? [Scan, roomLabelAt(plan, room)?.name || 'Room']
+    : !only
+      ? [Layers, `${sel.length} elements`]
+      : ELEMENT_META[wall ? 'wall' : opening!.type];
+
+  // Thickness reaches every selected wall, so a room and a marquee over the
+  // same walls offer the same power. undefined: no wall to retype.
+  const selWalls = sel
+    .map((ref) => (ref.type === 'wall' ? plan.walls[ref.id] : undefined))
+    .filter((w) => w !== undefined);
+  const thickness = selWalls.length === 0 ? undefined : sharedThickness(selWalls);
 
   return (
     <div className="panel">
       <PanelHeader Icon={Icon} title={title} />
-      {wall && (
+      {thickness !== undefined && (
         <section>
           <div className="panel-section-label">Dimensions</div>
-          <WallRows plan={plan} rooms={rooms} wall={wall} />
+          {room && (
+            <div className="panel-row">
+              <span className="panel-row-label">Area</span>
+              <span className="panel-row-value">{formatArea(room.areaCm2)}</span>
+            </div>
+          )}
+          {wall && <WallRows plan={plan} rooms={rooms} wall={wall} />}
           <div className="panel-row">
             <span className="panel-row-label">Thickness</span>
             <NumberField
               inline
               max={WALL_THICKNESS_MAX}
-              value={wall.thickness}
-              onCommit={(thickness) => {
-                setPlan((p) => setWallThickness(p, wall.id, thickness));
+              value={thickness}
+              onCommit={(value) => {
+                setPlan((p) => selWalls.reduce((next, w) => setWallThickness(next, w.id, value), p));
                 // sticky measure (CONTEXT.md: Tool defaults) — last used wins
-                setDefaults((d) => ({ ...d, wallThickness: thickness }));
+                setDefaults((d) => ({ ...d, wallThickness: value }));
               }}
             />
           </div>
@@ -149,6 +178,10 @@ function ToolDefaultsFacet({
   );
 }
 
+// null when they disagree: the field shows nothing rather than one wall's value.
+const sharedThickness = (walls: Wall[]): number | null =>
+  walls.every((w) => w.thickness === walls[0].thickness) ? walls[0].thickness : null;
+
 function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
   return (
     <div className="panel-header">
@@ -162,13 +195,14 @@ function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
 
 // draft is null while idle so the field mirrors the live value; while editing it
 // holds the keystrokes, reaching the plan only on commit — never mid-entry.
+// A null value is a selection whose walls disagree: blank, never a lie.
 function NumberField({
   value,
   onCommit,
   inline,
   max,
 }: {
-  value: number;
+  value: number | null;
   onCommit: (value: number) => void;
   inline?: boolean;
   max?: number;
@@ -194,8 +228,8 @@ function NumberField({
         max={max}
         step={1}
         className="panel-number-input"
-        value={draft ?? String(value)}
-        onFocus={() => setDraft(String(value))}
+        value={draft ?? (value === null ? '' : String(value))}
+        onFocus={() => setDraft(value === null ? '' : String(value))}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (reverting.current) {

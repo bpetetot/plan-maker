@@ -59,6 +59,47 @@ export function squareRoomPlan(): Plan {
   });
 }
 
+// 400×400 room holed by a disconnected 150×100 island at (100,100).
+export function nestedRoomPlan(): Plan {
+  return buildPlan((b) => {
+    const a = b.point(0, 0);
+    const c = b.point(400, 0);
+    const d = b.point(400, 400);
+    const e = b.point(0, 400);
+    b.wall(a, c);
+    b.wall(c, d);
+    b.wall(d, e);
+    b.wall(e, a);
+    const i1 = b.point(100, 100);
+    const i2 = b.point(250, 100);
+    const i3 = b.point(250, 200);
+    const i4 = b.point(100, 200);
+    b.wall(i1, i2);
+    b.wall(i2, i3);
+    b.wall(i3, i4);
+    b.wall(i4, i1);
+  });
+}
+
+// Two 400×400 rooms sharing the wall at x=400.
+export function twoRoomPlan(): Plan {
+  return buildPlan((b) => {
+    const a = b.point(0, 0);
+    const c = b.point(400, 0);
+    const d = b.point(400, 400);
+    const e = b.point(0, 400);
+    const f = b.point(800, 0);
+    const g = b.point(800, 400);
+    b.wall(a, c);
+    b.wall(c, d);
+    b.wall(d, e);
+    b.wall(e, a);
+    b.wall(c, f);
+    b.wall(f, g);
+    b.wall(g, d);
+  });
+}
+
 // 4×3 m named room: tells the area measure apart from the room name.
 export function namedRoomPlan(name = 'Kitchen'): Plan {
   return buildPlan((b) => {

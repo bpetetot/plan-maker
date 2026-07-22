@@ -5,10 +5,12 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  selectedRoom,
   toggleRef,
   translateElements,
 } from './selection';
-import { buildPlan } from './testHelpers';
+import { detectRooms, roomAt, roomWallIds } from './rooms';
+import { buildPlan, twoRoomPlan } from './testHelpers';
 import type { ElementRef } from './selection';
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
@@ -369,5 +371,73 @@ describe('referencePoint', () => {
       opening = b.opening(wall, 'door', 100).id;
     });
     expect(referencePoint(plan, [openingRef(opening)], { x: 100, y: 0 })).toBeNull();
+  });
+});
+
+// A room is read from the selection, never held in it (ADR 0014).
+describe('selectedRoom', () => {
+  it('reads the room whose boundary the selection is exactly', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = roomWallIds(plan, left)!.map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBe(left);
+  });
+
+  it('reads nothing from a selection missing one of the room walls', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = roomWallIds(plan, left)!.slice(1).map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+
+  it('reads nothing once a wall outside the room joins the selection', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const right = roomAt(rooms, 600, 200)!;
+    const outside = roomWallIds(plan, right)!.find((id) => !roomWallIds(plan, left)!.includes(id))!;
+    const sel = [...roomWallIds(plan, left)!, outside].map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+
+  // A marquee over a room captures its doors too, and an opening follows its
+  // wall through every action — so the two selections are the same room.
+  it('still reads the room when its own openings ride along', () => {
+    let openingId = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      openingId = b.opening(top, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
+    expect(selectedRoom(plan, rooms, sel)).toBe(rooms[0]);
+  });
+
+  it('reads nothing when an opening comes from a wall outside the room', () => {
+    let openingId = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const stray = b.wall(b.point(0, 900), b.point(400, 900));
+      openingId = b.opening(stray, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
   });
 });

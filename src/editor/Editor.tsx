@@ -32,7 +32,7 @@ import {
   setDimPlacement,
 } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt } from '../model/rooms';
+import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
   deleteElements,
@@ -40,6 +40,7 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  selectedRoom,
   toggleRef,
   translateElements,
 } from '../model/selection';
@@ -64,6 +65,7 @@ import {
   OpeningGlyph,
   OpeningGrabZone,
   PlacementDims,
+  RoomFill,
   RoomOverlay,
   roomTextBlocks,
   RubberWall,
@@ -96,10 +98,18 @@ type Drag =
   | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
   // Room label) is defensive and moves freely.
-  | { kind: 'label'; id: string; room: Room | null; grabDelta: Vec }
+  | {
+      kind: 'label';
+      id: string;
+      room: Room | null;
+      start: Vec;
+      grabDelta: Vec;
+      additive: boolean;
+      moved?: boolean;
+    }
   // The label is created only past the click threshold: a plain click must
   // not touch the plan.
-  | { kind: 'newLabel'; start: Vec; room: Room; grabDelta: Vec; id?: string }
+  | { kind: 'newLabel'; start: Vec; room: Room; grabDelta: Vec; additive: boolean; id?: string }
   | { kind: 'dim'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // `b` is mutated on the ref, not held in state: pointer-up would read a
   // stale React value.
@@ -157,6 +167,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults);
   const [sel, setSel] = useState<ElementRef[]>([]);
   const [hoverWall, setHoverWall] = useState<string | null>(null);
+  // The room's loop, not the object: a Room is rebuilt on every plan change.
+  const [hoverRoom, setHoverRoom] = useState<string | null>(null);
   // First click held as a pending snap, not committed: aborting the chain
   // (Esc, tool switch, double-click) must not mutate the plan.
   const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null);
@@ -205,6 +217,17 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     [wallDrag, plan],
   );
 
+  // A reading, not a memory (ADR 0014): a marquee over the same walls lights
+  // the room exactly as a click on it does.
+  const selRoom = useMemo(() => selectedRoom(plan, rooms, sel), [plan, rooms, sel]);
+  // A room whose boundary does not resolve is unselectable, so it must not
+  // announce itself either: the tint tracks what a click would select.
+  const hovered =
+    tool === 'select' && !dragNow && hoverRoom
+      ? (rooms.find((room) => roomKey(room) === hoverRoom) ?? null)
+      : null;
+  const hoveredRoom = hovered && roomWallIds(plan, hovered) ? hovered : null;
+
   const tolerance = () => 14 / pxPerCm();
 
   const switchTool = (next: Tool) => {
@@ -223,6 +246,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     },
     [setPlan],
   );
+
+  // A click reads the room under it (ADR 0014). Additive unions, never
+  // removes — the marquee's rule, not the wall's toggle.
+  const selectionForRoom = (room: Room | null, additive: boolean, prev: ElementRef[]): ElementRef[] => {
+    const ids = room ? roomWallIds(plan, room) : null;
+    if (!ids) return additive ? prev : [];
+    const refs: ElementRef[] = ids.map((id) => ({ type: 'wall', id }));
+    return additive ? [...prev, ...refs.filter((r) => !isSelected(prev, r))] : refs;
+  };
 
   const toggleSnap = useCallback(() => {
     setSnapEnabled(!snapEnabled);
@@ -251,6 +283,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const startPlanDrag = (d: Drag) => {
     beginHistoryGroup();
     drag.current = d;
+    // Or the tint flashes back onto the pre-drag room at pointer-up, and stays
+    // there until the next pointermove.
+    setHoverRoom(null);
   };
 
   const onSvgPointerDown = (e: React.PointerEvent) => {
@@ -305,6 +340,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setSel(id ? [{ type: 'opening', id }] : []);
     } else if (tool === 'select') {
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
+      setHoverRoom(null);
       setMarquee({ a: c, b: c });
       svg.setPointerCapture(e.pointerId);
     } else {
@@ -377,9 +413,14 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           }
         }
       } else if (d.kind === 'label') {
-        const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y };
-        const t = d.room ? clampToRoom(target, d.room) : target;
-        setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y));
+        if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
+          d.moved = true;
+        }
+        if (d.moved) {
+          const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y };
+          const t = d.room ? clampToRoom(target, d.room) : target;
+          setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y));
+        }
       } else if (d.kind === 'newLabel') {
         const t = clampToRoom({ x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }, d.room);
         if (d.id) {
@@ -416,6 +457,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
+    } else if (tool === 'select') {
+      // Same value bails React out, so tracking the pointer costs a render
+      // only when the room under it actually changes.
+      const room = roomAt(rooms, c.x, c.y);
+      setHoverRoom(room ? roomKey(room) : null);
     } else if (tool === 'door' || tool === 'window') {
       const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS);
       if (near) {
@@ -445,7 +491,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm();
       const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm();
       if (wPx < CLICK_PX && hPx < CLICK_PX) {
-        setSel(d.additive ? d.prev : []);
+        setSel(selectionForRoom(roomAt(rooms, d.a.x, d.a.y), d.additive, d.prev));
       } else {
         const captured = elementsInRect(plan, d.a, d.b);
         setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured);
@@ -457,6 +503,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // The dim label is a handle, not an element: only a click selects its wall.
     if (d.kind === 'dim') {
       if (!d.moved) setSel([{ type: 'wall', id: d.id }]);
+    }
+    // Same contract for the room text block, which selects the room it names.
+    if ((d.kind === 'label' && !d.moved) || (d.kind === 'newLabel' && !d.id)) {
+      setSel((s) => selectionForRoom(d.room, d.additive, s));
     }
     if (d.kind === 'point') setSnap(null);
     if (d.kind === 'opening') setMovingOpeningId(null);
@@ -526,21 +576,24 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // and double-click-edited directly.
   const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
     if (tool !== 'select' || e.button !== 0 || space) return;
+    const c = toPlan(e.clientX, e.clientY);
+    const grabDelta = { x: block.x - c.x, y: block.y - c.y };
     if (label) {
-      const c = toPlan(e.clientX, e.clientY);
       startPlanDrag({
         kind: 'label',
         id: label.id,
         room: block.room ?? null,
-        grabDelta: { x: block.x - c.x, y: block.y - c.y },
+        start: c,
+        grabDelta,
+        additive: e.shiftKey,
       });
     } else if (block.room) {
-      const c = toPlan(e.clientX, e.clientY);
       startPlanDrag({
         kind: 'newLabel',
         start: c,
         room: block.room,
-        grabDelta: { x: block.x - c.x, y: block.y - c.y },
+        grabDelta,
+        additive: e.shiftKey,
       });
     }
   };
@@ -607,11 +660,17 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         onPointerDown={onSvgPointerDown}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
+        // A pointer that left the sheet hovers nothing; only pointermove would
+        // ever clear the tint otherwise, and it stops arriving.
+        onPointerLeave={() => setHoverRoom(null)}
         onContextMenu={onSvgContextMenu}
         onDoubleClick={onCanvasDoubleClick}
       >
         {/* purely visual (CONTEXT.md: Grid) — grid snapping stays active either way */}
         {gridVisible && <GridLines view={view} pxPerCm={zoomScale} />}
+        {/* under the walls: a tint marks a floor, it never repaints geometry */}
+        {hoveredRoom && hoveredRoom !== selRoom && <RoomFill room={hoveredRoom} variant="hover" />}
+        {selRoom && <RoomFill room={selRoom} variant="selected" />}
         {Object.values(plan.walls).map((wall) => (
           <WallLine
             key={wall.id}
@@ -809,7 +868,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             : `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
           : tool === 'door' || tool === 'window'
             ? 'Hover a wall, click to place'
-            : 'Click or drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
+            : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>

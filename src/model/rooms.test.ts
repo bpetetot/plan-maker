@@ -7,6 +7,7 @@ import {
   reconcileRoomLabels,
   roomAt,
   roomContains,
+  roomWallIds,
   wallMeasures,
 } from './rooms';
 import type { Plan } from './types';
@@ -262,6 +263,17 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
     const { outer } = byArea(plan);
     expect(roomContains(outer, outer.anchor.x, outer.anchor.y)).toBe(true);
     expect(Math.hypot(outer.anchor.x - 200, outer.anchor.y - 200)).toBeGreaterThan(50);
+  });
+
+  it('counts the island loop in the outer room boundary', () => {
+    const { plan, islandWallIds } = nestedPlan();
+    const { inner, outer } = byArea(plan);
+    const boundary = roomWallIds(plan, outer)!;
+    expect(boundary).toHaveLength(8);
+    for (const id of islandWallIds) expect(boundary).toContain(id);
+    // the island's own boundary stays its four walls: a hole is not a hole of
+    // itself
+    expect(roomWallIds(plan, inner)).toHaveLength(4);
   });
 
   it('treats an island wall as a party wall between the two rooms', () => {

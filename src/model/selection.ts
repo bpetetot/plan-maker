@@ -52,6 +52,20 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   return refs;
 }
 
+/** A Room is read from the Selection, never held in it (ADR 0014). Openings
+ *  carried by its walls ride along: a marquee catches them. */
+export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Room | null {
+  const wallIds = new Set(refs.filter((ref) => ref.type === 'wall').map((ref) => ref.id));
+  return (
+    rooms.find((room) => {
+      const boundary = roomWallIds(plan, room);
+      if (boundary === null || boundary.length !== wallIds.size) return null;
+      if (!boundary.every((id) => wallIds.has(id))) return null;
+      return refs.every((ref) => ref.type === 'wall' || wallIds.has(plan.openings[ref.id]?.wallId));
+    }) ?? null
+  );
+}
+
 export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan;
   for (const ref of refs) {
