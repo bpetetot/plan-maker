@@ -231,6 +231,12 @@ describe('the dimension number field', () => {
     expect(wallThickness()).toBe(1);
   });
 
+  it('clamps a wall thickness above the maximum down to it', async () => {
+    await selectStandaloneWall();
+    await setField('500');
+    expect(wallThickness()).toBe(100);
+  });
+
   it('reverts an opening width that will not fit the wall', async () => {
     const { svg } = await setup(doorPlan());
     await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });

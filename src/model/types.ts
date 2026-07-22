@@ -61,6 +61,7 @@ export interface Plan {
 }
 
 export const WALL_THICKNESS: Cm = 10;
+export const WALL_THICKNESS_MAX: Cm = 100;
 export const GRID: Cm = 10;
 export const DOOR_WIDTH: Cm = 90;
 export const WINDOW_WIDTH: Cm = 120;

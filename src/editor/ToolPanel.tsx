@@ -9,6 +9,7 @@ import type { Room } from '../model/rooms';
 import { wallMeasures } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
+import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
 
 const ELEMENT_META: Record<'wall' | 'door' | 'window', [LucideIcon, string]> = {
@@ -62,6 +63,7 @@ export function ToolPanel({
             <span className="panel-row-label">Thickness</span>
             <NumberField
               inline
+              max={WALL_THICKNESS_MAX}
               value={wall.thickness}
               onCommit={(thickness) => {
                 setPlan((p) => setWallThickness(p, wall.id, thickness));
@@ -123,6 +125,7 @@ function ToolDefaultsFacet({
         <section>
           <div className="panel-section-label">Thickness</div>
           <NumberField
+            max={WALL_THICKNESS_MAX}
             value={defaults.wallThickness}
             onCommit={(thickness) => setDefaults((d) => ({ ...d, wallThickness: thickness }))}
           />
@@ -163,10 +166,12 @@ function NumberField({
   value,
   onCommit,
   inline,
+  max,
 }: {
   value: number;
   onCommit: (value: number) => void;
   inline?: boolean;
+  max?: number;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const reverting = useRef(false);
@@ -177,7 +182,8 @@ function NumberField({
     const n = Number(text);
     // Empty or non-numeric reverts, like Escape; a decimal rounds to the cm grid.
     if (text === null || text.trim() === '' || !Number.isFinite(n)) return;
-    onCommit(Math.max(1, Math.round(n)));
+    const rounded = Math.max(1, Math.round(n));
+    onCommit(max === undefined ? rounded : Math.min(max, rounded));
   };
 
   return (
@@ -185,6 +191,7 @@ function NumberField({
       <input
         type="number"
         min={1}
+        max={max}
         step={1}
         className="panel-number-input"
         value={draft ?? String(value)}
