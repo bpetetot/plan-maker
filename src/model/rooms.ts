@@ -9,7 +9,7 @@ import {
   polygonCentroid,
   regionCentroid,
 } from './geometry';
-import type { Plan, RoomLabel, Wall } from './types';
+import type { Opening, Plan, RoomLabel, Wall } from './types';
 
 // Rooms are derived, never stored (spec §2; CONTEXT.md: Room): faces of the
 // wall graph. Positive area = interior, negative = silhouette, punches holes.
@@ -205,6 +205,18 @@ export function roomWallIds(plan: Plan, room: Room): string[] | null {
     }
   }
   return ids;
+}
+
+export function openingsOnWalls(plan: Plan, wallIds: string[]): Opening[] {
+  const carriers = new Set(wallIds);
+  return Object.values(plan.openings).filter((opening) => carriers.has(opening.wallId));
+}
+
+// A boundary tally, not a dwelling inventory: a party wall belongs to both
+// rooms it separates, so its opening is counted by both.
+export function roomOpenings(plan: Plan, room: Room): Opening[] {
+  const wallIds = roomWallIds(plan, room);
+  return wallIds ? openingsOnWalls(plan, wallIds) : [];
 }
 
 const sameLoop = (a: Room, b: Room) => {

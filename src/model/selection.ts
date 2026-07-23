@@ -3,7 +3,7 @@ import { wallPoints } from './geometry';
 import { openingPlacement } from './openings';
 import { deleteOpening, deleteWall, setPoints, translateRoomLabel } from './operations';
 import type { Room } from './rooms';
-import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms';
+import { detectRooms, openingsOnWalls, reconcileRoomLabels, roomAt, roomWallIds } from './rooms';
 import type { Plan, Point } from './types';
 
 // CONTEXT.md: Selection. Editor state, never the plan; room labels are never
@@ -52,8 +52,20 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   return refs;
 }
 
+/** The refs a Room is: its boundary walls and the openings they carry, so a
+ *  click lands on the set a marquee already produced (ADR 0014). */
+export function roomSelection(plan: Plan, room: Room): ElementRef[] | null {
+  const wallIds = roomWallIds(plan, room);
+  if (!wallIds) return null;
+  return [
+    ...wallIds.map((id): ElementRef => ({ type: 'wall', id })),
+    ...openingsOnWalls(plan, wallIds).map((o): ElementRef => ({ type: 'opening', id: o.id })),
+  ];
+}
+
 /** A Room is read from the Selection, never held in it (ADR 0014). Openings
- *  carried by its walls ride along: a marquee catches them. */
+ *  carried by its walls ride along, and none of them votes: the reading
+ *  survives a Shift-click that puts one out. */
 export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Room | null {
   const wallIds = new Set(refs.filter((ref) => ref.type === 'wall').map((ref) => ref.id));
   return (

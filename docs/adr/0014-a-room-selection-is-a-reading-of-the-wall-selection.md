@@ -14,6 +14,14 @@ selection of the room's walls plus some of their openings is behaviourally the
 same selection, so it reads as the same room — otherwise the promise above
 would fail for every room that has a door, which is every real room.
 
+Clicking a room therefore takes those openings too. The tolerance above made
+the two paths read alike; taking the openings makes them *be* alike, down to
+the set of refs — and the click stops leaving a room's doors unlit while a
+Delete carries them off. The reading stays tolerant all the same: the openings
+still do not vote, so a Shift-click that puts one out leaves the room a room.
+A door in a party wall is taken by both rooms it separates: it pierces the
+whole thickness and has no side, and Delete already treats it that way.
+
 Identity is what settles it. A Room is detected, never stored: it has no id,
 only its loop of Points, and that loop changes under the plan's ordinary edits —
 a planar insertion (ADR 0002) adds a corner, a coincident merge (ADR 0003)
@@ -68,3 +76,15 @@ shred both.
 - Because the reading is a state, the Tool panel's facets follow it wherever it
   lands: a marquee that reads as a room offers no grouped Thickness either.
   Two paths to one Selection cannot offer different powers.
+- A room's openings are in the Selection, so each shows its Placement
+  dimensions: selecting a room with four doors posts eight clearance chips at
+  once. The rule has no cardinality threshold and gains none here — the
+  fallback, if this ever reads as noise, is for a Room reading to silence them,
+  which is a refinement of the rule and not a retreat from this decision.
+- The group grab is blind to type, so a drag started on a door of a selected
+  room translates the room, exactly as a drag on one of its walls does. A click
+  without travel still demotes the Selection to that door, which is how the
+  door is reached in one gesture more.
+- The Tool panel counts the room's Doors and Windows. The count is read from
+  the room, not from the refs, so it states what the Delete below it takes even
+  after a Shift-click has unlit one of them.

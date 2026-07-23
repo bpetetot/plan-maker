@@ -5,6 +5,7 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  roomSelection,
   selectedRoom,
   toggleRef,
   translateElements,
@@ -439,5 +440,49 @@ describe('selectedRoom', () => {
     const rooms = detectRooms(plan);
     const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
     expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+});
+
+// The refs a room reads as: clicking it and marqueeing it must land on the
+// same set, or "indistinguishable afterwards" (ADR 0014) is a promise on paper.
+describe('roomSelection', () => {
+  const roomWithDoorPlan = () => {
+    let ids = { door: '', outside: '' };
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const away = b.wall(b.point(0, 900), b.point(400, 900));
+      ids = { door: b.opening(top, 'door', 200).id, outside: b.opening(away, 'window', 200).id };
+    });
+    return { plan, ...ids };
+  };
+
+  it('takes the boundary walls and the openings they carry', () => {
+    const { plan, door, outside } = roomWithDoorPlan();
+    const room = detectRooms(plan)[0];
+    const refs = roomSelection(plan, room)!;
+    for (const id of roomWallIds(plan, room)!) expect(isSelected(refs, wallRef(id))).toBe(true);
+    expect(isSelected(refs, openingRef(door))).toBe(true);
+    expect(isSelected(refs, openingRef(outside))).toBe(false);
+  });
+
+  it('reads back as the room it came from', () => {
+    const { plan } = roomWithDoorPlan();
+    const rooms = detectRooms(plan);
+    expect(selectedRoom(plan, rooms, roomSelection(plan, rooms[0])!)).toBe(rooms[0]);
+  });
+
+  it('gives nothing when the boundary does not resolve to walls', () => {
+    const { plan } = roomWithDoorPlan();
+    const room = detectRooms(plan)[0];
+    // a diagonal loop: no wall spans that pair of points
+    const diagonal = { ...room, pointIds: [room.pointIds[0], room.pointIds[2]] };
+    expect(roomSelection(plan, diagonal)).toBeNull();
   });
 });

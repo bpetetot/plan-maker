@@ -40,6 +40,7 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  roomSelection,
   selectedRoom,
   toggleRef,
   translateElements,
@@ -251,9 +252,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // A click reads the room under it (ADR 0014). Additive unions, never
   // removes — the marquee's rule, not the wall's toggle.
   const selectionForRoom = (room: Room | null, additive: boolean, prev: ElementRef[]): ElementRef[] => {
-    const ids = room ? roomWallIds(plan, room) : null;
-    if (!ids) return additive ? prev : [];
-    const refs: ElementRef[] = ids.map((id) => ({ type: 'wall', id }));
+    const refs = room ? roomSelection(plan, room) : null;
+    if (!refs) return additive ? prev : [];
     return additive ? [...prev, ...refs.filter((r) => !isSelected(prev, r))] : refs;
   };
 

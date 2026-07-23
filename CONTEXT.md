@@ -152,13 +152,14 @@ selectable itself, never in the set — as soon as it sits between selected
 walls: at least two of the walls meeting at its Point are in the Selection.
 A Room is never in the Selection either — it is *read from* it: a Selection
 that is exactly the boundary walls of a detected Room is that Room, and the
-editor names and tints it accordingly (ADR 0014). The reading is a state, not
-a memory of the gesture that produced it: clicking a room's interior, clicking
-its text block, and marqueeing its walls all read as the same Room, and are
-indistinguishable afterwards — a marquee also sweeps up the Openings those
-walls carry, and an Opening riding with its own wall never breaks the
-reading. Clicking a room's interior
-selects its boundary; Shift adds it, following the marquee's rule — a room
+editor names and tints it accordingly (ADR 0014). Selecting a Room takes its
+boundary walls *and* every Opening those walls carry — the set a marquee over
+the room already produced, so clicking a room's interior, clicking its text
+block, and marqueeing its walls all land on one and the same Selection. The
+reading is a state, not a memory of the gesture that produced it, and the
+Openings do not vote: the room still reads as itself when a Shift-click puts
+one of them out. A door in a party wall belongs to both rooms it separates —
+it has no side. Shift adds a room, following the marquee's rule — a room
 joins the set, never leaves it. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
@@ -170,9 +171,13 @@ so the next element is configured before it is placed. Hidden only when the
 Selection is empty and the Select tool is active. Selection values are
 derived on render from the same silhouette readings as the Dimensions, never
 stored. A Selection read as a Room takes that room's name as its title — or
-"Room" while it has none — and states its Room area, nothing else: retyping
-every boundary wall is a wall action, not something a room states about
-itself. Every other Selection holding walls offers their common Thickness,
+"Room" while it has none — and states its Room area and how many Doors and
+Windows its boundary carries, zero included; nothing else: retyping every
+boundary wall is a wall action, not something a room states about itself. The
+two counts are read from the room, never from the set of refs, so they state
+what the Delete beneath them takes — a boundary tally, where a party wall's
+door counts for both rooms, not a dwelling inventory. Every other Selection
+holding walls offers their common Thickness,
 which reaches all of them at once and shows nothing at all while they
 disagree — a field that named one wall's value would speak for the others.
 _Avoid_: Selection panel, popover, inspector, properties dialog
@@ -269,7 +274,9 @@ _Avoid_: Sur-grille, sous-grille, overlay, mesh
 The pair of temporary measures flanking an Opening, shown while it is being
 placed or moved and, past the release, for as long as it stays in the
 Selection — every Opening of the Selection shows its own, with no cardinality
-threshold, while a selected Wall stays silent for the Openings it carries.
+threshold, while a selected Wall stays silent for the Openings it carries. A
+selected Room is no exception: it holds its Openings, so all of them flank
+themselves at once.
 Each is the clearance left to one end of the opening's Rail: from the near
 edge of the opening to the mitered Face corner at a junction, the body
 overhang at a free end, or the near edge of the neighbouring opening that

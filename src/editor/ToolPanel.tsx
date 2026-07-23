@@ -15,7 +15,7 @@ import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { roomLabelAt, wallMeasures } from '../model/rooms';
+import { roomLabelAt, roomOpenings, wallMeasures } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import { selectedRoom } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
@@ -105,6 +105,7 @@ export function ToolPanel({
           )}
         </section>
       )}
+      {room && <RoomOpeningRows plan={plan} room={room} />}
       {opening && (
         <section>
           <div className="panel-section-label">Width</div>
@@ -265,6 +266,27 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
           <FlipVertical2 size={14} aria-hidden /> Swing
         </button>
       </div>
+    </section>
+  );
+}
+
+// The tally the Delete button below it takes: read from the room, so a
+// Shift+click that puts a door out of the selection never lowers it.
+function RoomOpeningRows({ plan, room }: { plan: Plan; room: Room }) {
+  const openings = roomOpenings(plan, room);
+  const rows = [
+    ['Doors', openings.filter((o) => o.type === 'door').length],
+    ['Windows', openings.filter((o) => o.type === 'window').length],
+  ] as const;
+  return (
+    <section>
+      <div className="panel-section-label">Openings</div>
+      {rows.map(([label, count]) => (
+        <div key={label} className="panel-row">
+          <span className="panel-row-label">{label}</span>
+          <span className="panel-row-value">{count}</span>
+        </div>
+      ))}
     </section>
   );
 }

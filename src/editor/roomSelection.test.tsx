@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import { namedRoomPlan, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from '../model/testHelpers';
+import type { Opening } from '../model/types';
 import { emptyPlan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { EditorWithHotkeys } from './testHarness';
@@ -26,6 +27,17 @@ const clickAt = async (svg: SVGSVGElement, x: number, y: number, init: PointerEv
 
 const walls = () => Object.values(usePlanStore.getState().plan.walls);
 const panel = () => document.querySelector('.panel');
+
+// 90 cm at the middle of a 4 m wall: clear of both ends, on every fixture here.
+const doorOn = (wallId: string): Opening => ({
+  id: 'o1',
+  wallId,
+  type: 'door',
+  offset: 200,
+  width: 90,
+  hingeSide: 'start',
+  swing: 'in',
+});
 
 // Scoped to the panel: a named room prints its name on the sheet too.
 const panelTitle = () => document.querySelector('.panel-title')?.textContent;
@@ -119,16 +131,7 @@ describe('the tool panel reading a room', () => {
 
   it('still reads the room when a marquee sweeps up its door', async () => {
     const plan = squareRoomPlan();
-    const top = Object.values(plan.walls)[0];
-    plan.openings.o1 = {
-      id: 'o1',
-      wallId: top.id,
-      type: 'door',
-      offset: 200,
-      width: 90,
-      hingeSide: 'start',
-      swing: 'in',
-    };
+    plan.openings.o1 = doorOn(Object.values(plan.walls)[0].id);
     const { svg } = await setup(plan);
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
     await pointer(svg, 'pointermove', clientAt(svg, 450, 450));
@@ -142,6 +145,80 @@ describe('the tool panel reading a room', () => {
     await clickAt(svg, 600, 200, { shiftKey: true });
     await expect.element(page.getByText('7 elements')).toBeInTheDocument();
     expect(rowValue('Area')).toBeUndefined();
+  });
+});
+
+// A room takes the openings its walls carry (ADR 0014): a click lands on the
+// set a marquee already produced.
+describe('a room and its openings', () => {
+  const roomWithOpenings = (withWindow = true) => {
+    const plan = squareRoomPlan();
+    const [top, right] = Object.values(plan.walls);
+    plan.openings.o1 = doorOn(top.id);
+    if (withWindow) {
+      plan.openings.o2 = { id: 'o2', wallId: right.id, type: 'window', offset: 200, width: 120 };
+    }
+    return plan;
+  };
+
+  const chips = (svg: SVGSVGElement) => svg.querySelectorAll('text.placement-chip');
+
+  it('gives every opening of the room its placement dimensions', async () => {
+    const { svg } = await setup(roomWithOpenings());
+    expect(chips(svg)).toHaveLength(0);
+    await clickAt(svg, 200, 200);
+    // two clearances per opening, none of them nil
+    expect(chips(svg)).toHaveLength(4);
+  });
+
+  it('counts the doors and the windows it holds', async () => {
+    const { svg } = await setup(roomWithOpenings());
+    await clickAt(svg, 200, 200);
+    expect(rowValue('Doors')).toBe('1');
+    expect(rowValue('Windows')).toBe('1');
+  });
+
+  it('states a bare room as zero, never as silence', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    expect(rowValue('Doors')).toBe('0');
+    expect(rowValue('Windows')).toBe('0');
+  });
+
+  it('counts a party wall door for both rooms it separates', async () => {
+    const plan = twoRoomPlan();
+    plan.openings.o1 = doorOn(Object.values(plan.walls)[1].id);
+    const { svg } = await setup(plan);
+    await clickAt(svg, 200, 200);
+    expect(rowValue('Doors')).toBe('1');
+    await clickAt(svg, 600, 200);
+    expect(rowValue('Doors')).toBe('1');
+  });
+
+  // The Delete button below the count takes every opening of the boundary, so
+  // the count states the room, not what happens to be lit.
+  it('keeps counting a door a Shift+click put out of the selection', async () => {
+    const { svg } = await setup(roomWithOpenings(false));
+    await clickAt(svg, 200, 200);
+    const grab = svg.querySelector('rect[width="90"][fill="transparent"]')!;
+    await pointer(grab, 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 200, 0) });
+    await pointer(svg, 'pointerup');
+    expect(panelTitle()).toBe('Room');
+    expect(rowValue('Doors')).toBe('1');
+    expect(chips(svg)).toHaveLength(0);
+  });
+
+  it('states nothing about openings once the selection is no longer a room', async () => {
+    const { svg } = await setup(roomWithOpenings());
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
+    await pointer(svg, 'pointermove', clientAt(svg, 450, 450));
+    await pointer(svg, 'pointerup');
+    expect(rowValue('Doors')).toBe('1');
+    await clickAt(svg, 600, 600);
+    const wall = svg.querySelectorAll('line[stroke="transparent"]')[0];
+    await pointer(wall, 'pointerdown', { button: 0, ...clientAt(svg, 100, 0) });
+    await pointer(svg, 'pointerup');
+    expect(rowValue('Doors')).toBeUndefined();
   });
 });
 
@@ -161,6 +238,26 @@ describe('moving a selected room', () => {
     );
     expect(new Set(moves).size).toBe(1);
     expect(moves[0]).toBe('50,50');
+  });
+
+  // The group grab is blind to type: what is highlighted travels together,
+  // and an opening of the room is a handle on the room like any wall.
+  it('travels whole when the drag starts on one of its doors', async () => {
+    const plan = squareRoomPlan();
+    plan.openings.o1 = doorOn(Object.values(plan.walls)[0].id);
+    const { svg } = await setup(plan);
+    await clickAt(svg, 200, 200);
+    const before = usePlanStore.getState().plan.points;
+    const grab = svg.querySelector('rect[width="90"][fill="transparent"]')!;
+    await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 200, 0) });
+    await pointer(svg, 'pointermove', clientAt(svg, 250, 50));
+    await pointer(svg, 'pointerup');
+    const after = usePlanStore.getState().plan;
+    const moves = Object.keys(before).map(
+      (id) => `${after.points[id].x - before[id].x},${after.points[id].y - before[id].y}`,
+    );
+    expect(new Set(moves)).toEqual(new Set(['50,50']));
+    expect(after.openings.o1.offset).toBe(200);
   });
 });
 
@@ -200,16 +297,7 @@ describe('the room tint', () => {
 
   it('drops over an opening, which a click would take instead', async () => {
     const plan = squareRoomPlan();
-    const top = Object.values(plan.walls)[0];
-    plan.openings.o1 = {
-      id: 'o1',
-      wallId: top.id,
-      type: 'door',
-      offset: 200,
-      width: 90,
-      hingeSide: 'start',
-      swing: 'in',
-    };
+    plan.openings.o1 = doorOn(Object.values(plan.walls)[0].id);
     const { svg } = await setup(plan);
     // the grab zone spans the door's 90 cm width
     const zone = svg.querySelector('rect[width="90"]')!;
