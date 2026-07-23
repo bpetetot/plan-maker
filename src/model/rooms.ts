@@ -9,7 +9,7 @@ import {
   polygonCentroid,
   regionCentroid,
 } from './geometry';
-import type { Plan, RoomLabel, Wall } from './types';
+import type { Opening, Plan, RoomLabel, Wall } from './types';
 
 // Rooms are derived, never stored (spec §2; CONTEXT.md: Room): faces of the
 // wall graph. Positive area = interior, negative = silhouette, punches holes.
@@ -164,12 +164,21 @@ function roomAnchor(room: Room): Vec {
   return poleOfInaccessibility(room.polygon, room.holes);
 }
 
+// A room is derived, never stored: its loop of Points is the only identity it
+// has, and it lasts exactly as long as the loop does.
+export const roomKey = (room: Room): string => room.pointIds.join(':');
+
 export const roomContains = (room: Room, x: number, y: number): boolean =>
   pointInPolygon({ x, y }, room.polygon) && !room.holes.some((hole) => pointInPolygon({ x, y }, hole));
 
 export function roomAt(rooms: Room[], x: number, y: number): Room | null {
   return rooms.find((room) => roomContains(room, x, y)) ?? null;
 }
+
+// Reconciliation keeps at most one label per room (CONTEXT.md: Room label);
+// labels iterate in creation order, so the oldest wins if state ever slipped.
+export const roomLabelAt = (plan: Plan, room: Room): RoomLabel | null =>
+  Object.values(plan.roomLabels).find((label) => roomContains(room, label.x, label.y)) ?? null;
 
 export function clampToRoom(point: Vec, room: Room): Vec {
   const inBoundary = clampToPolygon(point, room.polygon);
@@ -179,6 +188,8 @@ export function clampToRoom(point: Vec, room: Room): Vec {
   return roomContains(room, out.x, out.y) ? out : room.anchor;
 }
 
+// An island's footprint is part of the room it holes (CONTEXT.md: Room), so
+// its loop is boundary too: a room moves whole or breaks its own geometry.
 export function roomWallIds(plan: Plan, room: Room): string[] | null {
   const byPair = new Map<string, string>();
   for (const wall of Object.values(plan.walls)) {
@@ -186,12 +197,26 @@ export function roomWallIds(plan: Plan, room: Room): string[] | null {
     byPair.set(`${wall.endPointId}|${wall.startPointId}`, wall.id);
   }
   const ids: string[] = [];
-  for (let i = 0; i < room.pointIds.length; i++) {
-    const id = byPair.get(`${room.pointIds[i]}|${room.pointIds[(i + 1) % room.pointIds.length]}`);
-    if (!id) return null;
-    ids.push(id);
+  for (const loop of [room.pointIds, ...room.holeLoops]) {
+    for (let i = 0; i < loop.length; i++) {
+      const id = byPair.get(`${loop[i]}|${loop[(i + 1) % loop.length]}`);
+      if (!id) return null;
+      ids.push(id);
+    }
   }
   return ids;
+}
+
+export function openingsOnWalls(plan: Plan, wallIds: string[]): Opening[] {
+  const carriers = new Set(wallIds);
+  return Object.values(plan.openings).filter((opening) => carriers.has(opening.wallId));
+}
+
+// A boundary tally, not a dwelling inventory: a party wall belongs to both
+// rooms it separates, so its opening is counted by both.
+export function roomOpenings(plan: Plan, room: Room): Opening[] {
+  const wallIds = roomWallIds(plan, room);
+  return wallIds ? openingsOnWalls(plan, wallIds) : [];
 }
 
 const sameLoop = (a: Room, b: Room) => {

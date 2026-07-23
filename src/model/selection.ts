@@ -3,8 +3,15 @@ import { wallPoints } from './geometry';
 import { openingPlacement } from './openings';
 import { deleteOpening, deleteWall, setPoints, translateRoomLabel } from './operations';
 import type { Room } from './rooms';
-import { detectRooms, reconcileRoomLabels, roomAt, roomWallIds } from './rooms';
-import type { Plan, Point } from './types';
+import {
+  detectRooms,
+  openingsOnWalls,
+  reconcileRoomLabels,
+  roomAt,
+  roomOpenings,
+  roomWallIds,
+} from './rooms';
+import type { Opening, Plan, Point } from './types';
 
 // CONTEXT.md: Selection. Editor state, never the plan; room labels are never
 // selected.
@@ -50,6 +57,60 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
     }
   }
   return refs;
+}
+
+/** The refs a Room is: its boundary walls and the openings they carry, so a
+ *  click lands on the set a marquee already produced (ADR 0014). */
+export function roomSelection(plan: Plan, room: Room): ElementRef[] | null {
+  const wallIds = roomWallIds(plan, room);
+  if (!wallIds) return null;
+  return [
+    ...wallIds.map((id): ElementRef => ({ type: 'wall', id })),
+    ...openingsOnWalls(plan, wallIds).map((o): ElementRef => ({ type: 'opening', id: o.id })),
+  ];
+}
+
+export interface Contents {
+  walls: number;
+  doors: number;
+  windows: number;
+}
+
+const tally = (walls: number, openings: Opening[]): Contents => ({
+  walls,
+  doors: openings.filter((o) => o.type === 'door').length,
+  windows: openings.filter((o) => o.type === 'window').length,
+});
+
+// CONTEXT.md: Tool panel. What is lit and nothing more — a ref the plan no
+// longer holds counts for nothing.
+export function selectionContents(plan: Plan, refs: ElementRef[]): Contents {
+  const openings = refs
+    .filter((ref) => ref.type === 'opening')
+    .map((ref) => plan.openings[ref.id])
+    .filter((o) => o !== undefined);
+  return tally(refs.filter((ref) => ref.type === 'wall' && plan.walls[ref.id]).length, openings);
+}
+
+/** What a Room's boundary holds, islands included — read from the room and
+ *  never from the refs, so it states what a Delete takes (ADR 0014). */
+export function roomContents(plan: Plan, room: Room): Contents {
+  return tally((roomWallIds(plan, room) ?? []).length, roomOpenings(plan, room));
+}
+
+/** A Room is read from the Selection, never held in it (ADR 0014). Openings
+ *  carried by its walls ride along, and none of them votes: the reading
+ *  survives a Shift-click that puts one out. */
+export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Room | null {
+  const wallIds = new Set(refs.filter((ref) => ref.type === 'wall').map((ref) => ref.id));
+  return (
+    rooms.find((room) => {
+      const boundary = roomWallIds(plan, room);
+      if (boundary === null || boundary.length !== wallIds.size) return null;
+      if (!boundary.every((id) => wallIds.has(id))) return null;
+      return refs.every((ref) => ref.type === 'wall' || wallIds.has(plan.openings[ref.id]?.wallId));
+    }) ?? null
+  );
 }
 
 export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {

@@ -5,10 +5,15 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  roomContents,
+  roomSelection,
+  selectedRoom,
+  selectionContents,
   toggleRef,
   translateElements,
 } from './selection';
-import { buildPlan } from './testHelpers';
+import { detectRooms, roomAt, roomWallIds } from './rooms';
+import { buildPlan, doorOn, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from './testHelpers';
 import type { ElementRef } from './selection';
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
@@ -369,5 +374,166 @@ describe('referencePoint', () => {
       opening = b.opening(wall, 'door', 100).id;
     });
     expect(referencePoint(plan, [openingRef(opening)], { x: 100, y: 0 })).toBeNull();
+  });
+});
+
+// A room is read from the selection, never held in it (ADR 0014).
+describe('selectedRoom', () => {
+  it('reads the room whose boundary the selection is exactly', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = roomWallIds(plan, left)!.map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBe(left);
+  });
+
+  it('reads nothing from a selection missing one of the room walls', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = roomWallIds(plan, left)!.slice(1).map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+
+  it('reads nothing once a wall outside the room joins the selection', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const right = roomAt(rooms, 600, 200)!;
+    const outside = roomWallIds(plan, right)!.find((id) => !roomWallIds(plan, left)!.includes(id))!;
+    const sel = [...roomWallIds(plan, left)!, outside].map(wallRef);
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+
+  // A marquee over a room captures its doors too, and an opening follows its
+  // wall through every action — so the two selections are the same room.
+  it('still reads the room when its own openings ride along', () => {
+    let openingId = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      openingId = b.opening(top, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
+    expect(selectedRoom(plan, rooms, sel)).toBe(rooms[0]);
+  });
+
+  it('reads nothing when an opening comes from a wall outside the room', () => {
+    let openingId = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const stray = b.wall(b.point(0, 900), b.point(400, 900));
+      openingId = b.opening(stray, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
+});
+
+// The refs a room reads as: clicking it and marqueeing it must land on the
+// same set, or "indistinguishable afterwards" (ADR 0014) is a promise on paper.
+describe('roomSelection', () => {
+  const roomWithDoorPlan = () => {
+    let ids = { door: '', outside: '' };
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const away = b.wall(b.point(0, 900), b.point(400, 900));
+      ids = { door: b.opening(top, 'door', 200).id, outside: b.opening(away, 'window', 200).id };
+    });
+    return { plan, ...ids };
+  };
+
+  it('takes the boundary walls and the openings they carry', () => {
+    const { plan, door, outside } = roomWithDoorPlan();
+    const room = detectRooms(plan)[0];
+    const refs = roomSelection(plan, room)!;
+    for (const id of roomWallIds(plan, room)!) expect(isSelected(refs, wallRef(id))).toBe(true);
+    expect(isSelected(refs, openingRef(door))).toBe(true);
+    expect(isSelected(refs, openingRef(outside))).toBe(false);
+  });
+
+  it('reads back as the room it came from', () => {
+    const { plan } = roomWithDoorPlan();
+    const rooms = detectRooms(plan);
+    expect(selectedRoom(plan, rooms, roomSelection(plan, rooms[0])!)).toBe(rooms[0]);
+  });
+
+  it('gives nothing when the boundary does not resolve to walls', () => {
+    const { plan } = roomWithDoorPlan();
+    const room = detectRooms(plan)[0];
+    // a diagonal loop: no wall spans that pair of points
+    const diagonal = { ...room, pointIds: [room.pointIds[0], room.pointIds[2]] };
+    expect(roomSelection(plan, diagonal)).toBeNull();
+  });
+});
+
+describe('contents', () => {
+  it('counts a selection from its refs, type by type', () => {
+    const plan = buildPlan((b) => {
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(0, 200), b.point(400, 200));
+      b.opening(wall, 'door', 100);
+      b.opening(wall, 'window', 300);
+    });
+    const refs = [...Object.keys(plan.walls).map(wallRef), ...Object.keys(plan.openings).map(openingRef)];
+    expect(selectionContents(plan, refs)).toEqual({ walls: 2, doors: 1, windows: 1 });
+  });
+
+  it('counts nothing for refs pointing at elements the plan no longer holds', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    expect(selectionContents(plan, [wallRef('gone'), openingRef('gone')])).toEqual({
+      walls: 0,
+      doors: 0,
+      windows: 0,
+    });
+  });
+
+  it('counts a room from its boundary, island walls included', () => {
+    const plan = nestedRoomPlan();
+    const room = roomAt(detectRooms(plan), 330, 330)!;
+    expect(roomContents(plan, room).walls).toBe(8);
+  });
+
+  it('counts the openings the room boundary carries, wherever they sit on it', () => {
+    const plan = nestedRoomPlan();
+    const walls = Object.values(plan.walls);
+    plan.openings.d1 = doorOn(walls[0].id, 'd1');
+    plan.openings.w1 = { id: 'w1', wallId: walls[4].id, type: 'window', offset: 75, width: 60 };
+    const room = roomAt(detectRooms(plan), 330, 330)!;
+    expect(roomContents(plan, room)).toEqual({ walls: 8, doors: 1, windows: 1 });
+  });
+
+  // The panel counts what is lit — a room excepted, which states itself.
+  it('parts ways when a ref is dropped: the room holds, the selection follows', () => {
+    const plan = squareRoomPlan();
+    plan.openings.d1 = doorOn(Object.values(plan.walls)[0].id, 'd1');
+    const room = detectRooms(plan)[0];
+    const refs = toggleRef(roomSelection(plan, room)!, openingRef('d1'));
+    expect(roomContents(plan, room).doors).toBe(1);
+    expect(selectionContents(plan, refs).doors).toBe(0);
   });
 });

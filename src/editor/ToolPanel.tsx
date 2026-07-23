@@ -1,13 +1,23 @@
 // CONTEXT.md: Tool panel. Selection values derived on render, never stored —
 // the panel cannot disagree with the canvas, drags included.
-import { BrickWall, DoorClosed, FlipHorizontal2, FlipVertical2, Grid2x2, Layers, Trash2 } from 'lucide-react';
+import {
+  BrickWall,
+  DoorClosed,
+  FlipHorizontal2,
+  FlipVertical2,
+  Grid2x2,
+  Layers,
+  Scan,
+  Trash2,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { formatLength } from '../model/format';
+import { formatArea, formatLength } from '../model/format';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { wallMeasures } from '../model/rooms';
-import type { ElementRef } from '../model/selection';
+import { roomLabelAt, wallMeasures } from '../model/rooms';
+import type { Contents, ElementRef } from '../model/selection';
+import { roomContents, selectedRoom, selectionContents } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
@@ -48,32 +58,51 @@ export function ToolPanel({
   const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null;
   if (only && !wall && !opening) return null;
 
-  const [Icon, title]: [LucideIcon, string] = !only
-    ? [Layers, `${sel.length} elements`]
-    : ELEMENT_META[wall ? 'wall' : opening!.type];
+  // The room is read from the selection, not held in it (ADR 0014), so a
+  // marquee over the same walls reads the same room.
+  const room = selectedRoom(plan, rooms, sel);
+
+  const [Icon, title]: [LucideIcon, string] = room
+    ? [Scan, roomLabelAt(plan, room)?.name || 'Room']
+    : !only
+      ? [Layers, `${sel.length} elements`]
+      : ELEMENT_META[wall ? 'wall' : opening!.type];
+
+  // CONTEXT.md: Tool panel. A room counts its boundary, never its refs: a
+  // Shift+click that unlights one of its doors must not lower the count.
+  const contents = room ? roomContents(plan, room) : sel.length > 1 ? selectionContents(plan, sel) : null;
 
   return (
     <div className="panel">
       <PanelHeader Icon={Icon} title={title} />
-      {wall && (
+      {(room || wall) && (
         <section>
           <div className="panel-section-label">Dimensions</div>
-          <WallRows plan={plan} rooms={rooms} wall={wall} />
-          <div className="panel-row">
-            <span className="panel-row-label">Thickness</span>
-            <NumberField
-              inline
-              max={WALL_THICKNESS_MAX}
-              value={wall.thickness}
-              onCommit={(thickness) => {
-                setPlan((p) => setWallThickness(p, wall.id, thickness));
-                // sticky measure (CONTEXT.md: Tool defaults) — last used wins
-                setDefaults((d) => ({ ...d, wallThickness: thickness }));
-              }}
-            />
-          </div>
+          {room && (
+            <div className="panel-row">
+              <span className="panel-row-label">Area</span>
+              <span className="panel-row-value">{formatArea(room.areaCm2)}</span>
+            </div>
+          )}
+          {wall && <WallRows plan={plan} rooms={rooms} wall={wall} />}
+          {wall && (
+            <div className="panel-row">
+              <span className="panel-row-label">Thickness</span>
+              <NumberField
+                inline
+                max={WALL_THICKNESS_MAX}
+                value={wall.thickness}
+                onCommit={(value) => {
+                  setPlan((p) => setWallThickness(p, wall.id, value));
+                  // sticky measure (CONTEXT.md: Tool defaults) — last used wins
+                  setDefaults((d) => ({ ...d, wallThickness: value }));
+                }}
+              />
+            </div>
+          )}
         </section>
       )}
+      {contents && <ContentsRows contents={contents} zeros={room !== null} />}
       {opening && (
         <section>
           <div className="panel-section-label">Width</div>
@@ -229,6 +258,30 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
           <FlipVertical2 size={14} aria-hidden /> Swing
         </button>
       </div>
+    </section>
+  );
+}
+
+// zeros: a room states a nil count as a fact about itself, where any other
+// selection lists only what it holds.
+function ContentsRows({ contents, zeros }: { contents: Contents; zeros: boolean }) {
+  const rows = (
+    [
+      ['Walls', contents.walls],
+      ['Doors', contents.doors],
+      ['Windows', contents.windows],
+    ] as const
+  ).filter(([, count]) => zeros || count > 0);
+  if (rows.length === 0) return null;
+  return (
+    <section>
+      <div className="panel-section-label">Contents</div>
+      {rows.map(([label, count]) => (
+        <div key={label} className="panel-row">
+          <span className="panel-row-label">{label}</span>
+          <span className="panel-row-value">{count}</span>
+        </div>
+      ))}
     </section>
   );
 }

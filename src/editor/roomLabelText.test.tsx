@@ -165,13 +165,15 @@ describe('dragging the area text', () => {
     expect(undoDepth()).toBe(1);
   });
 
-  it('a plain click on the area text does nothing', async () => {
+  // The block is a handle: a click selects the room it belongs to (ADR 0014)
+  // and never touches the plan — no label is born from a click.
+  it('a plain click on the area text selects the room, leaving the plan alone', async () => {
     const { svg, areaBlock } = await setup();
     await pointer(areaBlock(), 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointerup');
     expect(labels()).toHaveLength(0);
     expect(undoDepth()).toBe(0);
-    expect(document.querySelector('.panel')).toBeNull();
+    expect(document.querySelector('.panel-title')?.textContent).toBe('Room');
   });
 
   it('the block cannot leave its room: a drag past a wall clamps to the boundary', async () => {

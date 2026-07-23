@@ -58,7 +58,12 @@ walls, never drawn or stored; they appear as soon as walls close a loop. A room
 fully contained in another is excluded from it: the island's whole footprint —
 floor and walls — punches a hole in the containing room, so a position inside
 the island belongs to the island's room only, and an island wall separates two
-rooms exactly like any party wall.
+rooms exactly like any party wall. A room's boundary is every wall of its
+outline *and* of the islands it holes: the footprint that shapes the room
+belongs to it, so a room moves whole or it breaks its own geometry. Because a
+room is derived, its loop of Points is the only identity it has — it lasts
+exactly as long as that loop does, and a split or a merge ends it, which is why
+a room is read from a Selection rather than held in one (ADR 0014).
 _Avoid_: Zone, area, space
 
 **Room label**:
@@ -145,7 +150,17 @@ it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. A junction reads as selected — never
 selectable itself, never in the set — as soon as it sits between selected
 walls: at least two of the walls meeting at its Point are in the Selection.
-Never part of the plan.
+A Room is never in the Selection either — it is *read from* it: a Selection
+that is exactly the boundary walls of a detected Room is that Room, and the
+editor names and tints it accordingly (ADR 0014). Selecting a Room takes its
+boundary walls *and* every Opening those walls carry — the set a marquee over
+the room already produced, so clicking a room's interior, clicking its text
+block, and marqueeing its walls all land on one and the same Selection. The
+reading is a state, not a memory of the gesture that produced it, and the
+Openings do not vote: the room still reads as itself when a Shift-click puts
+one of them out. A door in a party wall belongs to both rooms it separates —
+it has no side. Shift adds a room, following the marquee's rule — a room
+joins the set, never leaves it. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
 **Tool panel**:
@@ -155,7 +170,21 @@ opening options, delete; otherwise it shows the active Tool's Tool defaults,
 so the next element is configured before it is placed. Hidden only when the
 Selection is empty and the Select tool is active. Selection values are
 derived on render from the same silhouette readings as the Dimensions, never
-stored.
+stored. Any Selection of more than one element states what it holds — how many
+Walls, Doors and Windows — where a Selection of one has its title to name what
+it is. A Selection read as a Room takes that room's name as its title — or
+"Room" while it has none — and states its Room area beside those counts;
+nothing else: retyping every boundary wall is a wall action, not something a
+room states about itself. A room inventories its boundary: its counts are read
+from the room, never from the set of refs, so they state what the Delete
+beneath them takes — a boundary tally, island walls included, where a party
+wall's door counts for both rooms, not a dwelling inventory — and a nil count
+reads zero rather than vanishing, a room having no window being a fact about
+the room. Every other Selection counts what is lit and nothing more — its own
+refs, so a Shift-click that puts an opening out lowers the count — and lists
+only what it holds: a row with nothing to count does not appear. Thickness is
+offered on a single selected wall and nowhere else: no Selection retypes
+several walls at once.
 _Avoid_: Selection panel, popover, inspector, properties dialog
 
 **Tool defaults**:
@@ -250,7 +279,9 @@ _Avoid_: Sur-grille, sous-grille, overlay, mesh
 The pair of temporary measures flanking an Opening, shown while it is being
 placed or moved and, past the release, for as long as it stays in the
 Selection — every Opening of the Selection shows its own, with no cardinality
-threshold, while a selected Wall stays silent for the Openings it carries.
+threshold, while a selected Wall stays silent for the Openings it carries. A
+selected Room is no exception: it holds its Openings, so all of them flank
+themselves at once.
 Each is the clearance left to one end of the opening's Rail: from the near
 edge of the opening to the mitered Face corner at a junction, the body
 overhang at a free end, or the near edge of the neighbouring opening that

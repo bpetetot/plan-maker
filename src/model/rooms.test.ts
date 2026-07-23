@@ -7,6 +7,8 @@ import {
   reconcileRoomLabels,
   roomAt,
   roomContains,
+  roomOpenings,
+  roomWallIds,
   wallMeasures,
 } from './rooms';
 import type { Plan } from './types';
@@ -262,6 +264,17 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
     const { outer } = byArea(plan);
     expect(roomContains(outer, outer.anchor.x, outer.anchor.y)).toBe(true);
     expect(Math.hypot(outer.anchor.x - 200, outer.anchor.y - 200)).toBeGreaterThan(50);
+  });
+
+  it('counts the island loop in the outer room boundary', () => {
+    const { plan, islandWallIds } = nestedPlan();
+    const { inner, outer } = byArea(plan);
+    const boundary = roomWallIds(plan, outer)!;
+    expect(boundary).toHaveLength(8);
+    for (const id of islandWallIds) expect(boundary).toContain(id);
+    // the island's own boundary stays its four walls: a hole is not a hole of
+    // itself
+    expect(roomWallIds(plan, inner)).toHaveLength(4);
   });
 
   it('treats an island wall as a party wall between the two rooms', () => {
@@ -620,5 +633,82 @@ describe('reconcileRoomLabels — placement state', () => {
     });
     const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
     expect(reconcileRoomLabels(plan, after)).toBe(after);
+  });
+});
+
+// A boundary tally, not a dwelling inventory: a party wall belongs to both
+// rooms it separates, so its opening counts for both (ADR 0014).
+describe('roomOpenings', () => {
+  it('gives the openings its boundary walls carry, and no other', () => {
+    let ids = { door: '', stray: '' };
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const away = b.wall(b.point(0, 900), b.point(400, 900));
+      ids = { door: b.opening(top, 'door', 200).id, stray: b.opening(away, 'window', 200).id };
+    });
+    const room = detectRooms(plan)[0];
+    expect(roomOpenings(plan, room).map((o) => o.id)).toEqual([ids.door]);
+    expect(roomOpenings(plan, room).map((o) => o.id)).not.toContain(ids.stray);
+  });
+
+  it('counts a party wall opening for both rooms it separates', () => {
+    let door = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const f = b.point(800, 0);
+      const g = b.point(800, 400);
+      b.wall(a, c);
+      const party = b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(c, f);
+      b.wall(f, g);
+      b.wall(g, d);
+      door = b.opening(party, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    expect(roomOpenings(plan, roomAt(rooms, 200, 200)!).map((o) => o.id)).toEqual([door]);
+    expect(roomOpenings(plan, roomAt(rooms, 600, 200)!).map((o) => o.id)).toEqual([door]);
+  });
+
+  it('counts an island wall opening in the containing room', () => {
+    let door = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const i1 = b.point(100, 100);
+      const i2 = b.point(250, 100);
+      const i3 = b.point(250, 200);
+      const i4 = b.point(100, 200);
+      const top = b.wall(i1, i2);
+      b.wall(i2, i3);
+      b.wall(i3, i4);
+      b.wall(i4, i1);
+      door = b.opening(top, 'door', 75).id;
+    });
+    const rooms = detectRooms(plan);
+    const outer = roomAt(rooms, 350, 350)!;
+    expect(roomOpenings(plan, outer).map((o) => o.id)).toEqual([door]);
+  });
+
+  it('gives nothing for a room without openings', () => {
+    const plan = squareRoomPlan();
+    expect(roomOpenings(plan, detectRooms(plan)[0])).toEqual([]);
   });
 });

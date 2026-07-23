@@ -116,6 +116,7 @@ export const SHORTCUT_ACTIONS = Object.keys(SHORTCUTS) as ShortcutAction[];
 // gesture beside a shortcut instead of in the tail.
 const GESTURES: { gesture: string; sections: HelpLabels; after?: ShortcutAction }[] = [
   { gesture: 'Right-click', sections: { tools: 'Back to the Select tool', editor: 'End the wall chain' } },
+  { gesture: 'Click a room', sections: { editor: 'Select its walls' } },
   { gesture: 'Drag a box', sections: { editor: 'Select everything it covers' } },
   { gesture: 'Shift + click', sections: { editor: 'Add to the selection' } },
   { gesture: 'Double-click', sections: { editor: 'Name a room, or end the wall chain' } },

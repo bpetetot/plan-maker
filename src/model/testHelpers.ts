@@ -45,6 +45,17 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
   return plan;
 }
 
+// 90 cm at the middle of a 4 m wall: clear of both ends, on every fixture here.
+export const doorOn = (wallId: string, id = 'o1'): Opening => ({
+  id,
+  wallId,
+  type: 'door',
+  offset: 200,
+  width: 90,
+  hingeSide: 'start',
+  swing: 'in',
+});
+
 // 4×4 m axis-to-axis, walls 10 cm: interior faces 3,90 m, exterior 4,10 m.
 export function squareRoomPlan(): Plan {
   return buildPlan((b) => {
@@ -56,6 +67,47 @@ export function squareRoomPlan(): Plan {
     b.wall(p2, p3);
     b.wall(p3, p4);
     b.wall(p4, p1);
+  });
+}
+
+// 400×400 room holed by a disconnected 150×100 island at (100,100).
+export function nestedRoomPlan(): Plan {
+  return buildPlan((b) => {
+    const a = b.point(0, 0);
+    const c = b.point(400, 0);
+    const d = b.point(400, 400);
+    const e = b.point(0, 400);
+    b.wall(a, c);
+    b.wall(c, d);
+    b.wall(d, e);
+    b.wall(e, a);
+    const i1 = b.point(100, 100);
+    const i2 = b.point(250, 100);
+    const i3 = b.point(250, 200);
+    const i4 = b.point(100, 200);
+    b.wall(i1, i2);
+    b.wall(i2, i3);
+    b.wall(i3, i4);
+    b.wall(i4, i1);
+  });
+}
+
+// Two 400×400 rooms sharing the wall at x=400.
+export function twoRoomPlan(): Plan {
+  return buildPlan((b) => {
+    const a = b.point(0, 0);
+    const c = b.point(400, 0);
+    const d = b.point(400, 400);
+    const e = b.point(0, 400);
+    const f = b.point(800, 0);
+    const g = b.point(800, 400);
+    b.wall(a, c);
+    b.wall(c, d);
+    b.wall(d, e);
+    b.wall(e, a);
+    b.wall(c, f);
+    b.wall(f, g);
+    b.wall(g, d);
   });
 }
 

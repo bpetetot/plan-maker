@@ -1,10 +1,11 @@
 import { faceSpan, junctionPatches, wallOutline } from '../model/faces';
+import type { Vec } from '../model/geometry';
 import { wallLength, wallPoints } from '../model/geometry';
 import { formatArea, formatLength } from '../model/format';
 import { openingPlacement, openingRail } from '../model/openings';
 import type { Room } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
-import { roomAt } from '../model/rooms';
+import { roomAt, roomKey } from '../model/rooms';
 import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types';
 import type { Snap } from '../model/snap';
 
@@ -562,7 +563,7 @@ export function roomTextBlocks(rooms: Room[], labels: RoomLabel[]): RoomTextBloc
     const oldest = oldestByRoom.get(room);
     if (defaults.length === 0 && oldest) continue;
     blocks.push({
-      key: defaults[0]?.id ?? `room-${room.pointIds.join(':')}`,
+      key: defaults[0]?.id ?? `room-${roomKey(room)}`,
       x: room.anchor.x,
       y: room.anchor.y,
       labels: defaults,
@@ -580,6 +581,10 @@ export const BLOCK_LINE_HEIGHT = 13;
 // land on that line.
 export const blockNameSlots = (block: RoomTextBlock, editingKey?: string) =>
   block.labels.filter((label) => label.name || label.id === editingKey);
+
+/** Marks the blocks a click selects the room by, so the room tint can tell
+ *  them from the grab zones that outrank the room (ADR 0014). */
+export const ROOM_TEXT_HIT = 'room-text-hit';
 
 // Room labels are never selected; lines are dragged and edited directly
 // (CONTEXT.md: Selection). Only the area line is a Measure (CONTEXT.md).
@@ -608,7 +613,7 @@ export function RoomOverlay({
   ) => (
     <rect
       key={key}
-      className={className}
+      className={`${ROOM_TEXT_HIT} ${className}`}
       x={-50}
       y={y - 10}
       width={100}
@@ -656,6 +661,20 @@ export function RoomOverlay({
         );
       })}
     </g>
+  );
+}
+
+// Interaction chrome, not drawing (ADR 0005), so the export never prints it.
+// evenodd: an island's footprint is not this room's floor (CONTEXT.md: Room).
+export function RoomFill({ room, variant }: { room: Room; variant: 'hover' | 'selected' }) {
+  const loop = (points: Vec[]) => `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')} Z`;
+  return (
+    <path
+      className={`room-fill-${variant}`}
+      d={[room.polygon, ...room.holes].map(loop).join(' ')}
+      fillRule="evenodd"
+      pointerEvents="none"
+    />
   );
 }
 
