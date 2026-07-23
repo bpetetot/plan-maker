@@ -37,8 +37,8 @@ describe('zoom percentage indicator', () => {
   it('refreshes after a wheel zoom', async () => {
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
-    await wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 });
-    expect(zoomLabel()).toBe(pct(820 / 1.08, 620 / 1.08)); // 108%
+    await wheel(svg, { deltaY: -100, clientX: 400, clientY: 300, ctrlKey: true });
+    expect(zoomLabel()).toBe(pct(820 / 1.1, 620 / 1.1)); // 110%
   });
 
   it('refreshes after a single click on Fit to plan', async () => {

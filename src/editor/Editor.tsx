@@ -159,8 +159,9 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
 
 export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<Drag | null>(null);
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
-    useView(svgRef);
+    useView(svgRef, () => drag.current?.kind === 'pan');
   const plan = usePlanStore((s) => s.plan);
   const setPlan = usePlanStore((s) => s.setPlan);
   const planEpoch = usePlanStore((s) => s.planEpoch);
@@ -195,7 +196,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   } | null>(null);
   const editCancelled = useRef(false);
   const space = useSpaceHeld();
-  const drag = useRef<Drag | null>(null);
   // Tracked, not sampled: the snap toggle shows the *effective* state, so Alt
   // transitions must re-render. The keyup after an Alt+Tab never arrives.
   const altHeld = useKeyHold('Alt');

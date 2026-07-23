@@ -127,7 +127,9 @@ const GESTURES: { gesture: string; sections: HelpLabels; after?: ShortcutAction 
   { gesture: 'Shift + click', sections: { editor: 'Add to the selection' } },
   { gesture: 'Double-click', sections: { editor: 'Name a room, or end the wall chain' } },
   { gesture: 'Alt', sections: { editor: 'Invert snap while held' } },
-  { gesture: 'Scroll', sections: { view: 'Zoom in and out' }, after: 'zoomOut' },
+  { gesture: 'Ctrl/Cmd + scroll', sections: { view: 'Zoom in and out' }, after: 'zoomOut' },
+  { gesture: 'Scroll', sections: { view: 'Pan the view top-down' } },
+  { gesture: 'Shift + scroll', sections: { view: 'Pan the view sideways' } },
   { gesture: 'Space + drag', sections: { view: 'Pan the view' } },
   { gesture: 'Middle-click + drag', sections: { view: 'Pan the view' } },
 ];
