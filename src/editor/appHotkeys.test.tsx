@@ -1,4 +1,4 @@
-// ADR 0012. Mod is dispatched as Ctrl: the suite runs Chromium on Linux.
+// ADR 0012. Mod is dispatched as Ctrl: the harness pins platform to linux.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
@@ -186,6 +186,22 @@ describe('the menu actions', () => {
 
     await key('Delete', { ctrlKey: true });
     expect(spy).not.toHaveBeenCalled();
+    await unmount();
+  });
+});
+
+// The suite pins platform to linux so Mod is Ctrl everywhere; this one pins mac
+// to prove the same registry resolves Mod to Cmd, locking the library's contract.
+describe('on a mac', () => {
+  it('resolves Mod to Cmd, not Ctrl', async () => {
+    const undo = vi.fn();
+    const { unmount } = await render(<EditorWithHotkeys actions={{ undo }} platform="mac" />);
+
+    await key('z', { ctrlKey: true });
+    expect(undo).not.toHaveBeenCalled();
+
+    await key('z', { metaKey: true });
+    expect(undo).toHaveBeenCalledOnce();
     await unmount();
   });
 });

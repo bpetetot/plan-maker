@@ -49,6 +49,9 @@ idb-keyval (autosave), vite-plugin-pwa.
   Headless UI panel applies to Escape. When a test turns on *where* the focus
   is, assert it (`expect(document.activeElement).toBe(…)`) rather than assume
   it — a keystroke sent from the wrong element passes for the wrong reason.
+- `EditorWithHotkeys` pins the hotkey platform to `linux`, so `Mod` resolves to
+  `Ctrl` wherever the suite runs: for a `Mod` shortcut dispatch `{ ctrlKey: true }`,
+  never `{ metaKey: true }`. Pass `platform="mac"` only to exercise Cmd on purpose.
 - Never construct an event object directly — always a `src/editor/testKit.ts`
   helper (`pointer`, `mouse`, `key`, `keyUp`, `wheel`, `blur`). They carry the mandatory
   init (`pointerId: 1`, `bubbles`), and they `await` React's commit, which
