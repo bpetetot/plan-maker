@@ -87,6 +87,7 @@ shred both.
   door is reached in one gesture more.
 - The Tool panel counts the room's Walls, Doors and Windows. A room is the one
   Selection whose counts are read from the room and not from the refs — it is
-  an object with a boundary, where every other Selection is only its own set —
-  so they state what the Delete below them takes even after a Shift-click has
-  unlit one of the openings. Any other Selection counts what is lit.
+  an object with a boundary, where every other Selection is only its own set,
+  even after a Shift-click has unlit one of the openings. Any other Selection
+  counts what is lit. The counts describe the room, not what Delete removes:
+  Delete keeps the walls shared with other rooms (ADR 0015).

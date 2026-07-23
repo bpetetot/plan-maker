@@ -188,14 +188,19 @@ export function clampToRoom(point: Vec, room: Room): Vec {
   return roomContains(room, out.x, out.y) ? out : room.anchor;
 }
 
-// An island's footprint is part of the room it holes (CONTEXT.md: Room), so
-// its loop is boundary too: a room moves whole or breaks its own geometry.
-export function roomWallIds(plan: Plan, room: Room): string[] | null {
+function wallIdByPair(plan: Plan): Map<string, string> {
   const byPair = new Map<string, string>();
   for (const wall of Object.values(plan.walls)) {
     byPair.set(`${wall.startPointId}|${wall.endPointId}`, wall.id);
     byPair.set(`${wall.endPointId}|${wall.startPointId}`, wall.id);
   }
+  return byPair;
+}
+
+// An island's footprint is part of the room it holes (CONTEXT.md: Room), so
+// its loop is boundary too: a room moves whole or breaks its own geometry.
+export function roomWallIds(plan: Plan, room: Room): string[] | null {
+  const byPair = wallIdByPair(plan);
   const ids: string[] = [];
   for (const loop of [room.pointIds, ...room.holeLoops]) {
     for (let i = 0; i < loop.length; i++) {
@@ -203,6 +208,19 @@ export function roomWallIds(plan: Plan, room: Room): string[] | null {
       if (!id) return null;
       ids.push(id);
     }
+  }
+  return ids;
+}
+
+// The walls on a room's outer loop only — the edges whose removal opens the
+// room. Hole-loop walls merely subtract area, so removing one never destroys
+// the room (ADR 0015); they are excluded.
+export function roomOutlineWallIds(plan: Plan, room: Room): string[] {
+  const byPair = wallIdByPair(plan);
+  const ids: string[] = [];
+  for (let i = 0; i < room.pointIds.length; i++) {
+    const id = byPair.get(`${room.pointIds[i]}|${room.pointIds[(i + 1) % room.pointIds.length]}`);
+    if (id) ids.push(id);
   }
   return ids;
 }

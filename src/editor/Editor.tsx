@@ -43,6 +43,7 @@ import {
   referencePoint,
   roomSelection,
   selectedRoom,
+  selectionDeletion,
   toggleRef,
   translateElements,
 } from '../model/selection';
@@ -246,7 +247,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const deleteSelection = useCallback(
     (selection: ElementRef[]) => {
       if (selection.length === 0) return;
-      setPlan((p) => deleteElements(p, selection));
+      // A room keeps other rooms' walls (ADR 0015); rooms read from the latest
+      // plan, not a render-time closure.
+      setPlan((p) => deleteElements(p, selectionDeletion(p, detectRooms(p), selection)));
       setSel([]);
     },
     [setPlan],

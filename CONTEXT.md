@@ -64,6 +64,14 @@ belongs to it, so a room moves whole or it breaks its own geometry. Because a
 room is derived, its loop of Points is the only identity it has — it lasts
 exactly as long as that loop does, and a split or a merge ends it, which is why
 a room is read from a Selection rather than held in one (ADR 0014).
+Deleting a room removes its own walls and openings but keeps every wall that is
+the outline of another room — a party wall, or the wall of an island it
+contains — so no neighbouring room is broken: the kept wall is exactly the one
+whose removal would destroy another room, never merely shrink it. Deleting an
+island therefore removes its walls and lets the containing room reclaim the
+floor, while deleting the container keeps the island's walls and leaves it
+standing. A room whose every wall is another room's outline has nothing of its
+own to delete, so deleting it does nothing (ADR 0015).
 _Avoid_: Zone, area, space
 
 **Room label**:
@@ -178,11 +186,12 @@ it is. A Selection read as a Room takes that room's name as its title — or
 "Room" while it has none — and states its Room area beside those counts;
 nothing else: retyping every boundary wall is a wall action, not something a
 room states about itself. A room inventories its boundary: its counts are read
-from the room, never from the set of refs, so they state what the Delete
-beneath them takes — a boundary tally, island walls included, where a party
-wall's door counts for both rooms, not a dwelling inventory — and a nil count
-reads zero rather than vanishing, a room having no window being a fact about
-the room. Every other Selection counts what is lit and nothing more — its own
+from the room, never from the set of refs — a boundary tally of what the room
+is, island walls included, where a party wall's door counts for both rooms, not
+a dwelling inventory. They describe the room, not what the Delete beneath them
+takes: Delete keeps the walls shared with other rooms (ADR 0015), so on a room
+that touches its neighbours it removes fewer than it counts. A nil count reads
+zero rather than vanishing, a room having no window being a fact about the room. Every other Selection counts what is lit and nothing more — its own
 refs, so a Shift-click that puts an opening out lowers the count — and lists
 only what it holds: a row with nothing to count does not appear. Thickness is
 offered on a single selected wall and nowhere else: no Selection retypes

@@ -53,14 +53,18 @@ describe('clicking a room', () => {
     expect(panel()).toBeNull();
   });
 
-  it('takes the island walls with the room they hole', async () => {
+  // The container's own walls go; the island's four are another room's
+  // outline, so they stay and the island keeps standing (ADR 0015).
+  it('keeps the island standing when the room it holes is deleted', async () => {
     const { svg } = await setup(nestedRoomPlan());
     await clickAt(svg, 330, 330);
     await key('Delete');
-    expect(walls()).toHaveLength(0);
+    expect(walls()).toHaveLength(4);
   });
 
-  it('reads the island alone when the click lands inside it', async () => {
+  // Deleting the island removes its walls and lets the room reclaim the floor;
+  // the room's own four outline walls stay (ADR 0015).
+  it('removes the island alone when the click lands inside it', async () => {
     const { svg } = await setup(nestedRoomPlan());
     await clickAt(svg, 175, 150);
     await key('Delete');
@@ -80,7 +84,9 @@ describe('clicking a room', () => {
     await clickAt(svg, 200, 200);
     await clickAt(svg, 200, 200, { shiftKey: true });
     await key('Delete');
-    expect(walls()).toHaveLength(3);
+    // left's three own walls go; the shared wall stays with the right room,
+    // which keeps all four of its own (ADR 0015)
+    expect(walls()).toHaveLength(4);
   });
 });
 
@@ -125,8 +131,8 @@ describe('the tool panel reading a room', () => {
     expect(rowValue('Walls')).toBe('4');
   });
 
-  // The boundary is the outline and the islands it holes, which is exactly
-  // what the Delete beneath the count takes.
+  // The boundary is the outline and the islands it holes: the count states the
+  // room, not what Delete takes (ADR 0015).
   it('counts the island walls it is bound to move with', async () => {
     const { svg } = await setup(nestedRoomPlan());
     await clickAt(svg, 330, 330);

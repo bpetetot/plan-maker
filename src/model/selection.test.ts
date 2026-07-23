@@ -7,9 +7,11 @@ import {
   refKey,
   referencePoint,
   roomContents,
+  roomDeletion,
   roomSelection,
   selectedRoom,
   selectionContents,
+  selectionDeletion,
   toggleRef,
   translateElements,
 } from './selection';
@@ -559,5 +561,145 @@ describe('contents', () => {
     const refs = toggleRef(roomSelection(plan, room)!, openingRef('d1'));
     expect(roomContents(plan, room).doors).toBe(1);
     expect(selectionContents(plan, refs).doors).toBe(0);
+  });
+});
+
+// Center cell (400,400)-(800,800) ringed by four rooms, one per edge: every
+// center wall is a neighbour's outline, so the center has nothing of its own.
+function gridCenterPlan() {
+  return buildPlan((b) => {
+    const a = b.point(400, 400);
+    const c = b.point(800, 400);
+    const d = b.point(800, 800);
+    const e = b.point(400, 800);
+    b.wall(a, c);
+    b.wall(c, d);
+    b.wall(d, e);
+    b.wall(e, a);
+    const n1 = b.point(400, 0);
+    const n2 = b.point(800, 0);
+    b.wall(a, n1);
+    b.wall(n1, n2);
+    b.wall(n2, c);
+    const e1 = b.point(1200, 400);
+    const e2 = b.point(1200, 800);
+    b.wall(c, e1);
+    b.wall(e1, e2);
+    b.wall(e2, d);
+    const s1 = b.point(800, 1200);
+    const s2 = b.point(400, 1200);
+    b.wall(d, s1);
+    b.wall(s1, s2);
+    b.wall(s2, e);
+    const w1 = b.point(0, 800);
+    const w2 = b.point(0, 400);
+    b.wall(e, w1);
+    b.wall(w1, w2);
+    b.wall(w2, a);
+  });
+}
+
+// Deleting a room keeps every wall that is another room's outline, so no
+// neighbour is broken (ADR 0015).
+describe('roomDeletion', () => {
+  it('takes the whole boundary of a standalone room', () => {
+    const plan = squareRoomPlan();
+    const rooms = detectRooms(plan);
+    const del = new Set(roomDeletion(plan, rooms, rooms[0]).map((r) => r.id));
+    expect(del).toEqual(new Set(Object.keys(plan.walls)));
+  });
+
+  it('keeps the party wall shared with a neighbour', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const right = roomAt(rooms, 600, 200)!;
+    const shared = roomWallIds(plan, left)!.find((id) => roomWallIds(plan, right)!.includes(id))!;
+    const del = roomDeletion(plan, rooms, left).map((r) => r.id);
+    expect(del).not.toContain(shared);
+    expect(del).toHaveLength(3);
+  });
+
+  it('leaves the neighbour standing after the delete', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const next = deleteElements(plan, roomDeletion(plan, rooms, left));
+    const after = detectRooms(next);
+    expect(roomAt(after, 600, 200)).not.toBeNull();
+    expect(roomAt(after, 200, 200)).toBeNull();
+  });
+
+  it('keeps the island walls when the container is deleted', () => {
+    const plan = nestedRoomPlan();
+    const rooms = detectRooms(plan);
+    const container = roomAt(rooms, 350, 350)!;
+    const next = deleteElements(plan, roomDeletion(plan, rooms, container));
+    const after = detectRooms(next);
+    expect(roomAt(after, 175, 150)).not.toBeNull();
+    expect(roomAt(after, 350, 350)).toBeNull();
+  });
+
+  it('removes the island walls when the island is deleted, and the room reclaims its floor', () => {
+    const plan = nestedRoomPlan();
+    const rooms = detectRooms(plan);
+    const island = roomAt(rooms, 175, 150)!;
+    const before = roomAt(rooms, 350, 350)!;
+    const next = deleteElements(plan, roomDeletion(plan, rooms, island));
+    const after = detectRooms(next);
+    expect(after).toHaveLength(1);
+    expect(roomAt(after, 175, 150)!.areaCm2).toBeGreaterThan(before.areaCm2);
+  });
+
+  it('deletes nothing from a room whose every wall is a neighbour outline', () => {
+    const plan = gridCenterPlan();
+    const rooms = detectRooms(plan);
+    const center = roomAt(rooms, 600, 600)!;
+    expect(roomDeletion(plan, rooms, center)).toEqual([]);
+  });
+});
+
+describe('selectionDeletion', () => {
+  it('reduces a room selection to the walls the room may delete', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = roomSelection(plan, left)!;
+    expect(selectionDeletion(plan, rooms, sel)).toEqual(roomDeletion(plan, rooms, left));
+  });
+
+  // Scope: only a room reading is narrowed — a lone party wall stays deletable.
+  it('deletes any other selection exactly as it holds', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const right = roomAt(rooms, 600, 200)!;
+    const shared = roomWallIds(plan, left)!.find((id) => roomWallIds(plan, right)!.includes(id))!;
+    const sel = [wallRef(shared)];
+    expect(selectionDeletion(plan, rooms, sel)).toBe(sel);
+  });
+
+  // Openings need no rule of their own: they die with a removed wall and live
+  // with a kept one (ADR 0015).
+  it('keeps a door on a kept party wall and drops a window on a removed wall', () => {
+    const plan = twoRoomPlan();
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const right = roomAt(rooms, 600, 200)!;
+    const shared = roomWallIds(plan, left)!.find((id) => roomWallIds(plan, right)!.includes(id))!;
+    const own = roomWallIds(plan, left)!.find((id) => id !== shared)!;
+    plan.openings.od = {
+      id: 'od',
+      wallId: shared,
+      type: 'door',
+      offset: 200,
+      width: 90,
+      hingeSide: 'start',
+      swing: 'in',
+    };
+    plan.openings.ow = { id: 'ow', wallId: own, type: 'window', offset: 200, width: 90 };
+    const next = deleteElements(plan, selectionDeletion(plan, detectRooms(plan), roomSelection(plan, left)!));
+    expect(next.openings.od).toBeDefined();
+    expect(next.openings.ow).toBeUndefined();
   });
 });
