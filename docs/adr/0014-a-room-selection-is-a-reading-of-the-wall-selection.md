@@ -14,11 +14,11 @@ selection of the room's walls plus some of their openings is behaviourally the
 same selection, so it reads as the same room — otherwise the promise above
 would fail for every room that has a door, which is every real room.
 
-Clicking a room therefore takes those openings too. The tolerance above made
-the two paths read alike; taking the openings makes them *be* alike, down to
-the set of refs — and the click stops leaving a room's doors unlit while a
-Delete carries them off. The reading stays tolerant all the same: the openings
-still do not vote, so a Shift-click that puts one out leaves the room a room.
+Clicking a room therefore takes those openings too. Tolerating them makes the
+two paths *read* alike; taking them makes the two paths *be* alike, down to the
+set of refs — and the click stops leaving a room's doors unlit while a Delete
+carries them off. The reading stays tolerant all the same: the openings still
+do not vote, so a Shift-click that puts one out leaves the room a room.
 A door in a party wall is taken by both rooms it separates: it pierces the
 whole thickness and has no side, and Delete already treats it that way.
 
@@ -74,8 +74,8 @@ shred both.
   only what a click would actually take — a grab zone outranks the room, the
   block the room is clicked by does not.
 - Because the reading is a state, the Tool panel's facets follow it wherever it
-  lands: a marquee that reads as a room offers no grouped Thickness either.
-  Two paths to one Selection cannot offer different powers.
+  lands: two paths to one Selection cannot offer different powers, so nothing
+  the panel offers may be conditioned on how the Selection was made.
 - A room's openings are in the Selection, so each shows its Placement
   dimensions: selecting a room with four doors posts eight clearance chips at
   once. The rule has no cardinality threshold and gains none here — the
@@ -85,6 +85,8 @@ shred both.
   room translates the room, exactly as a drag on one of its walls does. A click
   without travel still demotes the Selection to that door, which is how the
   door is reached in one gesture more.
-- The Tool panel counts the room's Doors and Windows. The count is read from
-  the room, not from the refs, so it states what the Delete below it takes even
-  after a Shift-click has unlit one of them.
+- The Tool panel counts the room's Walls, Doors and Windows. A room is the one
+  Selection whose counts are read from the room and not from the refs — it is
+  an object with a boundary, where every other Selection is only its own set —
+  so they state what the Delete below them takes even after a Shift-click has
+  unlit one of the openings. Any other Selection counts what is lit.
