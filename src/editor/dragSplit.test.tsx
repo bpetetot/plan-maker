@@ -50,7 +50,7 @@ describe('point drag ending on a wall body', () => {
   it('splits the host wall at the dropped point (T junction), in one history entry', async () => {
     const { svg } = await setup();
     await marqueeSelect(svg, { x: 150, y: 50 }, { x: 250, y: 350 });
-    const handles = svg.querySelectorAll('circle');
+    const handles = svg.querySelectorAll('.point-handle');
     expect(handles).toHaveLength(2);
     // drag c (200,100) onto w1's body at (200,0)
     await pointer(handles[0], 'pointerdown', { button: 0, ...clientAt(svg, 200, 100) });

@@ -706,26 +706,56 @@ export function SnapMarker({ snap }: { snap: Snap | null }) {
   );
 }
 
+// Screen px: the ring stays small and constant at every zoom, while a wider
+// invisible disc catches the pointer (CONTEXT.md: Grab zone).
+const HANDLE_RING_PX = 7;
+const HANDLE_GRAB_PX = 14;
+
 export function Handle({
   x,
   y,
+  pxPerCm,
   onPointerDown,
 }: {
   x: number;
   y: number;
+  pxPerCm: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
+  const r = HANDLE_RING_PX / pxPerCm;
   return (
-    <circle
-      cx={x}
-      cy={y}
-      r={8}
-      fill="var(--sheet)"
-      stroke={COLORS.wallSelected}
-      strokeWidth={2.5}
-      style={{ cursor: 'grab' }}
-      onPointerDown={onPointerDown}
-    />
+    <g>
+      {/* wall-colored edge defines the sheet ring where it overhangs the body */}
+      <circle
+        cx={x}
+        cy={y}
+        r={r}
+        fill="none"
+        stroke="var(--wall)"
+        strokeWidth={5}
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
+      <circle
+        cx={x}
+        cy={y}
+        r={r}
+        fill="none"
+        stroke="var(--sheet)"
+        strokeWidth={3}
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
+      <circle
+        className="point-handle"
+        cx={x}
+        cy={y}
+        r={HANDLE_GRAB_PX / pxPerCm}
+        fill="transparent"
+        style={{ cursor: 'grab' }}
+        onPointerDown={onPointerDown}
+      />
+    </g>
   );
 }
 

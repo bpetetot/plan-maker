@@ -49,7 +49,7 @@ describe('point drag ending on another point', () => {
   it('merges the dragged point into the stationary one, in one history entry', async () => {
     const { svg } = await setup();
     await marqueeSelect(svg, { x: 450, y: 150 }, { x: 550, y: 550 });
-    const handles = svg.querySelectorAll('circle');
+    const handles = svg.querySelectorAll('.point-handle');
     expect(handles).toHaveLength(2);
     // drag c (500,200) onto b (500,100)
     await pointer(handles[0], 'pointerdown', { button: 0, ...clientAt(svg, 500, 200) });
