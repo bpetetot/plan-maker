@@ -8,7 +8,9 @@ import {
   openingsOnWalls,
   reconcileRoomLabels,
   roomAt,
+  roomKey,
   roomOpenings,
+  roomOutlineWallIds,
   roomWallIds,
 } from './rooms';
 import type { Opening, Plan, Point } from './types';
@@ -129,6 +131,28 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
     else next = deleteOpening(next, ref.id);
   }
   return reconcileRoomLabels(plan, next);
+}
+
+/** The walls Delete takes for a Room: its boundary minus every wall that is
+ *  another room's outer-loop outline, so no neighbour is broken (ADR 0015).
+ *  Openings ride along with their walls, so only walls are listed. */
+export function roomDeletion(plan: Plan, rooms: Room[], room: Room): ElementRef[] {
+  const wallIds = roomWallIds(plan, room);
+  if (!wallIds) return [];
+  const key = roomKey(room);
+  const foreignOutline = new Set<string>();
+  for (const other of rooms) {
+    if (roomKey(other) === key) continue;
+    for (const id of roomOutlineWallIds(plan, other)) foreignOutline.add(id);
+  }
+  return wallIds.filter((id) => !foreignOutline.has(id)).map((id): ElementRef => ({ type: 'wall', id }));
+}
+
+/** What Delete removes for a Selection: a Room keeps other rooms' walls
+ *  (ADR 0015); any other Selection deletes exactly what it holds. */
+export function selectionDeletion(plan: Plan, rooms: Room[], refs: ElementRef[]): ElementRef[] {
+  const room = selectedRoom(plan, rooms, refs);
+  return room ? roomDeletion(plan, rooms, room) : refs;
 }
 
 // Ties break on endpoint `a` then lowest id: selection order is an
