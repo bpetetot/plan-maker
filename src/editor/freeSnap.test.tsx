@@ -84,7 +84,7 @@ describe('dragging a point during a free move', () => {
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 150, 250) });
     await pointer(svg, 'pointermove', clientAt(svg, 450, 350));
     await pointer(svg, 'pointerup');
-    const handles = svg.querySelectorAll('circle');
+    const handles = svg.querySelectorAll('.point-handle');
     expect(handles).toHaveLength(2);
 
     await holdAlt();

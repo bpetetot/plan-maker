@@ -83,9 +83,9 @@ import { useSpaceHeld, useView } from './useView';
 
 type Drag =
   | { kind: 'pan'; x: number; y: number }
-  // `orig`: plan at drag start. Labels reconcile against it at gesture end,
-  // never on intermediate states.
-  | { kind: 'point'; id: string; orig: Plan }
+  // `orig`: plan at drag start (labels reconcile against it at gesture end).
+  // `grabDelta` fixes the grab point so the handle never recenters on the cursor.
+  | { kind: 'point'; id: string; orig: Plan; grabDelta: Vec }
   | {
       kind: 'group';
       refs: ElementRef[];
@@ -389,7 +389,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         panByPx(e.clientX - d.x, e.clientY - d.y);
         drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
       } else if (d.kind === 'point') {
-        const s = snapPoint(plan, c.x, c.y, {
+        const s = snapPoint(plan, c.x + d.grabDelta.x, c.y + d.grabDelta.y, {
           tolerance: tolerance(),
           exclude: new Set([d.id]),
           free,
@@ -790,10 +790,17 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               key={p.id}
               x={p.x}
               y={p.y}
+              pxPerCm={zoomScale}
               onPointerDown={(e) => {
                 if (e.button !== 0) return;
                 e.stopPropagation();
-                startPlanDrag({ kind: 'point', id: p.id, orig: plan });
+                const c = toPlan(e.clientX, e.clientY);
+                startPlanDrag({
+                  kind: 'point',
+                  id: p.id,
+                  orig: plan,
+                  grabDelta: { x: p.x - c.x, y: p.y - c.y },
+                });
                 svgRef.current!.setPointerCapture(e.pointerId);
               }}
             />
@@ -821,7 +828,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         )}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
         {tool === 'wall' && <SnapMarker snap={snap} />}
-        {drag.current?.kind === 'point' && <SnapMarker snap={snap} />}
         {editing && (
           <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input

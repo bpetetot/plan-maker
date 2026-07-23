@@ -57,7 +57,7 @@ describe('label reconciliation at the end of a wall gesture', () => {
   it('snaps the label to the room centroid when a point drag deforms the room away from it', async () => {
     const { svg } = await setup();
     await marqueeSelect(svg, { x: 450, y: 50 }, { x: 550, y: 550 });
-    const handles = svg.querySelectorAll('circle');
+    const handles = svg.querySelectorAll('.point-handle');
     expect(handles).toHaveLength(2);
     // drag the corner (500,500) to (300,300): the label at (480,250) leaves the room
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 500) });

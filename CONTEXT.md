@@ -205,9 +205,11 @@ whatever the element's thickness and the zoom: a thick wall never grabs the
 pointer far from its visible body, and a thin wall stays grabbable when
 zoomed out. Grabbing an element by its grab zone fixes the grab point: for
 the whole drag that point stays under the cursor — the element never
-recenters on the pointer, and a clamp never re-bases the grab point. Point
-handles follow the other rule: Snap decides the position, the cursor is the
-aim. Pure editor behavior: never part of the plan, never exported.
+recenters on the pointer, and a clamp never re-bases the grab point. A Point
+handle fixes the grab point too — it never recenters on the cursor — and from
+that aimed position Snap decides where the Point lands; its visible marker is a
+small ring of constant on-screen size, sat inside a wider invisible grab disc.
+Pure editor behavior: never part of the plan, never exported.
 _Avoid_: Hit zone, hit target, hover area
 
 **Snap**:

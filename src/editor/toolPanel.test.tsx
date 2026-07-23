@@ -80,7 +80,7 @@ describe('tool panel on a selected wall', () => {
     const { svg } = await setup(standalonePlan());
     await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 });
     expect(rowValue('Length')).toBe('4,10 m');
-    const handles = svg.querySelectorAll('circle');
+    const handles = svg.querySelectorAll('.point-handle');
     await pointer(handles[handles.length - 1], 'pointerdown', { button: 0, ...clientAt(svg, 400, 0) });
     await pointer(svg, 'pointermove', clientAt(svg, 500, 0));
     expect(rowValue('Length')).toBe('5,10 m');
