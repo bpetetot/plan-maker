@@ -155,7 +155,9 @@ that is exactly the boundary walls of a detected Room is that Room, and the
 editor names and tints it accordingly (ADR 0014). Selecting a Room takes its
 boundary walls *and* every Opening those walls carry — the set a marquee over
 the room already produced, so clicking a room's interior, clicking its text
-block, and marqueeing its walls all land on one and the same Selection. The
+block, and marqueeing its walls all land on one and the same Selection. Taking
+everything is one more of them: it holds every Wall and every Opening the plan
+has, so on a plan that is one closed Room it reads as that Room. The
 reading is a state, not a memory of the gesture that produced it, and the
 Openings do not vote: the room still reads as itself when a Shift-click puts
 one of them out. A door in a party wall belongs to both rooms it separates —

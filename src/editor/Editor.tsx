@@ -35,6 +35,7 @@ import type { Room } from '../model/rooms';
 import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
+  allElements,
   deleteElements,
   elementsInRect,
   isSelected,
@@ -131,6 +132,7 @@ const pointSnap = (p: Plan, id: string): Snap => ({
  *  move the editor's insides into its parent. Read through a ref, never stale. */
 export interface EditorCommands {
   cancel: () => void;
+  selectAll: () => void;
   deleteSelection: () => void;
   selectTool: (tool: Tool) => void;
   toggleSnap: () => void;
@@ -144,6 +146,7 @@ export interface EditorCommands {
 /** Shared so App and test harnesses reach the editor the same way. */
 export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => ({
   cancel: () => ref.current?.cancel(),
+  selectAll: () => ref.current?.selectAll(),
   deleteSelection: () => ref.current?.deleteSelection(),
   selectTool: (tool: Tool) => ref.current?.selectTool(tool),
   toggleSnap: () => ref.current?.toggleSnap(),
@@ -269,6 +272,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       if (chain) setChain(null);
       else if (sel.length > 0) setSel([]);
       else switchTool('select');
+    },
+    // Through switchTool: a Selection only exists under the Select tool.
+    selectAll: () => {
+      switchTool('select');
+      setSel(allElements(plan));
     },
     deleteSelection: () => deleteSelection(sel),
     selectTool: switchTool,

@@ -32,6 +32,15 @@ export function toggleRef(selection: ElementRef[], ref: ElementRef): ElementRef[
   return isSelected(selection, ref) ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref];
 }
 
+/** Everything a Selection can hold: every Wall and every Opening the plan has
+ *  (CONTEXT.md: Selection). */
+export function allElements(plan: Plan): ElementRef[] {
+  return [
+    ...Object.keys(plan.walls).map((id): ElementRef => ({ type: 'wall', id })),
+    ...Object.keys(plan.openings).map((id): ElementRef => ({ type: 'opening', id })),
+  ];
+}
+
 // Marquee capture: containment, not intersection. Wall thickness ignored.
 export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
   const minX = Math.min(a.x, b.x);

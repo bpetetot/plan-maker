@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allElements,
   deleteElements,
   elementsInRect,
   isSelected,
@@ -14,6 +15,7 @@ import {
 } from './selection';
 import { detectRooms, roomAt, roomWallIds } from './rooms';
 import { buildPlan, doorOn, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from './testHelpers';
+import { emptyPlan } from './types';
 import type { ElementRef } from './selection';
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
@@ -86,6 +88,28 @@ describe('elementsInRect', () => {
     });
     const refs = elementsInRect(plan, { x: 0, y: 0 }, { x: 100, y: 100 });
     expect(refs).toEqual([]);
+  });
+});
+
+describe('allElements', () => {
+  it('takes every wall and every opening the plan holds', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const w1 = b.wall(a, c);
+      const w2 = b.wall(c, b.point(400, 400));
+      b.opening(w1, 'door', 200);
+      b.opening(w2, 'window', 200);
+    });
+    const expected = [
+      ...Object.keys(plan.walls).map((id) => `wall:${id}`),
+      ...Object.keys(plan.openings).map((id) => `opening:${id}`),
+    ];
+    expect(allElements(plan).map(refKey).sort()).toEqual(expected.sort());
+  });
+
+  it('holds nothing on an empty plan', () => {
+    expect(allElements(emptyPlan())).toEqual([]);
   });
 });
 

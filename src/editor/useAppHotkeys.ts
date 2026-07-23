@@ -8,6 +8,7 @@ export type ShortcutAction =
   | 'undo'
   | 'redo'
   | 'cancel'
+  | 'selectAll'
   | 'deleteSelection'
   | 'toggleSnap'
   | 'toggleGrid'
@@ -62,6 +63,11 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
   },
   undo: { hotkey: 'Mod+Z', name: 'Undo', sections: { editor: 'Undo' } },
   redo: { hotkey: 'Mod+Shift+Z', name: 'Redo', sections: { editor: 'Redo' } },
+  selectAll: {
+    hotkey: 'Mod+A',
+    name: 'Select all',
+    sections: { editor: 'Select the whole plan' },
+  },
   deleteSelection: {
     hotkey: 'Delete',
     name: 'Delete selection',
