@@ -45,6 +45,17 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
   return plan;
 }
 
+// 90 cm at the middle of a 4 m wall: clear of both ends, on every fixture here.
+export const doorOn = (wallId: string, id = 'o1'): Opening => ({
+  id,
+  wallId,
+  type: 'door',
+  offset: 200,
+  width: 90,
+  hingeSide: 'start',
+  swing: 'in',
+});
+
 // 4×4 m axis-to-axis, walls 10 cm: interior faces 3,90 m, exterior 4,10 m.
 export function squareRoomPlan(): Plan {
   return buildPlan((b) => {

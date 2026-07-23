@@ -170,16 +170,21 @@ opening options, delete; otherwise it shows the active Tool's Tool defaults,
 so the next element is configured before it is placed. Hidden only when the
 Selection is empty and the Select tool is active. Selection values are
 derived on render from the same silhouette readings as the Dimensions, never
-stored. A Selection read as a Room takes that room's name as its title — or
-"Room" while it has none — and states its Room area and how many Doors and
-Windows its boundary carries, zero included; nothing else: retyping every
-boundary wall is a wall action, not something a room states about itself. The
-two counts are read from the room, never from the set of refs, so they state
-what the Delete beneath them takes — a boundary tally, where a party wall's
-door counts for both rooms, not a dwelling inventory. Every other Selection
-holding walls offers their common Thickness,
-which reaches all of them at once and shows nothing at all while they
-disagree — a field that named one wall's value would speak for the others.
+stored. Any Selection of more than one element states what it holds — how many
+Walls, Doors and Windows — where a Selection of one has its title to name what
+it is. A Selection read as a Room takes that room's name as its title — or
+"Room" while it has none — and states its Room area beside those counts;
+nothing else: retyping every boundary wall is a wall action, not something a
+room states about itself. A room inventories its boundary: its counts are read
+from the room, never from the set of refs, so they state what the Delete
+beneath them takes — a boundary tally, island walls included, where a party
+wall's door counts for both rooms, not a dwelling inventory — and a nil count
+reads zero rather than vanishing, a room having no window being a fact about
+the room. Every other Selection counts what is lit and nothing more — its own
+refs, so a Shift-click that puts an opening out lowers the count — and lists
+only what it holds: a row with nothing to count does not appear. Thickness is
+offered on a single selected wall and nowhere else: no Selection retypes
+several walls at once.
 _Avoid_: Selection panel, popover, inspector, properties dialog
 
 **Tool defaults**:

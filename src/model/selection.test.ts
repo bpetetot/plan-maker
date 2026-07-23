@@ -5,13 +5,15 @@ import {
   isSelected,
   refKey,
   referencePoint,
+  roomContents,
   roomSelection,
   selectedRoom,
+  selectionContents,
   toggleRef,
   translateElements,
 } from './selection';
 import { detectRooms, roomAt, roomWallIds } from './rooms';
-import { buildPlan, twoRoomPlan } from './testHelpers';
+import { buildPlan, doorOn, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from './testHelpers';
 import type { ElementRef } from './selection';
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
@@ -484,5 +486,54 @@ describe('roomSelection', () => {
     // a diagonal loop: no wall spans that pair of points
     const diagonal = { ...room, pointIds: [room.pointIds[0], room.pointIds[2]] };
     expect(roomSelection(plan, diagonal)).toBeNull();
+  });
+});
+
+describe('contents', () => {
+  it('counts a selection from its refs, type by type', () => {
+    const plan = buildPlan((b) => {
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(0, 200), b.point(400, 200));
+      b.opening(wall, 'door', 100);
+      b.opening(wall, 'window', 300);
+    });
+    const refs = [...Object.keys(plan.walls).map(wallRef), ...Object.keys(plan.openings).map(openingRef)];
+    expect(selectionContents(plan, refs)).toEqual({ walls: 2, doors: 1, windows: 1 });
+  });
+
+  it('counts nothing for refs pointing at elements the plan no longer holds', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    expect(selectionContents(plan, [wallRef('gone'), openingRef('gone')])).toEqual({
+      walls: 0,
+      doors: 0,
+      windows: 0,
+    });
+  });
+
+  it('counts a room from its boundary, island walls included', () => {
+    const plan = nestedRoomPlan();
+    const room = roomAt(detectRooms(plan), 330, 330)!;
+    expect(roomContents(plan, room).walls).toBe(8);
+  });
+
+  it('counts the openings the room boundary carries, wherever they sit on it', () => {
+    const plan = nestedRoomPlan();
+    const walls = Object.values(plan.walls);
+    plan.openings.d1 = doorOn(walls[0].id, 'd1');
+    plan.openings.w1 = { id: 'w1', wallId: walls[4].id, type: 'window', offset: 75, width: 60 };
+    const room = roomAt(detectRooms(plan), 330, 330)!;
+    expect(roomContents(plan, room)).toEqual({ walls: 8, doors: 1, windows: 1 });
+  });
+
+  // The panel counts what is lit — a room excepted, which states itself.
+  it('parts ways when a ref is dropped: the room holds, the selection follows', () => {
+    const plan = squareRoomPlan();
+    plan.openings.d1 = doorOn(Object.values(plan.walls)[0].id, 'd1');
+    const room = detectRooms(plan)[0];
+    const refs = toggleRef(roomSelection(plan, room)!, openingRef('d1'));
+    expect(roomContents(plan, room).doors).toBe(1);
+    expect(selectionContents(plan, refs).doors).toBe(0);
   });
 });

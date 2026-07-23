@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
-import { namedRoomPlan, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from '../model/testHelpers';
-import type { Opening } from '../model/types';
+import { doorOn, namedRoomPlan, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from '../model/testHelpers';
 import { emptyPlan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { EditorWithHotkeys } from './testHarness';
@@ -28,27 +27,8 @@ const clickAt = async (svg: SVGSVGElement, x: number, y: number, init: PointerEv
 const walls = () => Object.values(usePlanStore.getState().plan.walls);
 const panel = () => document.querySelector('.panel');
 
-// 90 cm at the middle of a 4 m wall: clear of both ends, on every fixture here.
-const doorOn = (wallId: string): Opening => ({
-  id: 'o1',
-  wallId,
-  type: 'door',
-  offset: 200,
-  width: 90,
-  hingeSide: 'start',
-  swing: 'in',
-});
-
 // Scoped to the panel: a named room prints its name on the sheet too.
 const panelTitle = () => document.querySelector('.panel-title')?.textContent;
-
-const fieldValue = () => document.querySelector<HTMLInputElement>('.panel-number-input')!.value;
-
-// A commit happens on blur or Enter, not per keystroke — the helper does both.
-async function setField(value: string) {
-  await page.getByRole('spinbutton').fill(value);
-  await key('Enter');
-}
 
 // DOM query, not a locator: label and value are sibling spans, unnavigable.
 function rowValue(label: string) {
@@ -139,6 +119,20 @@ describe('the tool panel reading a room', () => {
     expect(panelTitle()).toBe('Room');
   });
 
+  it('counts the walls that bound it', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    expect(rowValue('Walls')).toBe('4');
+  });
+
+  // The boundary is the outline and the islands it holes, which is exactly
+  // what the Delete beneath the count takes.
+  it('counts the island walls it is bound to move with', async () => {
+    const { svg } = await setup(nestedRoomPlan());
+    await clickAt(svg, 330, 330);
+    expect(rowValue('Walls')).toBe('8');
+  });
+
   it('falls back to the element count once the selection outgrows the room', async () => {
     const { svg } = await setup(twoRoomPlan());
     await clickAt(svg, 200, 200);
@@ -204,6 +198,7 @@ describe('a room and its openings', () => {
     await pointer(grab, 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 200, 0) });
     await pointer(svg, 'pointerup');
     expect(panelTitle()).toBe('Room');
+    expect(rowValue('Walls')).toBe('4');
     expect(rowValue('Doors')).toBe('1');
     expect(chips(svg)).toHaveLength(0);
   });
@@ -368,7 +363,7 @@ describe('clicking the room text block', () => {
   });
 });
 
-describe('thickness across a multi-selection', () => {
+describe('thickness beyond a single wall', () => {
   // Retyping every boundary wall is a wall action; a Room facet states what
   // the room is. A marquee that reads as the room is bare for the same reason.
   it('is absent from a room, however the room was selected', async () => {
@@ -381,39 +376,14 @@ describe('thickness across a multi-selection', () => {
     expect(document.querySelector('.panel-number-input')).toBeNull();
   });
 
-  it('retypes every wall a marquee took when they close no room', async () => {
+  // Two paths to one Selection cannot offer different powers (ADR 0014):
+  // neither has this one.
+  it('is absent from a marquee that closes no room either', async () => {
     const { svg } = await setup(twoRoomPlan());
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
     await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
     await pointer(svg, 'pointerup');
-    expect(fieldValue()).toBe('10');
-    await setField('16');
-    expect(walls().every((w) => w.thickness === 16)).toBe(true);
-  });
-
-  it('stays blank while the selected walls disagree, then levels them', async () => {
-    const plan = twoRoomPlan();
-    Object.values(plan.walls)[0].thickness = 30;
-    const { svg } = await setup(plan);
-    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
-    await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
-    await pointer(svg, 'pointerup');
-    expect(fieldValue()).toBe('');
-    await setField('12');
-    expect(walls().every((w) => w.thickness === 12)).toBe(true);
-  });
-
-  it('makes the retyped thickness the wall tool default (sticky)', async () => {
-    const { svg } = await setup(twoRoomPlan());
-    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
-    await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
-    await pointer(svg, 'pointerup');
-    await setField('22');
-    // Enter blurs the field: the shortcuts below only reach the registry
-    // because the typing guard no longer silences them.
-    expect(document.activeElement).toBe(document.body);
-    await key('Escape');
-    await key('2');
-    expect(fieldValue()).toBe('22');
+    await expect.element(page.getByText('7 elements')).toBeInTheDocument();
+    expect(document.querySelector('.panel-number-input')).toBeNull();
   });
 });

@@ -114,6 +114,14 @@ describe('tool panel on selected openings', () => {
     expect(Object.values(usePlanStore.getState().plan.openings)).toHaveLength(0);
     expect(panel()).toBeNull();
   });
+
+  // A count belongs to a selection of several: one element has its title.
+  it('states no count of its own', async () => {
+    const { svg } = await setup(doorPlan());
+    await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
+    expect(rowValue('Doors')).toBeUndefined();
+    expect(rowValue('Walls')).toBeUndefined();
+  });
 });
 
 describe('tool defaults facet', () => {
@@ -276,12 +284,57 @@ describe('tool panel on a multi-selection', () => {
       b.wall(b.point(0, 200), b.point(400, 200));
     });
 
+  // A door and a window on the same wall: every row has something to count.
+  const mixedPlan = () =>
+    buildPlan((b) => {
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(0, 200), b.point(400, 200));
+      b.opening(wall, 'door', 100);
+      b.opening(wall, 'window', 300);
+    });
+
+  const marqueeAll = (svg: SVGSVGElement) => marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 450 });
+
   it('shows the element count and Delete removes everything', async () => {
     const { svg } = await setup(twoWallPlan());
-    await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 450 });
+    await marqueeAll(svg);
     await expect.element(page.getByText('2 elements')).toBeInTheDocument();
     await userEvent.click(page.getByLabelText('Delete'));
     expect(Object.values(usePlanStore.getState().plan.walls)).toHaveLength(0);
     expect(panel()).toBeNull();
+  });
+
+  it('counts the walls, doors and windows it holds', async () => {
+    const { svg } = await setup(mixedPlan());
+    await marqueeAll(svg);
+    expect(rowValue('Walls')).toBe('2');
+    expect(rowValue('Doors')).toBe('1');
+    expect(rowValue('Windows')).toBe('1');
+  });
+
+  // A heap enumerates what it holds, where a room inventories its boundary.
+  it('omits a row it has nothing to count for', async () => {
+    const { svg } = await setup(twoWallPlan());
+    await marqueeAll(svg);
+    expect(rowValue('Walls')).toBe('2');
+    expect(rowValue('Doors')).toBeUndefined();
+    expect(rowValue('Windows')).toBeUndefined();
+  });
+
+  it('follows what is lit when a Shift+click puts the door out', async () => {
+    const { svg } = await setup(mixedPlan());
+    await marqueeAll(svg);
+    const door = svg.querySelector('rect[width="90"][fill="transparent"]')!;
+    await pointer(door, 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 100, 0) });
+    await pointer(svg, 'pointerup');
+    expect(rowValue('Doors')).toBeUndefined();
+    expect(rowValue('Windows')).toBe('1');
+  });
+
+  // Retyping walls is a wall action: no Selection retypes several at once.
+  it('offers no thickness field', async () => {
+    const { svg } = await setup(mixedPlan());
+    await marqueeAll(svg);
+    expect(document.querySelector('.panel-number-input')).toBeNull();
   });
 });

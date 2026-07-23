@@ -15,9 +15,9 @@ import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { roomLabelAt, roomOpenings, wallMeasures } from '../model/rooms';
-import type { ElementRef } from '../model/selection';
-import { selectedRoom } from '../model/selection';
+import { roomLabelAt, wallMeasures } from '../model/rooms';
+import type { Contents, ElementRef } from '../model/selection';
+import { roomContents, selectedRoom, selectionContents } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
@@ -68,17 +68,14 @@ export function ToolPanel({
       ? [Layers, `${sel.length} elements`]
       : ELEMENT_META[wall ? 'wall' : opening!.type];
 
-  // Retyping every boundary wall is a wall action, so a Selection read as a
-  // room offers none. undefined: no wall to retype.
-  const selWalls = sel
-    .map((ref) => (ref.type === 'wall' ? plan.walls[ref.id] : undefined))
-    .filter((w) => w !== undefined);
-  const thickness = room || selWalls.length === 0 ? undefined : sharedThickness(selWalls);
+  // CONTEXT.md: Tool panel. A room counts its boundary, never its refs: a
+  // Shift+click that unlights one of its doors must not lower the count.
+  const contents = room ? roomContents(plan, room) : sel.length > 1 ? selectionContents(plan, sel) : null;
 
   return (
     <div className="panel">
       <PanelHeader Icon={Icon} title={title} />
-      {(room || thickness !== undefined) && (
+      {(room || wall) && (
         <section>
           <div className="panel-section-label">Dimensions</div>
           {room && (
@@ -88,15 +85,15 @@ export function ToolPanel({
             </div>
           )}
           {wall && <WallRows plan={plan} rooms={rooms} wall={wall} />}
-          {thickness !== undefined && (
+          {wall && (
             <div className="panel-row">
               <span className="panel-row-label">Thickness</span>
               <NumberField
                 inline
                 max={WALL_THICKNESS_MAX}
-                value={thickness}
+                value={wall.thickness}
                 onCommit={(value) => {
-                  setPlan((p) => selWalls.reduce((next, w) => setWallThickness(next, w.id, value), p));
+                  setPlan((p) => setWallThickness(p, wall.id, value));
                   // sticky measure (CONTEXT.md: Tool defaults) — last used wins
                   setDefaults((d) => ({ ...d, wallThickness: value }));
                 }}
@@ -105,7 +102,7 @@ export function ToolPanel({
           )}
         </section>
       )}
-      {room && <RoomOpeningRows plan={plan} room={room} />}
+      {contents && <ContentsRows contents={contents} zeros={room !== null} />}
       {opening && (
         <section>
           <div className="panel-section-label">Width</div>
@@ -181,10 +178,6 @@ function ToolDefaultsFacet({
   );
 }
 
-// null when they disagree: the field shows nothing rather than one wall's value.
-const sharedThickness = (walls: Wall[]): number | null =>
-  walls.every((w) => w.thickness === walls[0].thickness) ? walls[0].thickness : null;
-
 function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
   return (
     <div className="panel-header">
@@ -198,14 +191,13 @@ function PanelHeader({ Icon, title }: { Icon: LucideIcon; title: string }) {
 
 // draft is null while idle so the field mirrors the live value; while editing it
 // holds the keystrokes, reaching the plan only on commit — never mid-entry.
-// A null value is a selection whose walls disagree: blank, never a lie.
 function NumberField({
   value,
   onCommit,
   inline,
   max,
 }: {
-  value: number | null;
+  value: number;
   onCommit: (value: number) => void;
   inline?: boolean;
   max?: number;
@@ -231,8 +223,8 @@ function NumberField({
         max={max}
         step={1}
         className="panel-number-input"
-        value={draft ?? (value === null ? '' : String(value))}
-        onFocus={() => setDraft(value === null ? '' : String(value))}
+        value={draft ?? String(value)}
+        onFocus={() => setDraft(String(value))}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (reverting.current) {
@@ -270,17 +262,20 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
   );
 }
 
-// The tally the Delete button below it takes: read from the room, so a
-// Shift+click that puts a door out of the selection never lowers it.
-function RoomOpeningRows({ plan, room }: { plan: Plan; room: Room }) {
-  const openings = roomOpenings(plan, room);
-  const rows = [
-    ['Doors', openings.filter((o) => o.type === 'door').length],
-    ['Windows', openings.filter((o) => o.type === 'window').length],
-  ] as const;
+// zeros: a room states a nil count as a fact about itself, where any other
+// selection lists only what it holds.
+function ContentsRows({ contents, zeros }: { contents: Contents; zeros: boolean }) {
+  const rows = (
+    [
+      ['Walls', contents.walls],
+      ['Doors', contents.doors],
+      ['Windows', contents.windows],
+    ] as const
+  ).filter(([, count]) => zeros || count > 0);
+  if (rows.length === 0) return null;
   return (
     <section>
-      <div className="panel-section-label">Openings</div>
+      <div className="panel-section-label">Contents</div>
       {rows.map(([label, count]) => (
         <div key={label} className="panel-row">
           <span className="panel-row-label">{label}</span>
