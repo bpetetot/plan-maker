@@ -75,7 +75,7 @@ describe('zoom bounds', () => {
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
     await clickTimes(zoomOut(), CLICKS_TO_FLOOR);
-    for (let i = 0; i < 5; i++) await wheel(svg, { deltaY: 100, clientX: 400, clientY: 300 });
+    for (let i = 0; i < 5; i++) await wheel(svg, { deltaY: 100, clientX: 400, clientY: 300, ctrlKey: true });
     expect(zoomLabel()).toBe('10%');
   });
 

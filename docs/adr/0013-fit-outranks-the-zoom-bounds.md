@@ -40,7 +40,8 @@ would make Fit's framing unrecoverable in the other direction too.
   never greyed out. It is the way back from a below-floor Fit.
 - The greyed-out state tracks the exact bound, while the indicator rounds to a
   whole percent, so a narrow window exists where the indicator reads 10% and
-  Zoom out is still live — reachable by wheel (factor 1.08), not by the buttons
+  Zoom out is still live — reachable by Ctrl + wheel, whose step is a notch of
+  10% at most and a hair of finger travel on a trackpad, not by the buttons
   (factor 1.25 skips it). The alternative, greying out on the rounded reading,
   would disable a control that still has travel left, which is the thing the
   bounds are there to avoid saying.

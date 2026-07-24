@@ -35,7 +35,7 @@ export const blur = (el: EventTarget) => {
   return settle('blur');
 };
 
-// Zoom rides a native non-passive listener on the svg (useView).
+// Wheel navigation rides a native non-passive listener on the svg (useView).
 export const wheel = (el: Element, init: WheelEventInit = {}) => {
   el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init }));
   return settle('wheel');

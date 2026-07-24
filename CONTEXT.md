@@ -360,10 +360,21 @@ file, restoring at startup, resetting — and on demand. Pure editor behavior:
 never part of the plan.
 _Avoid_: Fit zoom, zoom to fit, center
 
+**Pan**:
+Moving the view without changing the Zoom. Three gestures do it, equally: a
+bare scroll — two fingers on a trackpad, a mouse wheel — Space + drag, and
+middle-click + drag; Shift + scroll pans sideways. Scrolling stays available
+while a wall chain or a drag is under way, so a point off screen can be reached
+without breaking the gesture; only a Pan drag already in progress silences it.
+Pure editor behavior: never part of the plan.
+_Avoid_: Scroll, drag the canvas, move the camera
+
 **Zoom**:
 How far the view is zoomed in or out, expressed relative to the default
 framing: 100% is the scale the default framing had in the window as of the
-last load or Fit. Resizing the window never pans or zooms the view — it only
+last load or Fit. Changed by Ctrl/Cmd + scroll — which is how a trackpad pinch
+arrives — by the +/− buttons and by their shortcuts; a bare scroll pans
+instead (ADR 0016). Resizing the window never pans or zooms the view — it only
 reveals or hides plan, the top-left corner staying put — so neither the plan
 on screen nor the Zoom changes. Bounded to 10%–3000%: a step that would
 overshoot stops on the bound instead, and the control that would cross it is

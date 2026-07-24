@@ -37,6 +37,19 @@ const clampScale = (scale: number, ref: number, from: number) =>
 
 const frameScale = (rect: View, w: number, h: number) => Math.min(w / rect.w, h / rect.h);
 
+// Firefox measures a mouse wheel in lines, everyone else in pixels; the deltas
+// only compare once they share a unit.
+const LINE_PX = 16;
+const inPixels = (delta: number, mode: number) =>
+  mode === WheelEvent.DOM_DELTA_LINE ? delta * LINE_PX : delta;
+
+// A notch is 10%, and the cap makes it the most any single event can do — the
+// dozens a trackpad emits per gesture would otherwise compound.
+const NOTCH_PX = 10;
+const ZOOM_RATE = Math.log(1.1) / NOTCH_PX;
+const wheelZoomFactor = (delta: number) =>
+  Math.exp(Math.max(-NOTCH_PX, Math.min(NOTCH_PX, delta)) * ZOOM_RATE);
+
 function frameCamera(rect: View, w: number, h: number): Camera {
   const scale = frameScale(rect, w, h);
   if (!(scale > 0)) return { x: rect.x, y: rect.y, scale: 1 };
@@ -48,7 +61,7 @@ function frameCamera(rect: View, w: number, h: number): Camera {
 }
 
 // Zoom/pan via the SVG viewBox (spec §3).
-export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
+export function useView(svgRef: React.RefObject<SVGSVGElement | null>, isPanning: () => boolean) {
   const [camera, setCamera] = useState<Camera>({ x: DEFAULT_FRAME.x, y: DEFAULT_FRAME.y, scale: 1 });
   // Captured at the last framing event, not derived from the live window size:
   // a resize must change neither the view nor the percentage (glossary: Zoom).
@@ -141,12 +154,24 @@ export function useView(svgRef: React.RefObject<SVGSVGElement | null>) {
   const canZoomOut = !atOrBelowFloor(camera.scale, refScale);
   const canZoomIn = !atOrAboveCeiling(camera.scale, refScale);
 
+  // The listener subscribes once, so the live predicate has to reach it through
+  // a ref rather than the closure it was mounted with.
+  const isPanningRef = useRef(isPanning);
+  isPanningRef.current = isPanning;
+
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    // A bare wheel pans, Ctrl/Cmd zooms (ADR 0016).
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.08 : 1 / 1.08);
+      if (isPanningRef.current()) return;
+      const dx = inPixels(e.deltaX, e.deltaMode);
+      const dy = inPixels(e.deltaY, e.deltaMode);
+      if (e.ctrlKey || e.metaKey) return zoomAt(e.clientX, e.clientY, wheelZoomFactor(dy));
+      // Shift turns the wheel's own axis on Mac, so take whichever axis moved.
+      if (e.shiftKey) return panByPx(-(dy || dx), 0);
+      panByPx(-dx, -dy);
     };
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
