@@ -769,8 +769,15 @@ export function RoomFill({ room, variant }: { room: Room; variant: 'hover' | 'se
   );
 }
 
-export function SnapMarker({ snap }: { snap: Snap | null }) {
+// Screen px held constant via /pxPerCm; RING_PX is shared with Handle so the
+// attached snap ring stays its exact size in green (ADR 0019).
+const RING_PX = 7;
+const SNAP_DOT_PX = 2.6;
+
+export function SnapMarker({ snap, pxPerCm }: { snap: Snap | null; pxPerCm: number }) {
   if (!snap) return null;
+  // point and wall snaps share one ring — both attach to existing geometry
+  const attached = snap.kind === 'point' || snap.kind === 'wall';
   return (
     <g pointerEvents="none">
       {/* dashed guide for any locked-axis position, wall intersections too */}
@@ -785,21 +792,50 @@ export function SnapMarker({ snap }: { snap: Snap | null }) {
           strokeDasharray="6 6"
         />
       )}
-      {snap.kind === 'point' ? (
-        <circle cx={snap.x} cy={snap.y} r={10} fill="none" stroke={COLORS.snap} strokeWidth={2.5} />
-      ) : snap.kind === 'wall' ? (
-        // hollow marker: the click will join (and split) this wall
-        <circle cx={snap.x} cy={snap.y} r={6.5} fill="none" stroke={COLORS.snap} strokeWidth={2.5} />
+      {attached ? (
+        // Handle's double-stroke ring, edged in snap green instead of wall: a
+        // sheet-colored band the snap green outlines on both sides.
+        <>
+          <circle
+            cx={snap.x}
+            cy={snap.y}
+            r={RING_PX / pxPerCm}
+            fill="none"
+            stroke={COLORS.snap}
+            strokeWidth={5}
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle
+            cx={snap.x}
+            cy={snap.y}
+            r={RING_PX / pxPerCm}
+            fill="none"
+            stroke="var(--sheet)"
+            strokeWidth={3}
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
       ) : (
-        <circle cx={snap.x} cy={snap.y} r={3.5} fill={COLORS.snap} />
+        // sheet halo keeps the dot legible over a dark wall
+        <>
+          <circle
+            cx={snap.x}
+            cy={snap.y}
+            r={(SNAP_DOT_PX + 1.1) / pxPerCm}
+            fill="none"
+            stroke="var(--sheet)"
+            strokeWidth={1.4}
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle cx={snap.x} cy={snap.y} r={SNAP_DOT_PX / pxPerCm} fill={COLORS.snap} />
+        </>
       )}
     </g>
   );
 }
 
-// Screen px: the ring stays small and constant at every zoom, while a wider
-// invisible disc catches the pointer (CONTEXT.md: Grab zone).
-const HANDLE_RING_PX = 7;
+// Screen px: the ring (RING_PX, shared with the snap marker) stays small and
+// constant at every zoom, while a wider invisible disc catches the pointer.
 const HANDLE_GRAB_PX = 14;
 
 export function Handle({
@@ -813,7 +849,7 @@ export function Handle({
   pxPerCm: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
-  const r = HANDLE_RING_PX / pxPerCm;
+  const r = RING_PX / pxPerCm;
   return (
     <g>
       {/* wall-colored edge defines the sheet ring where it overhangs the body */}

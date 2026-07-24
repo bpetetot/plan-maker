@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-react';
 import type { ElementRef } from '../model/selection';
+import type { Snap } from '../model/snap';
 import { buildPlan, squareRoomPlan } from '../model/testHelpers';
 import type { Plan, Ruler, Wall } from '../model/types';
 import {
@@ -12,6 +13,7 @@ import {
   OpeningGrabZone,
   RubberWall,
   RulerLabel,
+  SnapMarker,
   WallGrabZone,
   WallLine,
 } from './render';
@@ -443,6 +445,69 @@ describe('Grab zones', () => {
     const rect = container.querySelector('rect')!;
     expect(rect.getAttribute('height')).toBe('32');
     expect(rect.getAttribute('y')).toBe('-16');
+  });
+});
+
+describe('SnapMarker', () => {
+  async function renderMarker(snap: Snap | null, pxPerCm: number) {
+    const { container } = await render(
+      <svg>
+        <SnapMarker snap={snap} pxPerCm={pxPerCm} />
+      </svg>,
+    );
+    return container;
+  }
+  const rings = (c: Element) =>
+    Array.from(c.querySelectorAll('circle')).filter((el) => el.getAttribute('fill') === 'none');
+
+  it('renders nothing without a snap', async () => {
+    const c = await renderMarker(null, 1);
+    expect(c.querySelector('circle')).toBeNull();
+  });
+
+  it("draws the Handle's double-stroke ring, snap-edged, for a point snap", async () => {
+    const c = await renderMarker({ kind: 'point', x: 0, y: 0 }, 1);
+    const r = rings(c);
+    expect(r).toHaveLength(2);
+    // snap-green edge under a sheet-colored band — the Handle look in green
+    expect(r.map((el) => el.getAttribute('stroke'))).toEqual([COLORS.snap, 'var(--sheet)']);
+    for (const el of r) expect(el.getAttribute('vector-effect')).toBe('non-scaling-stroke');
+  });
+
+  it('gives a wall snap the same ring as a point snap: both attach to existing geometry', async () => {
+    const c = await renderMarker({ kind: 'wall', x: 0, y: 0 }, 1);
+    const r = rings(c);
+    expect(r).toHaveLength(2);
+    expect(r.map((el) => el.getAttribute('stroke'))).toEqual([COLORS.snap, 'var(--sheet)']);
+  });
+
+  it('holds the ring at 7 screen px, shrinking its world radius as the view zooms in', async () => {
+    for (const [pxPerCm, worldR] of [
+      [1, '7'],
+      [2, '3.5'],
+    ] as const) {
+      const c = await renderMarker({ kind: 'point', x: 0, y: 0 }, pxPerCm);
+      for (const el of rings(c)) expect(el.getAttribute('r')).toBe(worldR);
+      await cleanup();
+    }
+  });
+
+  it('marks a free snap with a small filled dot, not a ring', async () => {
+    const c = await renderMarker({ kind: 'free', x: 0, y: 0 }, 1);
+    // no snap-green edge: the free dot is filled, not the attached ring
+    const greenEdge = rings(c).filter((el) => el.getAttribute('stroke') === COLORS.snap);
+    expect(greenEdge).toHaveLength(0);
+    const dot = Array.from(c.querySelectorAll('circle')).find(
+      (el) => el.getAttribute('fill') === COLORS.snap,
+    )!;
+    expect(dot.getAttribute('r')).toBe('2.6');
+  });
+
+  it('keeps the dashed axis guide when the snap locks an axis', async () => {
+    const c = await renderMarker({ kind: 'axis', x: 100, y: 0, axisFrom: { x: 0, y: 0 } }, 1);
+    const line = c.querySelector('line')!;
+    expect(line.getAttribute('stroke-dasharray')).toBe('6 6');
+    expect(line.getAttribute('stroke')).toBe(COLORS.snap);
   });
 });
 

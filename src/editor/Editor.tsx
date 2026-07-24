@@ -980,7 +980,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             ruler={{ id: '__ghost', a: { x: rulerA.x, y: rulerA.y }, b: { x: snap.x, y: snap.y }, t: 0.5 }}
           />
         )}
-        {(tool === 'wall' || tool === 'ruler') && <SnapMarker snap={snap} />}
+        {(tool === 'wall' || tool === 'ruler') && <SnapMarker snap={snap} pxPerCm={zoomScale} />}
         {editing && (
           <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input

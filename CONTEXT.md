@@ -280,7 +280,10 @@ move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
 chosen so the group's Reference point lands on a grid intersection, to the grid
 only and to nothing else. An off-grid element therefore realigns on its first
-non-Free move. Pure editor behavior: never part of the plan.
+non-Free move. Snap shows the aimed position with a marker of constant on-screen
+size (ADR 0019): an *attached* ring — the Point handle's shape in the snap ink
+(Grab zone) — when the click lands on an existing Point or wall, a small dot
+otherwise. Pure editor behavior: never part of the plan.
 _Avoid_: Magnetism, snapping grid, attach
 
 **Drawing anchor**:
