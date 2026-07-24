@@ -217,8 +217,8 @@ svg text.room-area {
 /* square icon-only variant; anchors the .key-hint shortcut digit */
 .floating-btn.icon {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
 }
 .floating-btn.active {
@@ -279,6 +279,12 @@ svg text.room-area {
 .menu-row-group {
   display: flex;
   gap: 2px;
+}
+/* Hold theme swatches smaller than the floating toolbar buttons they share a
+   class with: a compact text menu row, not floating chrome. */
+.menu-row-group .floating-btn.icon {
+  width: 32px;
+  height: 32px;
 }
 /* The shortcut beside a menu entry. A plain annotation, not a key badge like
    the help dialog's: in a menu the shortcut is a note on an action, and nine
