@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-react';
 import type { ElementRef } from '../model/selection';
 import { buildPlan, squareRoomPlan } from '../model/testHelpers';
-import type { Plan, Wall } from '../model/types';
+import type { Plan, Ruler, Wall } from '../model/types';
 import {
   COLORS,
   DimLabel,
@@ -11,6 +11,7 @@ import {
   labelAngle,
   OpeningGrabZone,
   RubberWall,
+  RulerLabel,
   WallGrabZone,
   WallLine,
 } from './render';
@@ -31,6 +32,7 @@ function planWith(
     walls: { w: wall },
     openings: {},
     roomLabels: {},
+    rulers: {},
   };
   return { plan, wall };
 }
@@ -195,6 +197,76 @@ describe('DimLabel selection', () => {
     }
     for (const head of Array.from(container.querySelectorAll('polygon'))) {
       expect(head.getAttribute('fill')).toBe('var(--dim-line)');
+    }
+  });
+});
+
+describe('RulerLabel', () => {
+  const ruler = (ax: number, ay: number, bx: number, by: number, t = 0.5): Ruler => ({
+    id: 'r',
+    a: { x: ax, y: ay },
+    b: { x: bx, y: by },
+    t,
+  });
+
+  async function renderRuler(r: Ruler, selected?: boolean) {
+    const { container } = await render(
+      <svg>
+        <RulerLabel ruler={r} selected={selected} />
+      </svg>,
+    );
+    return container;
+  }
+
+  it('measures the free A→B distance, laid directly on the segment', async () => {
+    const container = await renderRuler(ruler(0, 0, 400, 0));
+    // no lateral offset: the value equals the raw distance, formatted like a wall
+    expect(container.querySelector('text')!.textContent).toBe('4,00 m');
+  });
+
+  it('pins an arrowhead at each endpoint, on the segment itself', async () => {
+    const container = await renderRuler(ruler(0, 0, 400, 0));
+    const heads = Array.from(container.querySelectorAll('polygon'));
+    expect(heads).toHaveLength(2);
+    // tips at A=(0,0) and B=(400,0): no off, so y stays 0
+    expect(heads[0].getAttribute('points')!.startsWith('0,0 ')).toBe(true);
+    expect(heads[1].getAttribute('points')!.startsWith('400,0 ')).toBe(true);
+  });
+
+  it('reads ISO on a vertical ruler, whatever the draw direction', async () => {
+    for (const [y1, y2] of [
+      [0, 200],
+      [200, 0],
+    ]) {
+      const container = await renderRuler(ruler(0, y1, 0, y2));
+      const group = container.querySelector('text')!.closest('g')!;
+      expect(group.getAttribute('transform')).toContain('rotate(-90)');
+      await cleanup();
+    }
+  });
+
+  it('slides the value to t along the segment', async () => {
+    const container = await renderRuler(ruler(0, 0, 400, 0, 0.25));
+    const group = container.querySelector('text')!.closest('g')!;
+    // t=0.25 of a 400 cm horizontal ruler: value plate centred at x=100
+    expect(group.getAttribute('transform')).toBe('translate(100,0) rotate(0)');
+  });
+
+  it('inks the whole ruler in accent when selected', async () => {
+    const container = await renderRuler(ruler(0, 0, 400, 0), true);
+    expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(true);
+    for (const line of Array.from(container.querySelectorAll('line'))) {
+      expect(line.getAttribute('stroke')).toBe(COLORS.wallSelected);
+    }
+    for (const head of Array.from(container.querySelectorAll('polygon'))) {
+      expect(head.getAttribute('fill')).toBe(COLORS.wallSelected);
+    }
+  });
+
+  it('keeps the measure ink when unselected', async () => {
+    const container = await renderRuler(ruler(0, 0, 400, 0));
+    for (const line of Array.from(container.querySelectorAll('line'))) {
+      expect(line.getAttribute('stroke')).toBe('var(--dim-line)');
     }
   });
 });

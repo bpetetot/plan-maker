@@ -22,6 +22,7 @@ import type { ElementRef } from './selection';
 
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
 const openingRef = (id: string): ElementRef => ({ type: 'opening', id });
+const rulerRef = (id: string): ElementRef => ({ type: 'ruler', id });
 
 describe('toggleRef', () => {
   it('adds a ref that is not in the selection', () => {
@@ -91,6 +92,22 @@ describe('elementsInRect', () => {
     const refs = elementsInRect(plan, { x: 0, y: 0 }, { x: 100, y: 100 });
     expect(refs).toEqual([]);
   });
+
+  it('captures a Ruler only when both endpoints are inside, and only when asked', () => {
+    const plan = {
+      ...emptyPlan(),
+      rulers: {
+        in: { id: 'in', a: { x: 10, y: 10 }, b: { x: 90, y: 90 }, t: 0.5 },
+        out: { id: 'out', a: { x: 10, y: 10 }, b: { x: 300, y: 90 }, t: 0.5 },
+      },
+    };
+    const a = { x: 0, y: 0 };
+    const b = { x: 100, y: 100 };
+    expect(elementsInRect(plan, a, b)).toEqual([]); // rulers stay out by default
+    const refs = elementsInRect(plan, a, b, true);
+    expect(isSelected(refs, rulerRef('in'))).toBe(true);
+    expect(isSelected(refs, rulerRef('out'))).toBe(false); // B sticks out of the rect
+  });
 });
 
 describe('allElements', () => {
@@ -112,6 +129,15 @@ describe('allElements', () => {
 
   it('holds nothing on an empty plan', () => {
     expect(allElements(emptyPlan())).toEqual([]);
+  });
+
+  it('includes Rulers only when asked', () => {
+    const plan = {
+      ...emptyPlan(),
+      rulers: { r: { id: 'r', a: { x: 0, y: 0 }, b: { x: 100, y: 0 }, t: 0.5 } },
+    };
+    expect(allElements(plan)).toEqual([]); // omitted by default
+    expect(allElements(plan, true)).toEqual([rulerRef('r')]);
   });
 });
 
@@ -149,6 +175,19 @@ describe('deleteElements', () => {
     const next = deleteElements(plan, [wallRef(wall.id), openingRef(opening.id)]);
     expect(Object.keys(next.walls)).toHaveLength(0);
     expect(Object.keys(next.openings)).toHaveLength(0);
+  });
+
+  it('deletes a Ruler, leaving the others', () => {
+    const plan = {
+      ...emptyPlan(),
+      rulers: {
+        r: { id: 'r', a: { x: 0, y: 0 }, b: { x: 100, y: 0 }, t: 0.5 },
+        keep: { id: 'keep', a: { x: 0, y: 50 }, b: { x: 100, y: 50 }, t: 0.5 },
+      },
+    };
+    const next = deleteElements(plan, [rulerRef('r')]);
+    expect(next.rulers.r).toBeUndefined();
+    expect(next.rulers.keep).toBeDefined();
   });
 });
 
@@ -208,6 +247,28 @@ describe('translateElements', () => {
     });
     const wall = Object.values(plan.walls)[0];
     expect(translateElements(plan, [wallRef(wall.id)], 0, 0)).toBe(plan);
+  });
+
+  it('rides a selected Ruler rigidly, shifting both endpoints', () => {
+    const base = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    const wall = Object.values(base.walls)[0];
+    const plan = { ...base, rulers: { r: { id: 'r', a: { x: 10, y: 20 }, b: { x: 110, y: 20 }, t: 0.5 } } };
+    const next = translateElements(plan, [wallRef(wall.id), rulerRef('r')], 50, -20);
+    expect(next.rulers.r.a).toEqual({ x: 60, y: 0 });
+    expect(next.rulers.r.b).toEqual({ x: 160, y: 0 });
+    expect(next.rulers.r.t).toBe(0.5); // a ratio, untouched by the shift
+  });
+
+  it('translates a Ruler-only selection (no walls to move)', () => {
+    const plan = {
+      ...emptyPlan(),
+      rulers: { r: { id: 'r', a: { x: 0, y: 0 }, b: { x: 100, y: 0 }, t: 0.5 } },
+    };
+    const next = translateElements(plan, [rulerRef('r')], 30, 40);
+    expect(next.rulers.r.a).toEqual({ x: 30, y: 40 });
+    expect(next.rulers.r.b).toEqual({ x: 130, y: 40 });
   });
 });
 

@@ -14,6 +14,14 @@ const squarePlan = () =>
     b.wall(e, a);
   });
 
+// A 137 cm Ruler laid inside the room: its value "1,37 m" collides with no
+// wall dimension or area of squarePlan.
+const rulerPlan = () => {
+  const plan = squarePlan();
+  plan.rulers.r1 = { id: 'r1', a: { x: 50, y: 150 }, b: { x: 187, y: 150 }, t: 0.5 };
+  return plan;
+};
+
 describe('computeExportFrame', () => {
   it('returns null for a plan without points', () => {
     expect(computeExportFrame(buildPlan(() => {}))).toBeNull();
@@ -91,6 +99,17 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('--wall: #1e293b');
     expect(svg).toContain('--sheet: #ffffff');
     expect(svg).toContain('--dim-line: #93c9c3');
+  });
+
+  // A Ruler follows the Measures toggle like a wall dimension (ADR 0008, ticket 10).
+  it('renders a Ruler value when measures are shown', () => {
+    const svg = buildExportSvg(rulerPlan(), { measuresVisible: true })!;
+    expect(svg).toContain('1,37 m');
+  });
+
+  it('omits the Ruler value when measures are hidden', () => {
+    const svg = buildExportSvg(rulerPlan(), { measuresVisible: false })!;
+    expect(svg).not.toContain('1,37 m');
   });
 
   // Rasterized through an <img>, which loads no external resource: without the

@@ -28,6 +28,7 @@ function emptySquare(label?: { name: string; x: number; y: number }): Plan {
     },
     openings: {},
     roomLabels: label ? { l1: { id: 'l1', ...label } } : {},
+    rulers: {},
   };
 }
 
@@ -124,6 +125,7 @@ describe('a room inside a room', () => {
       },
       openings: {},
       roomLabels: { l1: { id: 'l1', name: 'AAA', x: 325, y: 235 } },
+      rulers: {},
     };
   }
 

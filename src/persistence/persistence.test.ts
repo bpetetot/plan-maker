@@ -71,6 +71,36 @@ describe('validatePlan', () => {
       expect(validatePlan(plan)).toBeNull();
     }
   });
+
+  it('accepts a plan carrying a valid ruler', () => {
+    const plan = structuredClone(squarePlan());
+    plan.rulers['r1'] = { id: 'r1', a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, t: 0.5 };
+    expect(validatePlan(plan)).not.toBeNull();
+  });
+
+  it('rejects malformed rulers', () => {
+    const rulers = [
+      { id: 'other', a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, t: 0.5 }, // id ≠ key
+      { id: 'r1', a: { x: 0.5, y: 0 }, b: { x: 10, y: 0 }, t: 0.5 }, // non-integer cm
+      { id: 'r1', a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, t: 1.5 }, // t out of [0,1]
+      { id: 'r1', a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, t: NaN }, // t not finite
+      { id: 'r1', a: { x: 0, y: 0 }, t: 0.5 }, // missing endpoint
+      'nope',
+    ];
+    for (const ruler of rulers) {
+      const plan = structuredClone(squarePlan()) as { rulers: Record<string, unknown> };
+      plan.rulers['r1'] = ruler;
+      expect(validatePlan(plan)).toBeNull();
+    }
+  });
+
+  it('tolerates a plan missing the rulers field, defaulting it to empty', () => {
+    const plan = structuredClone(squarePlan()) as Partial<ReturnType<typeof squarePlan>>;
+    delete plan.rulers;
+    const validated = validatePlan(plan);
+    expect(validated).not.toBeNull();
+    expect(validated?.rulers).toEqual({});
+  });
 });
 
 describe('runMigrations', () => {

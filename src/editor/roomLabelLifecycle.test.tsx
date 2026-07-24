@@ -33,6 +33,7 @@ function labeledSquare(placed?: true): Plan {
         ? { id: 'l1', name: 'Kitchen', x: 480, y: 250, placed }
         : { id: 'l1', name: 'Kitchen', x: 480, y: 250 },
     },
+    rulers: {},
   };
 }
 

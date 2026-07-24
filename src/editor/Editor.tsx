@@ -9,6 +9,7 @@ import {
   Magnet,
   MousePointer2,
   Redo2,
+  Ruler,
   RulerDimensionLine,
   Undo2,
   ZoomIn,
@@ -19,6 +20,7 @@ import type { Vec } from '../model/geometry';
 import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry';
 import {
   addRoomLabel,
+  addRuler,
   clampOpeningOffset,
   commitPoint,
   commitWall,
@@ -26,6 +28,7 @@ import {
   movePoint,
   moveOpening,
   moveRoomLabel,
+  moveRulerEndpoint,
   placeOpening,
   planarize,
   renameRoomLabel,
@@ -53,7 +56,7 @@ import type { Opening, Plan, RoomLabel } from '../model/types';
 import { WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
-import { toggleGrid, toggleMeasures, usePreferences } from './preferences';
+import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
 import type { RoomTextBlock } from './render';
 import { ToolPanel } from './ToolPanel';
@@ -73,6 +76,8 @@ import {
   ROOM_TEXT_HIT,
   roomTextBlocks,
   RubberWall,
+  RulerGrabZone,
+  RulerLabel,
   SnapMarker,
   WallGrabZone,
   WallLine,
@@ -100,6 +105,9 @@ type Drag =
     }
   // `grabDelta` keeps the grab point under the cursor (CONTEXT.md: Grab zone).
   | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
+  // A Ruler endpoint: snaps with the placement ladder, anchored on the far end
+  // for 45°. `grabDelta` fixes the grab point so the handle never recenters.
+  | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec }
   // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
   // Room label) is defensive and moves freely.
   | {
@@ -174,11 +182,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults);
   const [sel, setSel] = useState<ElementRef[]>([]);
   const [hoverWall, setHoverWall] = useState<string | null>(null);
+  const [hoverRuler, setHoverRuler] = useState<string | null>(null);
   // The room's loop, not the object: a Room is rebuilt on every plan change.
   const [hoverRoom, setHoverRoom] = useState<string | null>(null);
   // First click held as a pending snap, not committed: aborting the chain
   // (Esc, tool switch, double-click) must not mutate the plan.
   const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null);
+  // The Ruler's first click, held as a snap until B commits it: aborting (Esc,
+  // right-click, tool switch) must not touch the plan.
+  const [rulerA, setRulerA] = useState<Snap | null>(null);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null);
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
@@ -239,9 +251,12 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const switchTool = (next: Tool) => {
     setTool(next);
     setChain(null);
+    setRulerA(null);
     setSnap(null);
     setOpenPreview(null);
     if (next !== 'select') setSel([]);
+    // A Ruler is measured, so drawing one reveals the measures (ticket 03).
+    if (next === 'ruler') setMeasures(true);
   };
 
   const deleteSelection = useCallback(
@@ -273,13 +288,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   useImperativeHandle(commands, () => ({
     cancel: () => {
       if (chain) setChain(null);
+      else if (rulerA) setRulerA(null);
       else if (sel.length > 0) setSel([]);
       else switchTool('select');
     },
     // Through switchTool: a Selection only exists under the Select tool.
     selectAll: () => {
       switchTool('select');
-      setSel(allElements(plan));
+      // Rulers join only while measures are shown (ticket 02).
+      setSel(allElements(plan, measuresVisible));
     },
     deleteSelection: () => deleteSelection(sel),
     selectTool: switchTool,
@@ -350,6 +367,22 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       });
       setPlan(() => next);
       setSel(id ? [{ type: 'opening', id }] : []);
+    } else if (tool === 'ruler') {
+      // Aim from A once it exists, so B locks to 45° and the ladder anchors there.
+      const anchor = rulerA ? { x: rulerA.x, y: rulerA.y } : undefined;
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free });
+      if (!rulerA) {
+        setRulerA(s);
+        setSnap(s);
+        return;
+      }
+      // B on A is a mis-click: ignore it, the pending A keeps rubber-banding.
+      if (Math.hypot(s.x - rulerA.x, s.y - rulerA.y) * pxPerCm() < CLICK_PX / 4) return;
+      const [next, id] = addRuler(plan, { x: rulerA.x, y: rulerA.y }, { x: s.x, y: s.y });
+      setPlan(() => next);
+      // Auto-return to Select with the placed Ruler selected (tickets 03, 06).
+      switchTool('select');
+      setSel([{ type: 'ruler', id }]);
     } else if (tool === 'select') {
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
       setHoverRoom(null);
@@ -424,6 +457,20 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             setPlan((p) => moveOpening(p, d.id, t + d.grabDelta));
           }
         }
+      } else if (d.kind === 'rulerEnd') {
+        const ruler = plan.rulers[d.id];
+        if (ruler) {
+          // Anchor on the far end so 45° and its guide lock relative to it.
+          const anchor = d.end === 'a' ? ruler.b : ruler.a;
+          const s = snapPoint(plan, c.x + d.grabDelta.x, c.y + d.grabDelta.y, {
+            tolerance: tolerance(),
+            anchor,
+            walls: true,
+            free,
+          });
+          setPlan((p) => moveRulerEndpoint(p, d.id, d.end, s.x, s.y));
+          setSnap(s);
+        }
       } else if (d.kind === 'label') {
         if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
           d.moved = true;
@@ -469,6 +516,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (tool === 'wall') {
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
+    } else if (tool === 'ruler') {
+      const anchor = rulerA ? { x: rulerA.x, y: rulerA.y } : undefined;
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
     } else if (tool === 'select') {
       // The browser's hit test decides what a click takes: anything above the
       // sheet outranks the room, except the block the room is clicked by.
@@ -493,6 +543,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (chain) {
       setChain(null);
       setSnap(null);
+    } else if (rulerA) {
+      setRulerA(null);
+      setSnap(null);
     } else if (tool !== 'select') {
       switchTool('select');
     }
@@ -508,7 +561,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       if (wPx < CLICK_PX && hPx < CLICK_PX) {
         setSel(selectionForRoom(roomAt(rooms, d.a.x, d.a.y), d.additive, d.prev));
       } else {
-        const captured = elementsInRect(plan, d.a, d.b);
+        const captured = elementsInRect(plan, d.a, d.b, measuresVisible);
         setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured);
       }
       setMarquee(null);
@@ -523,7 +576,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if ((d.kind === 'label' && !d.moved) || (d.kind === 'newLabel' && !d.id)) {
       setSel((s) => selectionForRoom(d.room, d.additive, s));
     }
-    if (d.kind === 'point') setSnap(null);
+    if (d.kind === 'point' || d.kind === 'rulerEnd') setSnap(null);
     if (d.kind === 'opening') setMovingOpeningId(null);
     // Merge (ADR 0003), split (ADR 0002) and reconcile (CONTEXT.md: Room
     // label) once at gesture end, inside the same history group.
@@ -548,6 +601,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
   const only = sel.length === 1 ? sel[0] : null;
   const selWall = only?.type === 'wall' ? plan.walls[only.id] : null;
+  const selRuler = only?.type === 'ruler' ? plan.rulers[only.id] : null;
 
   const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
   const ghostOpening: Opening | null =
@@ -758,6 +812,30 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               }
             />
           ))}
+        {/* Only while drawn: measures hidden ⇒ a Ruler is inert (ticket 02). A
+            body drag translates the one Ruler rigidly (a single-ref group). */}
+        {tool === 'select' &&
+          measuresVisible &&
+          Object.values(plan.rulers).map((ruler) => (
+            <RulerGrabZone
+              key={ruler.id}
+              ruler={ruler}
+              onPointerDown={(e) =>
+                onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) => {
+                  const refs: ElementRef[] = [{ type: 'ruler', id: ruler.id }];
+                  return {
+                    kind: 'group',
+                    refs,
+                    start: c,
+                    orig: plan,
+                    refPoint: referencePoint(plan, refs, c),
+                  };
+                })
+              }
+              onPointerEnter={() => setHoverRuler(ruler.id)}
+              onPointerLeave={() => setHoverRuler((h) => (h === ruler.id ? null : h))}
+            />
+          ))}
         {/* After the grab zones so the label wins the hit-test. Hiding is
             global: selecting a wall does not bring its dimension back. */}
         {measuresVisible &&
@@ -784,6 +862,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               }
             />
           ))}
+        {measuresVisible &&
+          Object.values(plan.rulers).map((ruler) => (
+            <RulerLabel
+              key={ruler.id}
+              ruler={ruler}
+              selected={selKeys.has(refKey({ type: 'ruler', id: ruler.id }))}
+              hovered={hoverRuler === ruler.id && tool === 'select'}
+            />
+          ))}
         {dimmedOpenings.map((opening) => (
           <PlacementDims key={opening.id} plan={plan} opening={opening} pxPerCm={zoomScale} />
         ))}
@@ -808,6 +895,31 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               }}
             />
           ))}
+        {selRuler &&
+          measuresVisible &&
+          (['a', 'b'] as const).map((end) => {
+            const p = selRuler[end];
+            return (
+              <Handle
+                key={end}
+                x={p.x}
+                y={p.y}
+                pxPerCm={zoomScale}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.stopPropagation();
+                  const c = toPlan(e.clientX, e.clientY);
+                  startPlanDrag({
+                    kind: 'rulerEnd',
+                    id: selRuler.id,
+                    end,
+                    grabDelta: { x: p.x - c.x, y: p.y - c.y },
+                  });
+                  svgRef.current!.setPointerCapture(e.pointerId);
+                }}
+              />
+            );
+          })}
         {marquee && (
           <rect
             x={Math.min(marquee.a.x, marquee.b.x)}
@@ -830,7 +942,14 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           />
         )}
         {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
-        {tool === 'wall' && <SnapMarker snap={snap} />}
+        {/* Full live preview: the A→cursor segment already reads as the Ruler
+            (ISO arrows + live length), plus the SnapMarker at the aimed point. */}
+        {tool === 'ruler' && rulerA && snap && (
+          <RulerLabel
+            ruler={{ id: '__ghost', a: { x: rulerA.x, y: rulerA.y }, b: { x: snap.x, y: snap.y }, t: 0.5 }}
+          />
+        )}
+        {(tool === 'wall' || tool === 'ruler') && <SnapMarker snap={snap} />}
         {editing && (
           <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input
@@ -863,6 +982,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             ['wall', 'Wall', BrickWall],
             ['door', 'Door', DoorClosed],
             ['window', 'Window', Grid2x2],
+            ['ruler', 'Ruler', Ruler],
           ] as const
         ).map(([m, label, Icon]) => (
           <button
@@ -889,7 +1009,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             : `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
           : tool === 'door' || tool === 'window'
             ? 'Hover a wall, click to place'
-            : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
+            : tool === 'ruler'
+              ? rulerA
+                ? `Click to set the end point · ${keyHint('cancel')} / right-click cancels`
+                : `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
+              : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>

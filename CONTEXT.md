@@ -7,7 +7,7 @@ apartment. Simplicity beats precision.
 
 **Plan**:
 The single floor plan the user is editing — the whole document. Holds points,
-walls, openings, and room labels.
+walls, openings, room labels, and rulers.
 _Avoid_: Document, project, drawing
 
 **Point**:
@@ -117,6 +117,10 @@ number shown only for the duration of a gesture — the live length of the wall
 being drawn, a Placement dimension — is interaction chrome, not a measure, and
 never hides. A Room name is not a number the plan states about itself: it
 never hides either.
+The one thing that follows this toggle without being a Measure is the Ruler: it
+is stored in the plan, not computed from it, yet it hides on screen and drops
+from the export exactly as a Dimension does — a deliberate exception the rule
+tolerates rather than a hole in it (ADR 0017).
 _Avoid_: Measurement, cote, annotation
 
 **Dimension**:
@@ -144,14 +148,37 @@ footprint of a contained island, out to its walls' exterior Faces, is not
 floor: it is excluded.
 _Avoid_: Surface, square footage
 
+**Ruler**:
+A measurement the user hand-places between two points, rendered like a wall
+Dimension — ISO arrowheads at both ends, a line, a plated value reading its
+length — but laid directly on the segment from A to B, with no Face to offset
+from. Unlike a Measure it is part of the plan: its two endpoints, and the
+value's position along the segment, are stored and persist. Its endpoints are
+free integer-centimeter coordinates that reference no shared Point, so a Ruler
+never merges, splits, or couples to a wall — it measures the space it is drawn
+across, not any element. It follows the Measures toggle all the same: hidden
+when measures are hidden, absent from the export then too, and inert to the
+pointer while hidden — a stored object that still obeys a display preference
+(ADR 0017). Placed by two clicks — A, a live ghost, then B — snapping through
+the full ladder like any placement, the aimed position copied and never
+attached; drawing one with measures hidden turns them back on. After B the tool
+returns to Select with the new Ruler selected. Selectable like a wall and
+draggable by either endpoint; a marquee takes it only with both endpoints
+enclosed, and Delete removes it. The Tool panel states its Length, read-only —
+a Ruler is not resized by retyping. A single straight segment: no polyline, no
+angle, no free text.
+_Avoid_: Measure, Dimension, tape measure, guide
+
 **Tool**:
 The editor's active instrument, which determines what clicking the sheet does.
-Exactly one tool is active at a time: Select — the default —, Wall, Door, or
-Window. Pure editor state: never part of the plan.
+Exactly one tool is active at a time: Select — the default —, Wall, Door,
+Window, or Ruler. Activating the Ruler forces Measures on, since a tool that
+draws something the toggle can hide must not draw it into the void. Pure editor
+state: never part of the plan.
 _Avoid_: Mode
 
 **Selection**:
-The set of elements — walls, openings — the user is currently
+The set of elements — walls, openings, rulers — the user is currently
 acting on in the editor. Room labels are never selected: they are manipulated
 directly (dragged, edited in place). Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
@@ -170,7 +197,12 @@ reading is a state, not a memory of the gesture that produced it, and the
 Openings do not vote: the room still reads as itself when a Shift-click puts
 one of them out. A door in a party wall belongs to both rooms it separates —
 it has no side. Shift adds a room, following the marquee's rule — a room
-joins the set, never leaves it. Never part of the plan.
+joins the set, never leaves it. A Ruler joins the Selection like a wall, but
+only while measures are shown: hidden, it is inert to click, marquee, and
+Select-all, so a clean sheet stays clean. A marquee takes a Ruler only with
+both its endpoints enclosed — the wall rule, not the opening's — a group move
+carries it rigidly, and it never reads as part of a Room nor counts among a
+Selection's contents. Never part of the plan.
 _Avoid_: Highlight, marked elements
 
 **Tool panel**:

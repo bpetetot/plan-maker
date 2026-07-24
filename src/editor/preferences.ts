@@ -26,6 +26,14 @@ export function toggleMeasures(): void {
   saveMeasuresVisible(measures);
 }
 
+/** Force measures to a value; a no-op when already there so it never re-saves.
+ *  Entering the Ruler tool reveals measures (ticket 03): no inert object placed. */
+export function setMeasures(measures: boolean): void {
+  if (usePreferences.getState().measures === measures) return;
+  usePreferences.setState({ measures });
+  saveMeasuresVisible(measures);
+}
+
 /** The measure preference for a non-React reader — the PNG export (ADR 0008). */
 export const measuresVisible = (): boolean => usePreferences.getState().measures;
 

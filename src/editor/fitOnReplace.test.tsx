@@ -15,6 +15,7 @@ const farPlan = (): Plan => ({
   walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
   openings: {},
   roomLabels: {},
+  rulers: {},
 });
 
 // Fit = bbox + 120 cm margin per side, grown to screen aspect, centered.

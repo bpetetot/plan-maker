@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   addRoomLabel,
+  addRuler,
   addWall,
   clampOpeningOffset,
   commitPoint,
   commitWall,
   deleteOpening,
   deleteRoomLabel,
+  deleteRuler,
   deleteWall,
   ensurePoint,
   mergeCoincidentPoints,
   movePoint,
   moveRoomLabel,
+  moveRulerEndpoint,
   moveOpening,
   placeOpening,
   planarize,
@@ -26,7 +29,7 @@ import {
 } from './operations';
 import { openingRail } from './openings';
 import { buildPlan, squareRoomPlan } from './testHelpers';
-import { DOOR_WIDTH } from './types';
+import { DOOR_WIDTH, emptyPlan, isPlanEmpty } from './types';
 
 const rectPlan = () =>
   buildPlan((b) => {
@@ -778,5 +781,40 @@ describe('room label placement state', () => {
     expect(renamed.roomLabels[labelId].placed).toBeUndefined();
     const customThenRenamed = renameRoomLabel(moveRoomLabel(plan, labelId, 350, 120), labelId, 'Office');
     expect(customThenRenamed.roomLabels[labelId].placed).toBe(true);
+  });
+});
+
+describe('rulers', () => {
+  it('addRuler stores a free-coordinate segment centered at t = 0.5', () => {
+    const [next, id] = addRuler(emptyPlan(), { x: 10, y: 20 }, { x: 300, y: 20 });
+    expect(next.rulers[id]).toEqual({ id, a: { x: 10, y: 20 }, b: { x: 300, y: 20 }, t: 0.5 });
+  });
+
+  it('addRuler rounds endpoints to integer centimeters', () => {
+    const [next, id] = addRuler(emptyPlan(), { x: 10.4, y: 19.6 }, { x: 300.5, y: 20.2 });
+    expect(next.rulers[id]).toMatchObject({ a: { x: 10, y: 20 }, b: { x: 301, y: 20 } });
+  });
+
+  it('moveRulerEndpoint moves one end, rounding, and leaves the other alone', () => {
+    const [withRuler, id] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
+    const next = moveRulerEndpoint(withRuler, id, 'b', 150.6, 40.2);
+    expect(next.rulers[id]).toMatchObject({ a: { x: 0, y: 0 }, b: { x: 151, y: 40 } });
+  });
+
+  it('moveRulerEndpoint ignores an unknown ruler', () => {
+    const plan = emptyPlan();
+    expect(moveRulerEndpoint(plan, 'nope', 'a', 5, 5)).toBe(plan);
+  });
+
+  it('deleteRuler removes the segment and no-ops on an unknown id', () => {
+    const [withRuler, id] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
+    expect(deleteRuler(withRuler, id).rulers).toEqual({});
+    expect(deleteRuler(withRuler, 'nope')).toBe(withRuler);
+  });
+
+  it('isPlanEmpty counts rulers alongside walls, openings, and labels', () => {
+    const [withRuler] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
+    expect(isPlanEmpty(emptyPlan())).toBe(true);
+    expect(isPlanEmpty(withRuler)).toBe(false);
   });
 });

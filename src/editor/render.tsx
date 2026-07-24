@@ -6,7 +6,7 @@ import { openingPlacement, openingRail } from '../model/openings';
 import type { Room } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import { roomAt, roomKey } from '../model/rooms';
-import type { Door, Opening, Plan, RoomLabel, Wall } from '../model/types';
+import type { Door, Opening, Plan, RoomLabel, Ruler, Wall } from '../model/types';
 import type { Snap } from '../model/snap';
 
 // Values live in styles.css; the PNG export pins the light ones in its own
@@ -473,6 +473,97 @@ export function DimLabel({
   );
 }
 
+// A hand-placed Ruler (CONTEXT.md), drawn like a wall Dimension but laid
+// directly on its own A→B segment: no face offset, value is the raw distance.
+export function RulerLabel({
+  ruler,
+  selected,
+  hovered,
+  fontPx = DIM_FONT_PX,
+  onPointerDown,
+}: {
+  ruler: Ruler;
+  selected?: boolean;
+  hovered?: boolean;
+  fontPx?: number;
+  onPointerDown?: (e: React.PointerEvent) => void;
+}) {
+  const { a, b, t } = ruler;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1) return null;
+  const ux = dx / length;
+  const uy = dy / length;
+  const angle = labelAngle(dx, dy);
+  const label = formatLength(length);
+  const at = (s: number) => ({ x: a.x + ux * s, y: a.y + uy * s });
+  const tText = t * length;
+  const mid = at(tText);
+  const gapHalf = plateHalfWidth(label, fontPx);
+  // Line and arrows tint on hover like a wall body; the plate text stays plain.
+  const stroke = selected ? COLORS.wallSelected : hovered ? COLORS.wallHover : undefined;
+  return (
+    <g>
+      <ExtentLine
+        at={at}
+        ux={ux}
+        uy={uy}
+        from={0}
+        to={length}
+        gapFrom={tText - gapHalf}
+        gapTo={tText + gapHalf}
+        stroke={stroke}
+      />
+      <g
+        transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
+        pointerEvents={onPointerDown ? 'auto' : 'none'}
+        style={onPointerDown ? { cursor: 'move' } : undefined}
+        onPointerDown={onPointerDown}
+      >
+        {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
+        <DimText label={label} fontPx={fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
+      </g>
+    </g>
+  );
+}
+
+// Screen px, non-scaling-stroke: a Ruler has no body to add a margin to, so the
+// grab zone is a constant-width transparent line laid on the A→B segment.
+const RULER_GRAB_STROKE = 12;
+
+// Render after the value so the segment wins the click (CONTEXT.md: Grab zone).
+export function RulerGrabZone({
+  ruler,
+  onPointerDown,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  ruler: Ruler;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
+}) {
+  const { a, b } = ruler;
+  return (
+    <line
+      className="ruler-grab"
+      x1={a.x}
+      y1={a.y}
+      x2={b.x}
+      y2={b.y}
+      stroke="transparent"
+      strokeWidth={RULER_GRAB_STROKE}
+      strokeLinecap="round"
+      vectorEffect="non-scaling-stroke"
+      style={{ cursor: 'move' }}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    />
+  );
+}
+
 // Screen pixels: 9px measure text plus 5px of padding each side.
 const CHIP_HEIGHT = 16;
 const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10;
@@ -819,6 +910,10 @@ export function PlanScene({
       {measuresVisible &&
         Object.values(plan.walls).map((wall) => (
           <DimLabel key={wall.id} plan={plan} wall={wall} fontPx={dimFontPx} />
+        ))}
+      {measuresVisible &&
+        Object.values(plan.rulers).map((ruler) => (
+          <RulerLabel key={ruler.id} ruler={ruler} fontPx={dimFontPx} />
         ))}
     </>
   );
