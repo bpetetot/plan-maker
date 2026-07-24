@@ -1,7 +1,7 @@
 import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { openingPlacement } from './openings';
-import { deleteOpening, deleteWall, setPoints, translateRoomLabel } from './operations';
+import { deleteOpening, deleteRuler, deleteWall, setPoints, translateRoomLabel } from './operations';
 import type { Room } from './rooms';
 import {
   detectRooms,
@@ -19,7 +19,7 @@ import type { Opening, Plan, Point } from './types';
 // selected.
 
 export interface ElementRef {
-  type: 'wall' | 'opening';
+  type: 'wall' | 'opening' | 'ruler';
   id: string;
 }
 
@@ -34,17 +34,20 @@ export function toggleRef(selection: ElementRef[], ref: ElementRef): ElementRef[
   return isSelected(selection, ref) ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref];
 }
 
-/** Everything a Selection can hold: every Wall and every Opening the plan has
- *  (CONTEXT.md: Selection). */
-export function allElements(plan: Plan): ElementRef[] {
+/** Everything a Selection can hold: every Wall, Opening, and Ruler the plan has
+ *  (CONTEXT.md: Selection). Rulers join only while measures are shown, so the
+ *  caller passes `includeRulers` — you can only select what is drawn. */
+export function allElements(plan: Plan, includeRulers = false): ElementRef[] {
   return [
     ...Object.keys(plan.walls).map((id): ElementRef => ({ type: 'wall', id })),
     ...Object.keys(plan.openings).map((id): ElementRef => ({ type: 'opening', id })),
+    ...(includeRulers ? Object.keys(plan.rulers).map((id): ElementRef => ({ type: 'ruler', id })) : []),
   ];
 }
 
 // Marquee capture: containment, not intersection. Wall thickness ignored.
-export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
+// Rulers join only while measures are shown, so the caller passes `includeRulers`.
+export function elementsInRect(plan: Plan, a: Vec, b: Vec, includeRulers = false): ElementRef[] {
   const minX = Math.min(a.x, b.x);
   const maxX = Math.max(a.x, b.x);
   const minY = Math.min(a.y, b.y);
@@ -65,6 +68,14 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec): ElementRef[] {
     const hy = (Math.sin(angle) * opening.width) / 2;
     if (inside(placement.cx - hx, placement.cy - hy) && inside(placement.cx + hx, placement.cy + hy)) {
       refs.push({ type: 'opening', id: opening.id });
+    }
+  }
+  // Both endpoints inside, like a wall — one marquee, one capture semantic.
+  if (includeRulers) {
+    for (const ruler of Object.values(plan.rulers)) {
+      if (inside(ruler.a.x, ruler.a.y) && inside(ruler.b.x, ruler.b.y)) {
+        refs.push({ type: 'ruler', id: ruler.id });
+      }
     }
   }
   return refs;
@@ -128,7 +139,8 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan;
   for (const ref of refs) {
     if (ref.type === 'wall') next = deleteWall(next, ref.id);
-    else next = deleteOpening(next, ref.id);
+    else if (ref.type === 'opening') next = deleteOpening(next, ref.id);
+    else next = deleteRuler(next, ref.id);
   }
   return reconcileRoomLabels(plan, next);
 }
@@ -190,11 +202,28 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
       updates[point.id] = { x: point.x + dx, y: point.y + dy };
     }
   }
-  if (Object.keys(updates).length === 0) return plan;
-  let next = setPoints(plan, updates);
+  // Rulers ride along rigidly: free coordinates, so both endpoints just shift
+  // and `t` (a ratio) is untouched; they never anchor grid realignment.
+  const rulerRefs = refs.filter((ref) => ref.type === 'ruler' && plan.rulers[ref.id]);
+  const movesWalls = Object.keys(updates).length > 0;
+  if (!movesWalls && rulerRefs.length === 0) return plan;
+
+  let next = movesWalls ? setPoints(plan, updates) : plan;
+  if (rulerRefs.length > 0) {
+    const rulers = { ...next.rulers };
+    for (const ref of rulerRefs) {
+      const r = next.rulers[ref.id];
+      rulers[ref.id] = {
+        ...r,
+        a: { x: Math.round(r.a.x + dx), y: Math.round(r.a.y + dy) },
+        b: { x: Math.round(r.b.x + dx), y: Math.round(r.b.y + dy) },
+      };
+    }
+    next = { ...next, rulers };
+  }
 
   const labels = Object.values(plan.roomLabels);
-  if (labels.length > 0) {
+  if (movesWalls && labels.length > 0) {
     const selected = new Set(refs.filter((r) => r.type === 'wall').map((r) => r.id));
     const rigid = (room: Room) => {
       const wallIds = roomWallIds(plan, room);

@@ -3,7 +3,7 @@ import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { clampCenter, openingPlacement, openingRail } from './openings';
 import type { Snap } from './snap';
-import type { Opening, Plan, Wall } from './types';
+import type { Opening, Plan, Ruler, Wall } from './types';
 import { defaultOpeningWidth, WALL_THICKNESS } from './types';
 
 const newId = () => nanoid(10);
@@ -494,4 +494,35 @@ export function deleteRoomLabel(plan: Plan, id: string): Plan {
   const roomLabels = { ...plan.roomLabels };
   delete roomLabels[id];
   return { ...plan, roomLabels };
+}
+
+// Free-coordinate measurement (CONTEXT.md: Ruler); `t` centers the value.
+export function addRuler(
+  plan: Plan,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  t = 0.5,
+): [Plan, string] {
+  const id = newId();
+  const ruler: Ruler = {
+    id,
+    a: { x: Math.round(a.x), y: Math.round(a.y) },
+    b: { x: Math.round(b.x), y: Math.round(b.y) },
+    t,
+  };
+  return [{ ...plan, rulers: { ...plan.rulers, [id]: ruler } }, id];
+}
+
+export function moveRulerEndpoint(plan: Plan, id: string, end: 'a' | 'b', x: number, y: number): Plan {
+  const ruler = plan.rulers[id];
+  if (!ruler) return plan;
+  const moved = { ...ruler, [end]: { x: Math.round(x), y: Math.round(y) } };
+  return { ...plan, rulers: { ...plan.rulers, [id]: moved } };
+}
+
+export function deleteRuler(plan: Plan, id: string): Plan {
+  if (!plan.rulers[id]) return plan;
+  const rulers = { ...plan.rulers };
+  delete rulers[id];
+  return { ...plan, rulers };
 }

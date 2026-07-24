@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildPlan } from '../model/testHelpers';
-import { addRoomLabel } from '../model/operations';
+import { addRoomLabel, addRuler, moveRulerEndpoint } from '../model/operations';
 import { emptyPlan } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, replacePlan, undo, usePlanStore } from './planStore';
 
@@ -65,6 +65,26 @@ describe('planStore undo/redo', () => {
     expect(plan()).toBe(imported);
     expect(temporal().pastStates).toHaveLength(0);
     expect(temporal().futureStates).toHaveLength(0);
+  });
+
+  it('collapses a ruler endpoint drag into one undo that restores the start', () => {
+    let id = '';
+    usePlanStore.getState().setPlan((p) => {
+      const [next, rid] = addRuler(p, { x: 0, y: 0 }, { x: 100, y: 0 });
+      id = rid;
+      return next;
+    });
+
+    beginHistoryGroup();
+    usePlanStore.getState().setPlan((p) => moveRulerEndpoint(p, id, 'b', 120, 10));
+    usePlanStore.getState().setPlan((p) => moveRulerEndpoint(p, id, 'b', 150, 40));
+    endHistoryGroup();
+    expect(plan().rulers[id].b).toEqual({ x: 150, y: 40 });
+
+    undo();
+    expect(plan().rulers[id].b).toEqual({ x: 100, y: 0 });
+    redo();
+    expect(plan().rulers[id].b).toEqual({ x: 150, y: 40 });
   });
 
   it('caps history at 100 steps', () => {

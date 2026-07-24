@@ -53,11 +53,21 @@ export interface RoomLabel {
   placed?: true;
 }
 
+// A hand-placed measurement (CONTEXT.md: Ruler). Free coordinates, not shared
+// Points; `t` slides the value along A→B (ratio [0,1], default 0.5).
+export interface Ruler {
+  id: string;
+  a: { x: Cm; y: Cm };
+  b: { x: Cm; y: Cm };
+  t: number;
+}
+
 export interface Plan {
   points: Record<string, Point>;
   walls: Record<string, Wall>;
   openings: Record<string, Opening>;
   roomLabels: Record<string, RoomLabel>;
+  rulers: Record<string, Ruler>;
 }
 
 export const WALL_THICKNESS: Cm = 10;
@@ -70,7 +80,7 @@ export const defaultOpeningWidth = (type: Opening['type']): Cm =>
   type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH;
 
 export function emptyPlan(): Plan {
-  return { points: {}, walls: {}, openings: {}, roomLabels: {} };
+  return { points: {}, walls: {}, openings: {}, roomLabels: {}, rulers: {} };
 }
 
 export function isPlanEmpty(plan: Plan): boolean {
@@ -78,6 +88,7 @@ export function isPlanEmpty(plan: Plan): boolean {
     Object.keys(plan.points).length === 0 &&
     Object.keys(plan.walls).length === 0 &&
     Object.keys(plan.openings).length === 0 &&
-    Object.keys(plan.roomLabels).length === 0
+    Object.keys(plan.roomLabels).length === 0 &&
+    Object.keys(plan.rulers).length === 0
   );
 }

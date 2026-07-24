@@ -1,6 +1,6 @@
 import { mergeCoincidentPoints } from '../model/operations';
 import { dropOrphanRoomLabels } from '../model/rooms';
-import type { Opening, Plan } from '../model/types';
+import type { Opening, Plan, Ruler } from '../model/types';
 
 // Spec §7: the IndexedDB record and the JSON export file share this version.
 export const SCHEMA_VERSION = 2;
@@ -44,6 +44,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 // Spec §2: units are integer centimeters.
 const isCm = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value);
+
+const isCmPoint = (value: unknown): value is { x: number; y: number } =>
+  isRecord(value) && isCm(value.x) && isCm(value.y);
+
+// Free coordinates (not shared Points), `t` a ratio in [0, 1]; see CONTEXT.md.
+function isValidRuler(value: unknown): value is Ruler {
+  if (!isRecord(value) || typeof value.id !== 'string') return false;
+  if (!isCmPoint(value.a) || !isCmPoint(value.b)) return false;
+  return typeof value.t === 'number' && Number.isFinite(value.t) && value.t >= 0 && value.t <= 1;
+}
 
 function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening {
   if (!isRecord(value)) return false;
@@ -90,5 +100,13 @@ export function validatePlan(value: unknown): Plan | null {
     if (label.placed !== undefined && label.placed !== true) return null;
   }
 
-  return value as unknown as Plan;
+  // Rulers arrived after v2 (pre-production, no migration): plans without the
+  // field are valid and read as empty.
+  const rulers = value.rulers ?? {};
+  if (!isRecord(rulers)) return null;
+  for (const [id, ruler] of Object.entries(rulers)) {
+    if (!isValidRuler(ruler) || ruler.id !== id) return null;
+  }
+
+  return { ...value, rulers } as unknown as Plan;
 }

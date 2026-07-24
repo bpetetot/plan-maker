@@ -13,6 +13,7 @@ function planWith(opening: Opening): Plan {
     walls: { w: wall },
     openings: { [opening.id]: opening },
     roomLabels: {},
+    rulers: {},
   };
 }
 

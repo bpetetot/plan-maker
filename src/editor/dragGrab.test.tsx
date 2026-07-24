@@ -20,6 +20,7 @@ const openingPlan = (): Plan => ({
   walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
   openings: { o1: { id: 'o1', wallId: 'w1', type: 'window', offset: 150, width: 120 } },
   roomLabels: {},
+  rulers: {},
 });
 
 const renderEditor = async (plan: Plan) => {
@@ -86,6 +87,7 @@ const labeledRoomPlan = (): Plan => ({
   },
   openings: {},
   roomLabels: { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } },
+  rulers: {},
 });
 
 describe('dragging a room label keeps the grab point under the cursor', () => {

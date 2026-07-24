@@ -53,6 +53,7 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
   'tool:wall': { hotkey: '2', name: 'Wall tool', sections: { tools: 'Wall tool' } },
   'tool:door': { hotkey: '3', name: 'Door tool', sections: { tools: 'Door tool' } },
   'tool:window': { hotkey: '4', name: 'Window tool', sections: { tools: 'Window tool' } },
+  'tool:ruler': { hotkey: '5', name: 'Ruler tool', sections: { tools: 'Ruler tool' } },
   cancel: {
     hotkey: 'Escape',
     name: 'Cancel',

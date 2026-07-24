@@ -7,12 +7,14 @@ import {
   FlipVertical2,
   Grid2x2,
   Layers,
+  Ruler,
   Scan,
   Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
+import { distance } from '../model/geometry';
 import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
 import type { Room } from '../model/rooms';
 import { roomLabelAt, wallMeasures } from '../model/rooms';
@@ -50,13 +52,15 @@ export function ToolPanel({
   onDelete,
 }: ToolPanelProps) {
   if (sel.length === 0) {
-    if (tool === 'select') return null;
+    // Ruler has no pre-placement defaults; its selected panel is ticket 09.
+    if (tool === 'select' || tool === 'ruler') return null;
     return <ToolDefaultsFacet tool={tool} defaults={defaults} setDefaults={setDefaults} />;
   }
   const only = sel.length === 1 ? sel[0] : null;
   const wall = only?.type === 'wall' ? (plan.walls[only.id] ?? null) : null;
   const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null;
-  if (only && !wall && !opening) return null;
+  const ruler = only?.type === 'ruler' ? (plan.rulers[only.id] ?? null) : null;
+  if (only && !wall && !opening && !ruler) return null;
 
   // The room is read from the selection, not held in it (ADR 0014), so a
   // marquee over the same walls reads the same room.
@@ -66,7 +70,9 @@ export function ToolPanel({
     ? [Scan, roomLabelAt(plan, room)?.name || 'Room']
     : !only
       ? [Layers, `${sel.length} elements`]
-      : ELEMENT_META[wall ? 'wall' : opening!.type];
+      : ruler
+        ? [Ruler, 'Ruler']
+        : ELEMENT_META[wall ? 'wall' : opening!.type];
 
   // CONTEXT.md: Tool panel. A room counts its boundary, never its refs: a
   // Shift+click that unlights one of its doors must not lower the count.
@@ -100,6 +106,17 @@ export function ToolPanel({
               />
             </div>
           )}
+        </section>
+      )}
+      {ruler && (
+        <section>
+          <div className="panel-section-label">Dimensions</div>
+          <div className="panel-row">
+            <span className="panel-row-label">Length</span>
+            <span className="panel-row-value">
+              {formatLength(distance(ruler.a.x, ruler.a.y, ruler.b.x, ruler.b.y))}
+            </span>
+          </div>
         </section>
       )}
       {contents && <ContentsRows contents={contents} zeros={room !== null} />}
@@ -141,7 +158,7 @@ function ToolDefaultsFacet({
   defaults,
   setDefaults,
 }: {
-  tool: Exclude<Tool, 'select'>;
+  tool: Exclude<Tool, 'select' | 'ruler'>;
   defaults: ToolDefaults;
   setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void;
 }) {
