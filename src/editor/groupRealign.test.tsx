@@ -25,6 +25,7 @@ function offGridWall(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 
@@ -94,6 +95,7 @@ function wallNearAPoint(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 
@@ -124,6 +126,7 @@ function walledOpenings(): Plan {
     },
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 

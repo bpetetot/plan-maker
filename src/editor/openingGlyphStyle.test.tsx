@@ -14,6 +14,7 @@ function planWith(opening: Opening): Plan {
     openings: { [opening.id]: opening },
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 

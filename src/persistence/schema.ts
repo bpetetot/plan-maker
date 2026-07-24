@@ -1,6 +1,6 @@
 import { mergeCoincidentPoints } from '../model/operations';
 import { dropOrphanRoomLabels } from '../model/rooms';
-import type { Opening, Plan, Ruler } from '../model/types';
+import type { Opening, Plan, Ruler, TextNote } from '../model/types';
 
 // Spec §7: the IndexedDB record and the JSON export file share this version.
 export const SCHEMA_VERSION = 2;
@@ -53,6 +53,14 @@ function isValidRuler(value: unknown): value is Ruler {
   if (!isRecord(value) || typeof value.id !== 'string') return false;
   if (!isCmPoint(value.a) || !isCmPoint(value.b)) return false;
   return typeof value.t === 'number' && Number.isFinite(value.t) && value.t >= 0 && value.t <= 1;
+}
+
+// Free coordinates (not shared Points), a preset size; see CONTEXT.md.
+function isValidTextNote(value: unknown): value is TextNote {
+  if (!isRecord(value) || typeof value.id !== 'string') return false;
+  if (!isCm(value.x) || !isCm(value.y)) return false;
+  if (typeof value.content !== 'string') return false;
+  return value.size === 'S' || value.size === 'M' || value.size === 'L';
 }
 
 function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening {
@@ -108,5 +116,13 @@ export function validatePlan(value: unknown): Plan | null {
     if (!isValidRuler(ruler) || ruler.id !== id) return null;
   }
 
-  return { ...value, rulers } as unknown as Plan;
+  // Texts arrived after v2 (pre-production, no migration): plans without the
+  // field are valid and read as empty.
+  const texts = value.texts ?? {};
+  if (!isRecord(texts)) return null;
+  for (const [id, text] of Object.entries(texts)) {
+    if (!isValidTextNote(text) || text.id !== id) return null;
+  }
+
+  return { ...value, rulers, texts } as unknown as Plan;
 }

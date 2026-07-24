@@ -15,6 +15,7 @@ function planWithWindow(): { plan: Plan; wall: Wall; opening: Opening } {
     openings: { o: opening },
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
   return { plan, wall, opening };
 }

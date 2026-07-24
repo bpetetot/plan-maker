@@ -23,6 +23,7 @@ import type { ElementRef } from './selection';
 const wallRef = (id: string): ElementRef => ({ type: 'wall', id });
 const openingRef = (id: string): ElementRef => ({ type: 'opening', id });
 const rulerRef = (id: string): ElementRef => ({ type: 'ruler', id });
+const textRef = (id: string): ElementRef => ({ type: 'text', id });
 
 describe('toggleRef', () => {
   it('adds a ref that is not in the selection', () => {
@@ -108,6 +109,22 @@ describe('elementsInRect', () => {
     expect(isSelected(refs, rulerRef('in'))).toBe(true);
     expect(isSelected(refs, rulerRef('out'))).toBe(false); // B sticks out of the rect
   });
+
+  it('captures a Text when its anchor is enclosed — always, never measure-gated', () => {
+    const plan = {
+      ...emptyPlan(),
+      texts: {
+        in: { id: 'in', x: 50, y: 50, content: 'Kitchen', size: 'M' as const },
+        out: { id: 'out', x: 300, y: 50, content: 'Hall', size: 'M' as const },
+      },
+    };
+    const a = { x: 0, y: 0 };
+    const b = { x: 100, y: 100 };
+    // Text is always-visible content: the `includeRulers` flag never gates it.
+    const refs = elementsInRect(plan, a, b);
+    expect(isSelected(refs, textRef('in'))).toBe(true);
+    expect(isSelected(refs, textRef('out'))).toBe(false); // anchor outside the rect
+  });
 });
 
 describe('allElements', () => {
@@ -138,6 +155,15 @@ describe('allElements', () => {
     };
     expect(allElements(plan)).toEqual([]); // omitted by default
     expect(allElements(plan, true)).toEqual([rulerRef('r')]);
+  });
+
+  it('always includes Texts — never gated by the measures flag', () => {
+    const plan = {
+      ...emptyPlan(),
+      texts: { t: { id: 't', x: 0, y: 0, content: 'Note', size: 'M' as const } },
+    };
+    expect(allElements(plan)).toEqual([textRef('t')]); // present even with rulers off
+    expect(allElements(plan, true)).toEqual([textRef('t')]);
   });
 });
 
@@ -188,6 +214,19 @@ describe('deleteElements', () => {
     const next = deleteElements(plan, [rulerRef('r')]);
     expect(next.rulers.r).toBeUndefined();
     expect(next.rulers.keep).toBeDefined();
+  });
+
+  it('deletes a Text, leaving the others', () => {
+    const plan = {
+      ...emptyPlan(),
+      texts: {
+        t: { id: 't', x: 0, y: 0, content: 'Gone', size: 'M' as const },
+        keep: { id: 'keep', x: 50, y: 50, content: 'Stay', size: 'M' as const },
+      },
+    };
+    const next = deleteElements(plan, [textRef('t')]);
+    expect(next.texts.t).toBeUndefined();
+    expect(next.texts.keep).toBeDefined();
   });
 });
 
@@ -259,6 +298,28 @@ describe('translateElements', () => {
     expect(next.rulers.r.a).toEqual({ x: 60, y: 0 });
     expect(next.rulers.r.b).toEqual({ x: 160, y: 0 });
     expect(next.rulers.r.t).toBe(0.5); // a ratio, untouched by the shift
+  });
+
+  it('rides a selected Text rigidly, shifting its anchor', () => {
+    const base = squareRoomPlan();
+    const wall = Object.values(base.walls)[0];
+    const plan = {
+      ...base,
+      texts: { t: { id: 't', x: 10, y: 20, content: 'Note', size: 'M' as const } },
+    };
+    const next = translateElements(plan, [wallRef(wall.id), textRef('t')], 50, -20);
+    expect(next.texts.t.x).toBe(60);
+    expect(next.texts.t.y).toBe(0);
+  });
+
+  it('translates a Text-only selection (no walls to move)', () => {
+    const plan = {
+      ...emptyPlan(),
+      texts: { t: { id: 't', x: 5, y: 5, content: 'Note', size: 'M' as const } },
+    };
+    const next = translateElements(plan, [textRef('t')], 30, 40);
+    expect(next.texts.t.x).toBe(35);
+    expect(next.texts.t.y).toBe(45);
   });
 
   it('translates a Ruler-only selection (no walls to move)', () => {
@@ -530,6 +591,19 @@ describe('selectedRoom', () => {
     const sel = [...roomWallIds(plan, rooms[0])!.map(wallRef), openingRef(openingId)];
     expect(selectedRoom(plan, rooms, sel)).toBeNull();
   });
+
+  // A Text is free content, never part of a Room (CONTEXT.md: Text): a selection
+  // that holds one can never read as its room, even over the exact boundary.
+  it('reads nothing once a Text joins an otherwise exact room selection', () => {
+    const plan = {
+      ...twoRoomPlan(),
+      texts: { t: { id: 't', x: 200, y: 200, content: 'x', size: 'M' as const } },
+    };
+    const rooms = detectRooms(plan);
+    const left = roomAt(rooms, 200, 200)!;
+    const sel = [...roomWallIds(plan, left)!.map(wallRef), textRef('t')];
+    expect(selectedRoom(plan, rooms, sel)).toBeNull();
+  });
 });
 
 // The refs a room reads as: clicking it and marqueeing it must land on the
@@ -586,6 +660,14 @@ describe('contents', () => {
     });
     const refs = [...Object.keys(plan.walls).map(wallRef), ...Object.keys(plan.openings).map(openingRef)];
     expect(selectionContents(plan, refs)).toEqual({ walls: 2, doors: 1, windows: 1 });
+  });
+
+  it('never tallies a Text (it is not wall, door, or window)', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    const refs = [...Object.keys(plan.walls).map(wallRef), textRef('t')];
+    expect(selectionContents(plan, refs)).toEqual({ walls: 1, doors: 0, windows: 0 });
   });
 
   it('counts nothing for refs pointing at elements the plan no longer holds', () => {

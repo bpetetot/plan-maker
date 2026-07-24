@@ -1,7 +1,14 @@
 import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { openingPlacement } from './openings';
-import { deleteOpening, deleteRuler, deleteWall, setPoints, translateRoomLabel } from './operations';
+import {
+  deleteOpening,
+  deleteRuler,
+  deleteText,
+  deleteWall,
+  setPoints,
+  translateRoomLabel,
+} from './operations';
 import type { Room } from './rooms';
 import {
   detectRooms,
@@ -19,7 +26,7 @@ import type { Opening, Plan, Point } from './types';
 // selected.
 
 export interface ElementRef {
-  type: 'wall' | 'opening' | 'ruler';
+  type: 'wall' | 'opening' | 'ruler' | 'text';
   id: string;
 }
 
@@ -34,14 +41,16 @@ export function toggleRef(selection: ElementRef[], ref: ElementRef): ElementRef[
   return isSelected(selection, ref) ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref];
 }
 
-/** Everything a Selection can hold: every Wall, Opening, and Ruler the plan has
- *  (CONTEXT.md: Selection). Rulers join only while measures are shown, so the
- *  caller passes `includeRulers` — you can only select what is drawn. */
+/** Everything a Selection can hold: every Wall, Opening, Ruler, and Text the
+ *  plan has (CONTEXT.md: Selection). Rulers join only while measures are shown,
+ *  so the caller passes `includeRulers`; a Text is always-visible content, so it
+ *  is always included — you can only select what is drawn. */
 export function allElements(plan: Plan, includeRulers = false): ElementRef[] {
   return [
     ...Object.keys(plan.walls).map((id): ElementRef => ({ type: 'wall', id })),
     ...Object.keys(plan.openings).map((id): ElementRef => ({ type: 'opening', id })),
     ...(includeRulers ? Object.keys(plan.rulers).map((id): ElementRef => ({ type: 'ruler', id })) : []),
+    ...Object.keys(plan.texts).map((id): ElementRef => ({ type: 'text', id })),
   ];
 }
 
@@ -77,6 +86,11 @@ export function elementsInRect(plan: Plan, a: Vec, b: Vec, includeRulers = false
         refs.push({ type: 'ruler', id: ruler.id });
       }
     }
+  }
+  // A Text is a point, not a segment: its anchor enclosed is the whole capture,
+  // and it is never measure-gated (always-visible content).
+  for (const text of Object.values(plan.texts)) {
+    if (inside(text.x, text.y)) refs.push({ type: 'text', id: text.id });
   }
   return refs;
 }
@@ -140,7 +154,8 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   for (const ref of refs) {
     if (ref.type === 'wall') next = deleteWall(next, ref.id);
     else if (ref.type === 'opening') next = deleteOpening(next, ref.id);
-    else next = deleteRuler(next, ref.id);
+    else if (ref.type === 'ruler') next = deleteRuler(next, ref.id);
+    else next = deleteText(next, ref.id);
   }
   return reconcileRoomLabels(plan, next);
 }
@@ -205,8 +220,11 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
   // Rulers ride along rigidly: free coordinates, so both endpoints just shift
   // and `t` (a ratio) is untouched; they never anchor grid realignment.
   const rulerRefs = refs.filter((ref) => ref.type === 'ruler' && plan.rulers[ref.id]);
+  // Texts ride along the same way: a free anchor shifted by the delta, never a
+  // grid-realignment anchor (like a Ruler).
+  const textRefs = refs.filter((ref) => ref.type === 'text' && plan.texts[ref.id]);
   const movesWalls = Object.keys(updates).length > 0;
-  if (!movesWalls && rulerRefs.length === 0) return plan;
+  if (!movesWalls && rulerRefs.length === 0 && textRefs.length === 0) return plan;
 
   let next = movesWalls ? setPoints(plan, updates) : plan;
   if (rulerRefs.length > 0) {
@@ -220,6 +238,14 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
       };
     }
     next = { ...next, rulers };
+  }
+  if (textRefs.length > 0) {
+    const texts = { ...next.texts };
+    for (const ref of textRefs) {
+      const t = next.texts[ref.id];
+      texts[ref.id] = { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) };
+    }
+    next = { ...next, texts };
   }
 
   const labels = Object.values(plan.roomLabels);

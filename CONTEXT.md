@@ -7,7 +7,7 @@ apartment. Simplicity beats precision.
 
 **Plan**:
 The single floor plan the user is editing — the whole document. Holds points,
-walls, openings, room labels, and rulers.
+walls, openings, room labels, rulers, and texts.
 _Avoid_: Document, project, drawing
 
 **Point**:
@@ -120,7 +120,10 @@ never hides either.
 The one thing that follows this toggle without being a Measure is the Ruler: it
 is stored in the plan, not computed from it, yet it hides on screen and drops
 from the export exactly as a Dimension does — a deliberate exception the rule
-tolerates rather than a hole in it (ADR 0017).
+tolerates rather than a hole in it (ADR 0017). A Text is the opposite corner and
+no exception at all: also stored, but content the user wrote rather than a number
+the plan states about itself, so it never follows the toggle — always visible,
+always exported (ADR 0021), as the Room name is.
 _Avoid_: Measurement, cote, annotation
 
 **Dimension**:
@@ -169,23 +172,46 @@ a Ruler is not resized by retyping. A single straight segment: no polyline, no
 angle, no free text.
 _Avoid_: Measure, Dimension, tape measure, guide
 
+**Text**:
+A free-text annotation the user places on the sheet — one or more lines of prose
+laid at a point, drawn as itself and not as any Dimension. Like a Ruler it is
+part of the plan: its position, its content, and its size are stored and persist.
+Its position is a free integer-centimeter top-left anchor that references no
+shared Point, so a Text never merges, splits, or couples to a wall — it sits
+where it is placed and moves only when dragged, as a whole block. Unlike a Ruler
+it is content, not a measure: it never follows the Measures toggle, staying
+always visible and always exported, and inert to nothing — clickable, marquee-
+able, and draggable whether measures show or not (ADR 0021). Placed by a single
+click that drops the anchor and opens an inline editor on the canvas — a textarea
+in plan coordinates that grows down and to the right, Enter making a newline,
+commit on blur or Mod+Enter, Escape cancelling; an empty commit places nothing.
+After the commit the tool returns to Select with the new Text selected, and a
+double-click on a placed Text re-opens the editor. Its size is one of an S/M/L
+preset — a real size on the sheet that zooms with the plan, like a room label,
+chosen in the Tool panel with the last used becoming the tool default. Horizontal
+only, one style for all: no rotation, no rich runs, no per-text color or font.
+_Avoid_: Label, note, caption, annotation, callout
+
 **Tool**:
 The editor's active instrument, which determines what clicking the sheet does.
 Exactly one tool is active at a time: Select — the default —, Wall, Door,
-Window, or Ruler. Activating the Ruler forces Measures on, since a tool that
-draws something the toggle can hide must not draw it into the void. A drawing
-tool is one-shot: completing a placement hands the tool back to Select and
-leaves the result as the Selection — the walls a chain drew (which read as a
-Room when they close one), the Opening just set, the Ruler just measured.
+Window, Ruler, or Text. Activating the Ruler forces Measures on, since a tool
+that draws something the toggle can hide must not draw it into the void; the
+Text tool forces nothing, since a Text is always visible and can never be drawn
+into a hidden layer (ADR 0021). A drawing tool is one-shot: completing a
+placement hands the tool back to Select and leaves the result as the Selection —
+the walls a chain drew (which read as a Room when they close one), the Opening
+just set, the Ruler just measured, the Text just written.
 Completion is a positive finish only — a chain closed onto its start or ended
-by a double-click, an Opening placed, a Ruler's second click — never an abort:
-Escape or right-click ends the pending chain or Ruler point but keeps the tool,
-and a finish that placed nothing keeps it too (ADR 0018). Pure editor state:
+by a double-click, an Opening placed, a Ruler's second click, a Text committed
+with non-empty content — never an abort: Escape or right-click ends the pending
+chain or Ruler point but keeps the tool, an empty Text commits nothing and keeps
+it, and a finish that placed nothing keeps it too (ADR 0018). Pure editor state:
 never part of the plan.
 _Avoid_: Mode
 
 **Selection**:
-The set of elements — walls, openings, rulers — the user is currently
+The set of elements — walls, openings, rulers, texts — the user is currently
 acting on in the editor. Room labels are never selected: they are manipulated
 directly (dragged, edited in place). Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
@@ -209,6 +235,12 @@ only while measures are shown: hidden, it is inert to click, marquee, and
 Select-all, so a clean sheet stays clean. A marquee takes a Ruler only with
 both its endpoints enclosed — the wall rule, not the opening's — a group move
 carries it rigidly, and it never reads as part of a Room nor counts among a
+Selection's contents. A Text joins like a Ruler but is never measures-gated —
+always live to click, marquee, and Select-all, since it is always visible
+content (ADR 0021). Having one anchor rather than two endpoints, a marquee takes
+it when that anchor is enclosed, and it has no endpoint handles — the whole
+block drags as one. Like a Ruler it moves rigidly in a group, is never a
+realignment reference, and never reads as part of a Room nor counts among a
 Selection's contents. Never part of the plan.
 _Avoid_: Highlight, marked elements
 

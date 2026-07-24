@@ -25,6 +25,7 @@ function onePlan(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 

@@ -42,6 +42,22 @@ describe('serializePlanFile / parsePlanFile', () => {
     if (result.ok) expect(result.plan.rulers).toEqual({});
   });
 
+  it('round-trips texts through the file envelope', () => {
+    const plan = squarePlan();
+    plan.texts['t1'] = { id: 't1', x: 100, y: 120, content: 'Salon\néclairé', size: 'M' };
+    const result = parsePlanFile(serializePlanFile(plan));
+    expect(result).toEqual({ ok: true, plan });
+  });
+
+  it('imports a plan file that predates the texts field, reading it as empty', () => {
+    const plan = squarePlan() as Partial<ReturnType<typeof squarePlan>>;
+    delete plan.texts;
+    const text = JSON.stringify({ format: 'plan-maker', version: SCHEMA_VERSION, plan });
+    const result = parsePlanFile(text);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.plan.texts).toEqual({});
+  });
+
   it('rejects invalid JSON', () => {
     expect(parsePlanFile('{oops')).toEqual({ ok: false, reason: 'invalid-json' });
   });

@@ -62,12 +62,27 @@ export interface Ruler {
   t: number;
 }
 
+// A preset name, not a cm value: the sheet size is resolved at render,
+// keeping the model semantic and the S/M/L presets tunable.
+export type TextSize = 'S' | 'M' | 'L';
+
+// Free-text annotation (CONTEXT.md: Text). Always-visible content with free
+// coordinates (not shared Points); `(x, y)` is the top-left anchor.
+export interface TextNote {
+  id: string;
+  x: Cm;
+  y: Cm;
+  content: string;
+  size: TextSize;
+}
+
 export interface Plan {
   points: Record<string, Point>;
   walls: Record<string, Wall>;
   openings: Record<string, Opening>;
   roomLabels: Record<string, RoomLabel>;
   rulers: Record<string, Ruler>;
+  texts: Record<string, TextNote>;
 }
 
 export const WALL_THICKNESS: Cm = 10;
@@ -80,7 +95,7 @@ export const defaultOpeningWidth = (type: Opening['type']): Cm =>
   type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH;
 
 export function emptyPlan(): Plan {
-  return { points: {}, walls: {}, openings: {}, roomLabels: {}, rulers: {} };
+  return { points: {}, walls: {}, openings: {}, roomLabels: {}, rulers: {}, texts: {} };
 }
 
 export function isPlanEmpty(plan: Plan): boolean {
@@ -89,6 +104,7 @@ export function isPlanEmpty(plan: Plan): boolean {
     Object.keys(plan.walls).length === 0 &&
     Object.keys(plan.openings).length === 0 &&
     Object.keys(plan.roomLabels).length === 0 &&
-    Object.keys(plan.rulers).length === 0
+    Object.keys(plan.rulers).length === 0 &&
+    Object.keys(plan.texts).length === 0
   );
 }

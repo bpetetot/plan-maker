@@ -26,6 +26,7 @@ const square = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 // The square plus a wall standing apart, so the whole plan is not exactly one

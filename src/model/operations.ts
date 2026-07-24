@@ -3,7 +3,7 @@ import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { clampCenter, openingPlacement, openingRail } from './openings';
 import type { Snap } from './snap';
-import type { Opening, Plan, Ruler, Wall } from './types';
+import type { Opening, Plan, Ruler, TextNote, TextSize, Wall } from './types';
 import { defaultOpeningWidth, WALL_THICKNESS } from './types';
 
 const newId = () => nanoid(10);
@@ -553,4 +553,43 @@ export function deleteRuler(plan: Plan, id: string): Plan {
   const rulers = { ...plan.rulers };
   delete rulers[id];
   return { ...plan, rulers };
+}
+
+// Free-text annotation (CONTEXT.md: Text); `(x, y)` is the top-left anchor.
+export function addText(
+  plan: Plan,
+  x: number,
+  y: number,
+  content: string,
+  size: TextSize = 'M',
+): [Plan, string] {
+  const id = newId();
+  const text: TextNote = { id, x: Math.round(x), y: Math.round(y), content, size };
+  return [{ ...plan, texts: { ...plan.texts, [id]: text } }, id];
+}
+
+export function moveText(plan: Plan, id: string, x: number, y: number): Plan {
+  const text = plan.texts[id];
+  if (!text) return plan;
+  const moved = { ...text, x: Math.round(x), y: Math.round(y) };
+  return { ...plan, texts: { ...plan.texts, [id]: moved } };
+}
+
+export function editTextContent(plan: Plan, id: string, content: string): Plan {
+  const text = plan.texts[id];
+  if (!text) return plan;
+  return { ...plan, texts: { ...plan.texts, [id]: { ...text, content } } };
+}
+
+export function setTextSize(plan: Plan, id: string, size: TextSize): Plan {
+  const text = plan.texts[id];
+  if (!text) return plan;
+  return { ...plan, texts: { ...plan.texts, [id]: { ...text, size } } };
+}
+
+export function deleteText(plan: Plan, id: string): Plan {
+  if (!plan.texts[id]) return plan;
+  const texts = { ...plan.texts };
+  delete texts[id];
+  return { ...plan, texts };
 }

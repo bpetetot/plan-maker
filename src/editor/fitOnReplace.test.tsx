@@ -16,6 +16,7 @@ const farPlan = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 // Fit = bbox + 120 cm margin per side, grown to screen aspect, centered.

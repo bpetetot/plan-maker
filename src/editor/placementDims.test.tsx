@@ -25,6 +25,7 @@ function planWith(offset: number, width: number): { plan: Plan; opening: Opening
     openings: { o: opening },
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
   return { plan, opening };
 }
@@ -159,6 +160,7 @@ const editorPlan = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 describe('placement dimensions while placing an opening', () => {

@@ -22,6 +22,14 @@ const rulerPlan = () => {
   return plan;
 };
 
+// A multi-line accented-French Text inside the room: its lines collide with no
+// wall dimension or area of squarePlan.
+const textPlan = () => {
+  const plan = squarePlan();
+  plan.texts.t1 = { id: 't1', x: 100, y: 120, content: 'Salon\néclairé', size: 'M' };
+  return plan;
+};
+
 describe('computeExportFrame', () => {
   it('returns null for a plan without points', () => {
     expect(computeExportFrame(buildPlan(() => {}))).toBeNull();
@@ -119,5 +127,28 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('@font-face');
     expect(svg).toContain("font-family: 'JetBrains Mono'");
     expect(svg).toContain('data:font/woff2;base64,');
+  });
+
+  // CONTEXT.md: Text is always-visible content, not a Measure — it renders
+  // whatever the toggle, unlike the Ruler above (the contrast this map turns on).
+  it('renders a Text, and its accented multi-line content, when measures are shown', () => {
+    const svg = buildExportSvg(textPlan(), { measuresVisible: true })!;
+    expect(svg).toContain('text-note');
+    expect(svg).toContain('Salon');
+    expect(svg).toContain('éclairé');
+  });
+
+  it('renders a Text even when measures are hidden — a Text is not a measure', () => {
+    const svg = buildExportSvg(textPlan(), { measuresVisible: false })!;
+    expect(svg).toContain('Salon');
+    expect(svg).toContain('éclairé');
+    expect(svg).not.toContain('4,10 m');
+  });
+
+  // Without the pinned ink the export <style> gives text.text-note no fill and
+  // it rasterizes black instead of the label slate.
+  it('pins the free-text ink so it does not fall back to black', () => {
+    const svg = buildExportSvg(textPlan(), { measuresVisible: true })!;
+    expect(svg).toContain('--text-note: #334155');
   });
 });

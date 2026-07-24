@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addRoomLabel,
   addRuler,
+  addText,
   addWall,
   clampOpeningOffset,
   commitPoint,
@@ -9,7 +10,9 @@ import {
   deleteOpening,
   deleteRoomLabel,
   deleteRuler,
+  deleteText,
   deleteWall,
+  editTextContent,
   ensurePoint,
   mergeCoincidentPoints,
   movePoint,
@@ -20,8 +23,10 @@ import {
   planarize,
   renameRoomLabel,
   setDimPlacement,
+  moveText,
   setOpeningWidth,
   setPoints,
+  setTextSize,
   setWallThickness,
   splitWall,
   toggleHingeSide,
@@ -816,5 +821,52 @@ describe('rulers', () => {
     const [withRuler] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
     expect(isPlanEmpty(emptyPlan())).toBe(true);
     expect(isPlanEmpty(withRuler)).toBe(false);
+  });
+});
+
+describe('texts', () => {
+  it('addText stores a free-coordinate note at the medium default size', () => {
+    const [next, id] = addText(emptyPlan(), 10, 20, 'Hello');
+    expect(next.texts[id]).toEqual({ id, x: 10, y: 20, content: 'Hello', size: 'M' });
+  });
+
+  it('addText rounds coordinates to integer centimeters and keeps the chosen size', () => {
+    const [next, id] = addText(emptyPlan(), 10.4, 19.6, 'Note', 'L');
+    expect(next.texts[id]).toMatchObject({ x: 10, y: 20, size: 'L' });
+  });
+
+  it('moveText sets an absolute position, rounding to integer centimeters', () => {
+    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
+    const next = moveText(withText, id, 150.6, 80.2);
+    expect(next.texts[id]).toMatchObject({ x: 151, y: 80 });
+  });
+
+  it('moveText ignores an unknown text', () => {
+    const plan = emptyPlan();
+    expect(moveText(plan, 'nope', 5, 5)).toBe(plan);
+  });
+
+  it('editTextContent replaces the content and ignores an unknown text', () => {
+    const [withText, id] = addText(emptyPlan(), 0, 0, 'Old');
+    expect(editTextContent(withText, id, 'New').texts[id].content).toBe('New');
+    expect(editTextContent(withText, 'nope', 'New')).toBe(withText);
+  });
+
+  it('setTextSize changes the preset and ignores an unknown text', () => {
+    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
+    expect(setTextSize(withText, id, 'S').texts[id].size).toBe('S');
+    expect(setTextSize(withText, 'nope', 'S')).toBe(withText);
+  });
+
+  it('deleteText removes the note and no-ops on an unknown id', () => {
+    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
+    expect(deleteText(withText, id).texts).toEqual({});
+    expect(deleteText(withText, 'nope')).toBe(withText);
+  });
+
+  it('isPlanEmpty counts texts alongside walls, openings, labels, and rulers', () => {
+    const [withText] = addText(emptyPlan(), 0, 0, 'Note');
+    expect(isPlanEmpty(emptyPlan())).toBe(true);
+    expect(isPlanEmpty(withText)).toBe(false);
   });
 });

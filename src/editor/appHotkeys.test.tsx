@@ -24,6 +24,7 @@ const square = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 beforeEach(() => {

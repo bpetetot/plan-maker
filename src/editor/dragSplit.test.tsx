@@ -27,6 +27,7 @@ function tPlan(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 

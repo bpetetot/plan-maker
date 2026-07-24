@@ -26,6 +26,7 @@ function openCorner(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 

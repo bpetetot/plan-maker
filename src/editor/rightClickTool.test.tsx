@@ -25,6 +25,7 @@ const wallPlan = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 describe('right-click exits the drawing tool', () => {

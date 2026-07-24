@@ -45,10 +45,11 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
 // Font inlined: rasterization goes through an <img>, which loads no external resource.
 const EXPORT_STYLE = `
   @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
-  svg { --wall: #1e293b; --sheet: #ffffff; --dim-line: #93c9c3; }
+  svg { --wall: #1e293b; --sheet: #ffffff; --dim-line: #93c9c3; --text-note: #334155; }
   text.dim { font-family: 'JetBrains Mono', ui-monospace, monospace; fill: #1d7d74; }
   text.room-name { font: 600 11px system-ui, sans-serif; fill: #334155; }
   text.room-area { font: 9px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
+  text.text-note { font-family: system-ui, sans-serif; font-weight: 400; fill: var(--text-note); stroke: var(--sheet); paint-order: stroke; stroke-linejoin: round; }
 `;
 
 // Measures mirror the editor (ADR 0008).

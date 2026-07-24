@@ -10,19 +10,28 @@ import {
   Ruler,
   Scan,
   Trash2,
+  Type,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
-import { setOpeningWidth, setWallThickness, toggleHingeSide, toggleSwing } from '../model/operations';
+import {
+  setOpeningWidth,
+  setTextSize,
+  setWallThickness,
+  toggleHingeSide,
+  toggleSwing,
+} from '../model/operations';
 import type { Room } from '../model/rooms';
 import { roomLabelAt, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
-import type { Plan, Wall } from '../model/types';
+import type { Plan, TextSize, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
 import type { Tool, ToolDefaults } from './tools';
+
+const TEXT_SIZES: TextSize[] = ['S', 'M', 'L'];
 
 const ELEMENT_META: Record<'wall' | 'door' | 'window', [LucideIcon, string]> = {
   wall: [BrickWall, 'Wall'],
@@ -52,15 +61,26 @@ export function ToolPanel({
   onDelete,
 }: ToolPanelProps) {
   if (sel.length === 0) {
-    // Ruler has no pre-placement defaults; its selected panel is ticket 09.
+    // Ruler configures nothing pre-placement; Text picks its size default here.
     if (tool === 'select' || tool === 'ruler') return null;
+    if (tool === 'text')
+      return (
+        <div className="panel">
+          <PanelHeader Icon={Type} title="Text" />
+          <SizeSection
+            value={defaults.textSize}
+            onSelect={(size) => setDefaults((d) => ({ ...d, textSize: size }))}
+          />
+        </div>
+      );
     return <ToolDefaultsFacet tool={tool} defaults={defaults} setDefaults={setDefaults} />;
   }
   const only = sel.length === 1 ? sel[0] : null;
   const wall = only?.type === 'wall' ? (plan.walls[only.id] ?? null) : null;
   const opening = only?.type === 'opening' ? (plan.openings[only.id] ?? null) : null;
   const ruler = only?.type === 'ruler' ? (plan.rulers[only.id] ?? null) : null;
-  if (only && !wall && !opening && !ruler) return null;
+  const text = only?.type === 'text' ? (plan.texts[only.id] ?? null) : null;
+  if (only && !wall && !opening && !ruler && !text) return null;
 
   // The room is read from the selection, not held in it (ADR 0014), so a
   // marquee over the same walls reads the same room.
@@ -72,7 +92,9 @@ export function ToolPanel({
       ? [Layers, `${sel.length} elements`]
       : ruler
         ? [Ruler, 'Ruler']
-        : ELEMENT_META[wall ? 'wall' : opening!.type];
+        : text
+          ? [Type, 'Text']
+          : ELEMENT_META[wall ? 'wall' : opening!.type];
 
   // CONTEXT.md: Tool panel. A room counts its boundary, never its refs: a
   // Shift+click that unlights one of its doors must not lower the count.
@@ -119,6 +141,16 @@ export function ToolPanel({
           </div>
         </section>
       )}
+      {text && (
+        <SizeSection
+          value={text.size}
+          onSelect={(size) => {
+            setPlan((p) => setTextSize(p, text.id, size));
+            // sticky preset (CONTEXT.md: Tool defaults) — last used wins
+            setDefaults((d) => ({ ...d, textSize: size }));
+          }}
+        />
+      )}
       {contents && <ContentsRows contents={contents} zeros={room !== null} />}
       {opening && (
         <section>
@@ -158,7 +190,7 @@ function ToolDefaultsFacet({
   defaults,
   setDefaults,
 }: {
-  tool: Exclude<Tool, 'select' | 'ruler'>;
+  tool: Exclude<Tool, 'select' | 'ruler' | 'text'>;
   defaults: ToolDefaults;
   setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void;
 }) {
@@ -260,6 +292,29 @@ function NumberField({
       />
       <span className="panel-number-unit">cm</span>
     </span>
+  );
+}
+
+// A preset segmented control (S/M/L), not a NumberField: the size is one of a
+// fixed set, and the pressed button names the active preset.
+function SizeSection({ value, onSelect }: { value: TextSize; onSelect: (size: TextSize) => void }) {
+  return (
+    <section>
+      <div className="panel-section-label">Size</div>
+      <div className="panel-sizes">
+        {TEXT_SIZES.map((size) => (
+          <button
+            key={size}
+            type="button"
+            className="size"
+            aria-pressed={size === value}
+            onClick={() => onSelect(size)}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 

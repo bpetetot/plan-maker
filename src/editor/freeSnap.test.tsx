@@ -21,6 +21,7 @@ function hostPlan(): Plan {
     openings: {},
     roomLabels: {},
     rulers: {},
+    texts: {},
   };
 }
 
@@ -75,6 +76,7 @@ describe('dragging a point during a free move', () => {
         openings: {},
         roomLabels: {},
         rulers: {},
+        texts: {},
       },
       planEpoch: 0,
     });

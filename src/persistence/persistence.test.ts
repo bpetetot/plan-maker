@@ -101,6 +101,36 @@ describe('validatePlan', () => {
     expect(validated).not.toBeNull();
     expect(validated?.rulers).toEqual({});
   });
+
+  it('accepts a plan carrying a valid text note', () => {
+    const plan = structuredClone(squarePlan());
+    plan.texts['t1'] = { id: 't1', x: 100, y: 50, content: 'Garage', size: 'M' };
+    expect(validatePlan(plan)).not.toBeNull();
+  });
+
+  it('rejects malformed text notes', () => {
+    const texts = [
+      { id: 'other', x: 0, y: 0, content: 'A', size: 'M' }, // id ≠ key
+      { id: 't1', x: 0.5, y: 0, content: 'A', size: 'M' }, // non-integer cm
+      { id: 't1', x: 0, y: 0, content: 12, size: 'M' }, // content not a string
+      { id: 't1', x: 0, y: 0, content: 'A', size: 'XL' }, // size outside S/M/L
+      { id: 't1', x: 0, y: 0, content: 'A' }, // missing size
+      'nope',
+    ];
+    for (const text of texts) {
+      const plan = structuredClone(squarePlan()) as { texts: Record<string, unknown> };
+      plan.texts['t1'] = text;
+      expect(validatePlan(plan)).toBeNull();
+    }
+  });
+
+  it('tolerates a plan missing the texts field, defaulting it to empty', () => {
+    const plan = structuredClone(squarePlan()) as Partial<ReturnType<typeof squarePlan>>;
+    delete plan.texts;
+    const validated = validatePlan(plan);
+    expect(validated).not.toBeNull();
+    expect(validated?.texts).toEqual({});
+  });
 });
 
 describe('runMigrations', () => {

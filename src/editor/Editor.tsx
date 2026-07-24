@@ -11,6 +11,7 @@ import {
   Redo2,
   Ruler,
   RulerDimensionLine,
+  Type,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -21,9 +22,12 @@ import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '..
 import {
   addRoomLabel,
   addRuler,
+  addText,
   clampOpeningOffset,
   commitPoint,
   commitWall,
+  deleteText,
+  editTextContent,
   mergeCoincidentPoints,
   movePoint,
   moveOpening,
@@ -53,8 +57,8 @@ import {
 } from '../model/selection';
 import type { Snap } from '../model/snap';
 import { realignDelta, snapPoint } from '../model/snap';
-import type { Opening, Plan, RoomLabel } from '../model/types';
-import { WALL_THICKNESS } from '../model/types';
+import type { Opening, Plan, RoomLabel, TextNote, TextSize } from '../model/types';
+import { GRID, WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
 import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
@@ -80,6 +84,10 @@ import {
   RulerGrabZone,
   RulerLabel,
   SnapMarker,
+  TEXT_SIZE_CM,
+  textAtPoint,
+  textEditBox,
+  TextNoteView,
   WallGrabZone,
   WallLine,
 } from './render';
@@ -211,6 +219,22 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     initial: string;
   } | null>(null);
   const editCancelled = useRef(false);
+  // A Text under edit: `id` null while placing (the node is born only on a
+  // non-empty commit, so an aborted placement leaves no orphan).
+  const [textEditing, setTextEditing] = useState<{
+    id: string | null;
+    x: number;
+    y: number;
+    size: TextSize;
+    initial: string;
+  } | null>(null);
+  // Live value of the open editor, mirrored from the uncontrolled textarea so the
+  // editing box can grow with the text (down and to the right).
+  const [textDraft, setTextDraft] = useState('');
+  const textCancelled = useRef(false);
+  // A Text placement mousedown must not run its focus fixup, or it blurs the
+  // just-mounted editor and commits it empty before a key can land.
+  const placingText = useRef(false);
   const space = useSpaceHeld();
   // Tracked, not sampled: the snap toggle shows the *effective* state, so Alt
   // transitions must re-render. The keyup after an Alt+Tab never arrives.
@@ -218,6 +242,13 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // Alt inverts the current snap state for the gesture (ADR 0007).
   const isFree = (alt: boolean) => !snapEnabled !== alt;
   const free = isFree(altHeld);
+
+  // A Text attaches to nothing, so its placement runs the grid rung only —
+  // never Points or wall body (ticket 02). Alt / Snap-off give free 1cm coords.
+  const snapText = (x: number, y: number, freeNow: boolean): Snap =>
+    freeNow
+      ? { x: Math.round(x), y: Math.round(y), kind: 'free' }
+      : { x: Math.round(x / GRID) * GRID, y: Math.round(y / GRID) * GRID, kind: 'grid' };
 
   // Fit on any plan replacement (open, restore, reset); mount included, which
   // frames a plan restored before the editor mounted.
@@ -259,6 +290,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     setRulerA(null);
     setSnap(null);
     setOpenPreview(null);
+    setTextEditing(null);
     if (next !== 'select') setSel([]);
     // A Ruler is measured, so drawing one reveals the measures (ticket 03).
     if (next === 'ruler') setMeasures(true);
@@ -349,6 +381,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       return;
     }
     if (e.button !== 0) return;
+    // An open Text editor swallows the click: it commits on blur, and the sheet
+    // must not place a second Text or start a marquee underneath it.
+    if (textEditing) return;
     const c = toPlan(e.clientX, e.clientY);
     if (tool === 'wall') {
       const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free });
@@ -408,6 +443,16 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       // Auto-return to Select with the placed Ruler selected (tickets 03, 06).
       switchTool('select');
       setSel([{ type: 'ruler', id }]);
+    } else if (tool === 'text') {
+      // Place at the snapped position and open the inline editor there; the node
+      // is not born until a non-empty commit (ticket 02).
+      const s = snapText(c.x, c.y, isFree(e.altKey));
+      setSnap(null);
+      // The paired mousedown (next event) must skip its focus fixup so the
+      // editor's autoFocus survives — see onMouseDown below.
+      placingText.current = true;
+      setTextDraft('');
+      setTextEditing({ id: null, x: s.x, y: s.y, size: defaults.textSize, initial: '' });
     } else if (tool === 'select') {
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
       setHoverRoom(null);
@@ -539,6 +584,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
     } else if (tool === 'ruler') {
       setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
+    } else if (tool === 'text') {
+      // The aimed placement shows the constant on-screen SnapMarker (ticket 02),
+      // until the editor opens and takes over the spot.
+      if (!textEditing) setSnap(snapText(c.x, c.y, free));
     } else if (tool === 'select') {
       // The browser's hit test decides what a click takes: anything above the
       // sheet outranks the room, except the block the room is clicked by.
@@ -728,6 +777,40 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     startEditing(block, label);
   };
 
+  // Double-click a placed Text to re-open its editor (ticket 02); stops the
+  // dblclick from also reaching the sheet's room-naming path.
+  const onTextDoubleClick = (text: TextNote, e: React.MouseEvent) => {
+    if (tool !== 'select') return;
+    e.stopPropagation();
+    setSnap(null);
+    setTextDraft(text.content);
+    setTextEditing({ id: text.id, x: text.x, y: text.y, size: text.size, initial: text.content });
+  };
+
+  // Commit path shared by Ctrl+Enter, Escape and clicking away — all end in a
+  // blur. A just-placed node is born here; an emptied one is discarded.
+  const finishTextEditing = (value: string) => {
+    const ed = textEditing;
+    setTextEditing(null);
+    // One-shot: placement hands back to Select; a re-edit is already there.
+    if (tool === 'text') switchTool('select');
+    if (!ed) return;
+    if (textCancelled.current) {
+      textCancelled.current = false;
+      return;
+    }
+    const empty = value.trim() === '';
+    if (ed.id) {
+      setPlan((p) => (empty ? deleteText(p, ed.id!) : editTextContent(p, ed.id!, value)));
+    } else if (!empty) {
+      // A placed Text hands back to Select, selected (the 06 auto-select
+      // deferral) — mirroring a placed Ruler and Opening.
+      const [next, id] = addText(plan, ed.x, ed.y, value, ed.size);
+      setPlan(() => next);
+      setSel([{ type: 'text', id }]);
+    }
+  };
+
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
     if (tool === 'wall') {
       // Only an active chain finishes; without it the anchors are stale from an
@@ -738,6 +821,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
     if (tool !== 'select') return;
     const c = toPlan(e.clientX, e.clientY);
+    // A Text is content on top of any room, so re-edit it before the room label.
+    // The native dblclick lands on the svg (its subtree is re-rendered by the
+    // selecting mousedown), so this hit-test, not the grab rect's handler, opens
+    // the editor — and firing after both mouseups, it needs no focus-fixup guard.
+    const hitText = textAtPoint(Object.values(plan.texts), c.x, c.y, zoomScale);
+    if (hitText) {
+      onTextDoubleClick(hitText, e);
+      return;
+    }
     const room = roomAt(rooms, c.x, c.y);
     const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
     if (block) startEditing(block, block.labels[0] ?? null);
@@ -750,6 +842,14 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         style={{ width: '100%', height: '100%', background: 'var(--sheet)', display: 'block', cursor }}
         onPointerDown={onSvgPointerDown}
+        // Placing a Text just mounted and focused the editor; the paired
+        // mousedown's focus fixup would blur it. Cancel only that one.
+        onMouseDown={(e) => {
+          if (placingText.current) {
+            placingText.current = false;
+            e.preventDefault();
+          }
+        }}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
         // A pointer that left the sheet hovers nothing; only pointermove would
@@ -794,6 +894,33 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           onLinePointerDown={onLinePointerDown}
           onLineDoubleClick={onLineDoubleClick}
         />
+        {/* Always visible content — never gated by measures (ticket 07's key
+            contrast with the Ruler). The node under edit is hidden so the
+            textarea replaces it. Selection / drag wiring is 08. */}
+        {Object.values(plan.texts)
+          .filter((text) => textEditing?.id !== text.id)
+          .map((text) => (
+            <TextNoteView
+              key={text.id}
+              text={text}
+              pxPerCm={zoomScale}
+              interactive={tool === 'select'}
+              selected={selKeys.has(refKey({ type: 'text', id: text.id }))}
+              onPointerDown={(e) =>
+                onElementPointerDown({ type: 'text', id: text.id }, e, (c) => {
+                  const refs: ElementRef[] = [{ type: 'text', id: text.id }];
+                  return {
+                    kind: 'group',
+                    refs,
+                    start: c,
+                    orig: plan,
+                    refPoint: referencePoint(plan, refs, c),
+                  };
+                })
+              }
+              onDoubleClick={(e) => onTextDoubleClick(text, e)}
+            />
+          ))}
         {tool === 'select' &&
           Object.values(plan.walls).map((wall) => (
             <WallGrabZone
@@ -972,7 +1099,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             ruler={{ id: '__ghost', a: { x: rulerA.x, y: rulerA.y }, b: { x: snap.x, y: snap.y }, t: 0.5 }}
           />
         )}
-        {(tool === 'wall' || tool === 'ruler') && <SnapMarker snap={snap} pxPerCm={zoomScale} />}
+        {(tool === 'wall' || tool === 'ruler' || (tool === 'text' && !textEditing)) && (
+          <SnapMarker snap={snap} pxPerCm={zoomScale} />
+        )}
         {editing && (
           <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
             <input
@@ -992,6 +1121,35 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             />
           </foreignObject>
         )}
+        {textEditing && (
+          <foreignObject
+            x={textEditing.x}
+            y={textEditing.y}
+            width={textEditBox(textDraft, textEditing.size).width}
+            height={textEditBox(textDraft, textEditing.size).height}
+          >
+            <textarea
+              className="text-note-input"
+              style={{ fontSize: `${TEXT_SIZE_CM[textEditing.size]}px` }}
+              defaultValue={textEditing.initial}
+              autoFocus
+              onFocus={(e) => e.currentTarget.select()}
+              onInput={(e) => setTextDraft(e.currentTarget.value)}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  textCancelled.current = true;
+                  e.currentTarget.blur();
+                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  // Plain Enter is a newline; Mod+Enter commits (ticket 02).
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              onBlur={(e) => finishTextEditing(e.currentTarget.value)}
+            />
+          </foreignObject>
+        )}
       </svg>
 
       {/* floating toolbar (spec §4) */}
@@ -1006,6 +1164,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             ['door', 'Door', DoorClosed],
             ['window', 'Window', Grid2x2],
             ['ruler', 'Ruler', Ruler],
+            ['text', 'Text', Type],
           ] as const
         ).map(([m, label, Icon]) => (
           <button
@@ -1036,7 +1195,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               ? rulerA
                 ? `Click to set the end point · ${keyHint('cancel')} / right-click cancels`
                 : `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
-              : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
+              : tool === 'text'
+                ? textEditing
+                  ? `Type freely · ${keyHint('cancel')} cancels · Ctrl+Enter or click away commits`
+                  : `Click to place text · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
+                : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>

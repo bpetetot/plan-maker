@@ -33,6 +33,7 @@ const hugePlan = (): Plan => ({
   openings: {},
   roomLabels: {},
   rulers: {},
+  texts: {},
 });
 
 describe('zoom bounds', () => {
