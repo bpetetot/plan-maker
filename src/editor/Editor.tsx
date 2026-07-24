@@ -33,6 +33,7 @@ import {
   planarize,
   renameRoomLabel,
   setDimPlacement,
+  wallsAlongPath,
 } from '../model/operations';
 import type { Room } from '../model/rooms';
 import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
@@ -188,6 +189,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // First click held as a pending snap, not committed: aborting the chain
   // (Esc, tool switch, double-click) must not mutate the plan.
   const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null);
+  // The chain's anchor Points in draw order — a ref so id churn across commits
+  // never restages, read once at finish to select only the walls it drew.
+  const chainAnchors = useRef<string[]>([]);
   // The Ruler's first click, held as a snap until B commits it: aborting (Esc,
   // right-click, tool switch) must not touch the plan.
   const [rulerA, setRulerA] = useState<Snap | null>(null);
@@ -251,12 +255,26 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const switchTool = (next: Tool) => {
     setTool(next);
     setChain(null);
+    chainAnchors.current = [];
     setRulerA(null);
     setSnap(null);
     setOpenPreview(null);
     if (next !== 'select') setSel([]);
     // A Ruler is measured, so drawing one reveals the measures (ticket 03).
     if (next === 'ruler') setMeasures(true);
+  };
+
+  // A completed chain returns to Select with the walls it drew selected; a
+  // path with no wall is not a completion, so the tool simply stays (Q5).
+  const finishChain = (finalPlan: Plan, path: string[]) => {
+    const drawn = wallsAlongPath(finalPlan, path);
+    if (drawn.length === 0) {
+      setChain(null);
+      setSnap(null);
+      return;
+    }
+    switchTool('select');
+    setSel(drawn.map((id) => ({ type: 'wall', id })));
   };
 
   const deleteSelection = useCallback(
@@ -287,8 +305,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // camera goes stale the first time someone forgets to extend it.
   useImperativeHandle(commands, () => ({
     cancel: () => {
-      if (chain) setChain(null);
-      else if (rulerA) setRulerA(null);
+      if (chain) {
+        setChain(null);
+        chainAnchors.current = [];
+      } else if (rulerA) setRulerA(null);
       else if (sel.length > 0) setSel([]);
       else switchTool('select');
     },
@@ -334,12 +354,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
       const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free });
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
-        setPlan(
-          (p) =>
-            commitWall(p, pointSnap(p, chain.last), pointSnap(p, chain.start), defaults.wallThickness)[0],
-        );
-        setChain(null);
-        setSnap(null);
+        const closed = commitWall(
+          plan,
+          pointSnap(plan, chain.last),
+          pointSnap(plan, chain.start),
+          defaults.wallThickness,
+        )[0];
+        setPlan(() => closed);
+        // The closing segment runs last→start, so the path loops back to start.
+        finishChain(closed, [...chainAnchors.current, chain.start]);
         return;
       }
       if (chain) {
@@ -355,18 +378,23 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         );
         setPlan(() => next);
         setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId });
+        if ('pending' in chain) chainAnchors.current = [startId, pointId];
+        else chainAnchors.current.push(pointId);
       } else {
         setChain({ pending: s });
       }
     } else if ((tool === 'door' || tool === 'window') && openPreview) {
-      // Tool stays active, but the new opening is selected so its panel shows.
       const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset, {
         width: tool === 'door' ? defaults.doorWidth : defaults.windowWidth,
         hingeSide: defaults.doorHinge,
         swing: defaults.doorSwing,
       });
+      // A placed opening returns to Select, selected (Q5: a refused placement
+      // is not a completion, so the tool stays put).
+      if (!id) return;
       setPlan(() => next);
-      setSel(id ? [{ type: 'opening', id }] : []);
+      switchTool('select');
+      setSel([{ type: 'opening', id }]);
     } else if (tool === 'ruler') {
       // Aim from A once it exists, so B locks to 45° and the ladder anchors there.
       const anchor = rulerA ? { x: rulerA.x, y: rulerA.y } : undefined;
@@ -542,6 +570,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (drag.current) return;
     if (chain) {
       setChain(null);
+      chainAnchors.current = [];
       setSnap(null);
     } else if (rulerA) {
       setRulerA(null);
@@ -709,8 +738,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
     if (tool === 'wall') {
-      setChain(null);
-      setSnap(null);
+      // Only an active chain finishes; without it the anchors are stale from an
+      // aborted chain. Latest plan, not the render closure: the double-click's
+      // own clicks just committed through setPlan and the closure reads stale.
+      if (chain) finishChain(usePlanStore.getState().plan, chainAnchors.current);
       return;
     }
     if (tool !== 'select') return;

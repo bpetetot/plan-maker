@@ -173,8 +173,15 @@ _Avoid_: Measure, Dimension, tape measure, guide
 The editor's active instrument, which determines what clicking the sheet does.
 Exactly one tool is active at a time: Select — the default —, Wall, Door,
 Window, or Ruler. Activating the Ruler forces Measures on, since a tool that
-draws something the toggle can hide must not draw it into the void. Pure editor
-state: never part of the plan.
+draws something the toggle can hide must not draw it into the void. A drawing
+tool is one-shot: completing a placement hands the tool back to Select and
+leaves the result as the Selection — the walls a chain drew (which read as a
+Room when they close one), the Opening just set, the Ruler just measured.
+Completion is a positive finish only — a chain closed onto its start or ended
+by a double-click, an Opening placed, a Ruler's second click — never an abort:
+Escape or right-click ends the pending chain or Ruler point but keeps the tool,
+and a finish that placed nothing keeps it too (ADR 0018). Pure editor state:
+never part of the plan.
 _Avoid_: Mode
 
 **Selection**:

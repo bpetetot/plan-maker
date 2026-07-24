@@ -196,6 +196,34 @@ export function commitWall(
   return [next, endId];
 }
 
+// The walls a chain drew: those lying on the polyline through its anchor Points,
+// which excludes the halves a crossing split off a pre-existing wall (they sit
+// on the crossed wall's line, not the drawn path).
+export function wallsAlongPath(plan: Plan, anchorIds: string[]): string[] {
+  const onSegment = (p: Vec, s: Vec, e: Vec): boolean => {
+    const dx = e.x - s.x;
+    const dy = e.y - s.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return false;
+    const t = ((p.x - s.x) * dx + (p.y - s.y) * dy) / len2;
+    if (t < -0.001 || t > 1.001) return false;
+    return Math.abs((p.x - s.x) * dy - (p.y - s.y) * dx) / Math.sqrt(len2) <= 1.5;
+  };
+  const ids: string[] = [];
+  for (const wall of Object.values(plan.walls)) {
+    const [a, b] = wallPoints(plan, wall);
+    for (let i = 0; i < anchorIds.length - 1; i++) {
+      const s = plan.points[anchorIds[i]];
+      const e = plan.points[anchorIds[i + 1]];
+      if (s && e && onSegment(a, s, e) && onSegment(b, s, e)) {
+        ids.push(wall.id);
+        break;
+      }
+    }
+  }
+  return ids;
+}
+
 // ADR 0003. Opposed twins mirror the offset and flip hinge/swing, so the door
 // stays physically identical.
 function dedupeTwinWalls(plan: Plan): Plan {

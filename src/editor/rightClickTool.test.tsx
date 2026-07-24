@@ -59,13 +59,15 @@ describe('right-click exits the drawing tool', () => {
     await pointer(svg, 'pointerup');
   });
 
-  it('keeps the freshly placed opening selected when leaving the Door tool', async () => {
+  it('has already returned to Select once a Door is placed, so right-click is a no-op', async () => {
     usePlanStore.setState({ plan: wallPlan() });
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
     await userEvent.click(page.getByLabelText('Door'));
     await pointer(svg, 'pointermove', clientAt(svg, 300, 100));
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 300, 100) });
+    // Placement is one-shot: the tool switches without a right-click.
+    expect(activeTool()).toBe('Select');
     expect(page.getByText('Door', { exact: true }).element()).toBeTruthy();
     await mouse(svg, 'contextmenu');
     expect(activeTool()).toBe('Select');
