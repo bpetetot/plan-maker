@@ -502,13 +502,6 @@ describe('SnapMarker', () => {
     )!;
     expect(dot.getAttribute('r')).toBe('2.6');
   });
-
-  it('keeps the dashed axis guide when the snap locks an axis', async () => {
-    const c = await renderMarker({ kind: 'axis', x: 100, y: 0, axisFrom: { x: 0, y: 0 } }, 1);
-    const line = c.querySelector('line')!;
-    expect(line.getAttribute('stroke-dasharray')).toBe('6 6');
-    expect(line.getAttribute('stroke')).toBe(COLORS.snap);
-  });
 });
 
 describe('RubberWall', () => {

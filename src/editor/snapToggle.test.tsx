@@ -25,8 +25,7 @@ async function setup() {
   return { svg, unmount };
 }
 
-// Off-grid, and 22.5° off the anchor — between two 45° axes, so no axis lock
-// intervenes and the grid is the only alignment target left.
+// Off-grid, so the grid is the only alignment target that moves the points.
 const A = { x: 203, y: 187 };
 const B = { x: 400, y: 273 };
 const SNAPPED = [

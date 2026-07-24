@@ -1,5 +1,10 @@
 # Planar insertion on wall commit — walls split at junctions
 
+> **Amended by ADR 0020** — axis snapping has been removed, so the snap priority
+> below is now `existing point > wall body > grid` and the "axis ∩ wall"
+> refinement no longer applies; a wall ending on another's body takes the plain
+> orthogonal projection. The planar-insertion invariant itself is unchanged.
+
 Room detection walks the shared-point wall graph, so a wall started or ended on
 another wall's body used to create a free point with no topological link: the
 loop looked closed on screen but stayed open in the model, and the room was

@@ -780,18 +780,6 @@ export function SnapMarker({ snap, pxPerCm }: { snap: Snap | null; pxPerCm: numb
   const attached = snap.kind === 'point' || snap.kind === 'wall';
   return (
     <g pointerEvents="none">
-      {/* dashed guide for any locked-axis position, wall intersections too */}
-      {snap.axisFrom && (
-        <line
-          x1={snap.axisFrom.x}
-          y1={snap.axisFrom.y}
-          x2={snap.x}
-          y2={snap.y}
-          stroke={COLORS.snap}
-          strokeWidth={1.5}
-          strokeDasharray="6 6"
-        />
-      )}
       {attached ? (
         // Handle's double-stroke ring, edged in snap green instead of wall: a
         // sheet-colored band the snap green outlines on both sides.

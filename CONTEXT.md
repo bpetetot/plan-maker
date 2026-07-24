@@ -262,7 +262,7 @@ _Avoid_: Hit zone, hit target, hover area
 
 **Snap**:
 The magnetic guidance of any placement or move in the editor:
-positions are drawn to existing points, walls, 45° axes, or the 10 cm grid —
+positions are drawn to existing points, walls, or the 10 cm grid —
 that ladder governs placing a point. Snap is a state, not a permanent
 behavior: it is on by default and can be turned off for the whole editor —
 a per-device preference like the Grid or the Theme, never part of the plan,
@@ -270,12 +270,9 @@ never exported — and Alt inverts whichever state is current for the duration
 of the gesture, so the same key reaches a Free move from Snap and a snapped
 one from Free. Its rungs are of two natures: the
 connection targets — existing Point, wall body — which decide what the placed
-Point is attached to, and the alignment targets — 45° axis, grid — which only
-decide where it sits; a Free move keeps the first and drops the second. An axis
-lock places the Point where the axis crosses the grid lines, absolutely and not
-by stepping from the Drawing anchor: the segment stays exactly on its axis, and
-at least one of the Point's coordinates lands exactly on the grid — both at once
-whenever the anchor is itself on the grid. A group
+Point is attached to, and the alignment target — the grid — which only
+decides where it sits; a Free move keeps the first and drops the second. A
+group
 move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
 chosen so the group's Reference point lands on a grid intersection, to the grid
@@ -287,11 +284,11 @@ otherwise. Pure editor behavior: never part of the plan.
 _Avoid_: Magnetism, snapping grid, attach
 
 **Drawing anchor**:
-The Point a new wall segment is being drawn from — the origin of axis snapping,
-which fixes the axis's direction but never its graduation: the placed Point
-lands on the grid crossings the axis meets, so an off-grid anchor yields an
-endpoint aligned to the grid and a length that is not a grid multiple, never the
-reverse. A group move has no Drawing anchor: it aims at no connection. Pure editor state: never part of the plan.
+The Point a new wall segment is being drawn from — the fixed end of the segment
+being rubber-banded, and the Point the closing segment of a chain loops back to.
+It constrains nothing about where the moving end lands: the placement ladder
+alone decides that. A group move has no Drawing anchor: it aims at no connection.
+Pure editor state: never part of the plan.
 _Avoid_: Origin, start point, pivot
 
 **Reference point**:
@@ -309,7 +306,7 @@ because Alt inverts it while Snap is on; the two causes are indistinguishable
 in their effect. Snap's alignment targets are suspended, its connection
 targets are not — a Free move filters the ladder, it never switches it
 off. A free placement is therefore drawn to an existing Point or to a wall's
-body exactly as an ordinary one is, but never to a 45° axis nor to the grid;
+body exactly as an ordinary one is, but never to the grid;
 away from every connection target only the integer-centimeter rounding remains
 (Points have integer coordinates). Connecting is topology, aligning is
 geometry, and only the second is what a Free move escapes: a wall drawn freely

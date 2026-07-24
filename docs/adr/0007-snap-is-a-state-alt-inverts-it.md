@@ -1,5 +1,10 @@
 # Snap is a state, and Alt inverts it
 
+> **Amended by ADR 0020** — axis snapping has been removed. A Free move now
+> suspends only the grid (the 45° axis lock no longer exists), and the rejected
+> "Free keeps the 45° axis lock" option is moot. The state/inversion mechanic
+> this ADR defines is unchanged.
+
 Snap was a permanent behavior that one key escaped: Alt held meant a Free move,
 Alt released meant the full ladder, with no way to say "I am drawing this whole
 plan from real measurements". Entering a surveyed home — where almost no wall

@@ -1,5 +1,9 @@
 # Axis snapping targets absolute grid crossings — the offset dies where it was born
 
+> **Superseded by ADR 0020** — axis snapping has been removed entirely; the snap
+> ladder is now `point > wall body > grid`. This ADR is kept for the history of
+> why the axis, while it existed, graduated on absolute grid crossings.
+
 ADR 0004 made group moves *fix* alignment instead of inheriting it. Point
 placement kept inheriting it: an axis-locked endpoint stepped a whole number of
 grid multiples **relative to the anchor**, so from an off-grid anchor it carried

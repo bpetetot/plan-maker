@@ -207,10 +207,10 @@ describe('commitPoint', () => {
     expect(next).toBe(plan);
   });
 
-  it('reuses a coincident existing point on axis and free snaps too', () => {
+  it('reuses a coincident existing point on wall and free snaps too', () => {
     const plan = rectPlan();
     const endId = plan.walls[Object.keys(plan.walls)[0]].endPointId; // (400, 0)
-    expect(commitPoint(plan, { x: 400, y: 0, kind: 'axis', axisFrom: { x: 0, y: 0 } })[1]).toBe(endId);
+    expect(commitPoint(plan, { x: 400, y: 0, kind: 'wall' })[1]).toBe(endId);
     // 400.4/0.4: within the 1 cm junction tolerance of the existing point
     expect(commitPoint(plan, { x: 400.4, y: 0.4, kind: 'free' })[1]).toBe(endId);
   });

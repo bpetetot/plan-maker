@@ -106,8 +106,8 @@ type Drag =
     }
   // `grabDelta` keeps the grab point under the cursor (CONTEXT.md: Grab zone).
   | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
-  // A Ruler endpoint: snaps with the placement ladder, anchored on the far end
-  // for 45°. `grabDelta` fixes the grab point so the handle never recenters.
+  // A Ruler endpoint: snaps with the placement ladder. `grabDelta` fixes the
+  // grab point so the handle never recenters.
   | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec }
   // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
   // Room label) is defensive and moves freely.
@@ -351,8 +351,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (e.button !== 0) return;
     const c = toPlan(e.clientX, e.clientY);
     if (tool === 'wall') {
-      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free });
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free });
       if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
         const closed = commitWall(
           plan,
@@ -396,9 +395,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       switchTool('select');
       setSel([{ type: 'opening', id }]);
     } else if (tool === 'ruler') {
-      // Aim from A once it exists, so B locks to 45° and the ladder anchors there.
-      const anchor = rulerA ? { x: rulerA.x, y: rulerA.y } : undefined;
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free });
+      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free });
       if (!rulerA) {
         setRulerA(s);
         setSnap(s);
@@ -488,11 +485,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       } else if (d.kind === 'rulerEnd') {
         const ruler = plan.rulers[d.id];
         if (ruler) {
-          // Anchor on the far end so 45° and its guide lock relative to it.
-          const anchor = d.end === 'a' ? ruler.b : ruler.a;
           const s = snapPoint(plan, c.x + d.grabDelta.x, c.y + d.grabDelta.y, {
             tolerance: tolerance(),
-            anchor,
             walls: true,
             free,
           });
@@ -542,11 +536,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       return;
     }
     if (tool === 'wall') {
-      const anchor = chain ? ('pending' in chain ? chain.pending : plan.points[chain.last]) : undefined;
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
     } else if (tool === 'ruler') {
-      const anchor = rulerA ? { x: rulerA.x, y: rulerA.y } : undefined;
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), anchor, walls: true, free }));
+      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
     } else if (tool === 'select') {
       // The browser's hit test decides what a click takes: anything above the
       // sheet outranks the room, except the block the room is clicked by.

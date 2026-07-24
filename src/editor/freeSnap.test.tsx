@@ -1,5 +1,5 @@
-// Issue 13: a free move (Alt) suspends the alignment snaps (45° axes, grid)
-// and keeps the connection ones (existing points, wall bodies).
+// Issue 13: a free move (Alt) suspends the grid alignment snap and keeps the
+// connection ones (existing points, wall bodies).
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
 import type { Plan } from '../model/types';
