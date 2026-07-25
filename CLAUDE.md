@@ -31,15 +31,19 @@ idb-keyval (autosave), vite-plugin-pwa.
 
 `src/` holds only what ships. The suite lives in `tests/`, mirroring `src/`
 directory for directory, with the shared support at its root: `kit.ts` (event
-dispatch), `helpers.ts` (plan fixtures), `harness.tsx` (`EditorWithHotkeys`),
-`setup.browser.ts` (the browser project's `setupFiles`).
+dispatch), `helpers.ts` (plan fixtures), `panel.ts` (tool-panel readers),
+`harness.tsx` (`EditorWithHotkeys`), `setup.browser.ts` (the browser project's
+`setupFiles`).
 
 `tests/editor/` is the one folder that does not mirror module for module: 34 of
 its 40 files drive `Editor.tsx` through its surface, so they are grouped by the
 noun they exercise — `view/`, `drag/`, `tools/`, `text/`, `toggles/`, `ruler/`,
 `room/`, `shortcuts/` — leaving `chrome` and `pointer` at the root as the module
 tests they are. A test named for a module keeps the module's name; a test named
-for a scenario drops the prefix its folder already carries.
+for a scenario drops the prefix its folder already carries. The tool panel on an
+entity belongs in that entity's folder — `text/panel.test.tsx`,
+`room/panel.test.tsx`, `ruler/panel.test.tsx` — leaving `tools/toolPanel.test.tsx`
+for what has no folder of its own.
 
 `vitest.config.ts` is the test config, `vite.config.ts` the build config. Vitest
 loads only the former, which is why it declares its own `react()` plugin.
