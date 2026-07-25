@@ -415,8 +415,11 @@ An invisible bounded travel line. Nothing is drawn: a Rail is a constraint,
 not a graphic. Two things have one.
 A Dimension's text slides along the dimension line of the side the pointer is
 on, bounded by the arrowheads: the text can at most touch a head, never cover
-it, and a span too narrow for the text pins it to the middle. Pure editor
-behavior: never part of the plan, never exported.
+it, and a span too narrow for the text pins it to the middle. The Rail is never
+drawn and never stored, and it binds at every drawing, not only at the gesture:
+the placement kept in the plan is a wish, and a plate too wide for the Rail of
+the size it is being drawn at slides back onto it. That is what keeps the
+export honest, its measure font being larger than the editor's.
 An Opening slides along the stretch of its wall that is at full thickness —
 bounded at each end by the shorter of the two Faces, since the opening pierces
 the whole thickness, and cut back to the near edge of the closest neighbouring

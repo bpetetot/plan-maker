@@ -444,7 +444,10 @@ export function DimLabel({
   const value = Math.max(0, span.to - span.from);
   const label = formatLength(value);
   const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off });
-  const tText = (wall.dimPlacement?.t ?? 0.5) * length;
+  // The stored ratio was bounded at the size the editor draws; a wider font
+  // shortens the Rail, so it binds again here (CONTEXT.md: Rail).
+  const bounds = dimTravelBounds(plan, wall, side, fontPx);
+  const tText = Math.min(bounds.max, Math.max(bounds.min, wall.dimPlacement?.t ?? 0.5)) * length;
   const mid = at(tText);
   const gapHalf = plateHalfWidth(label, fontPx);
   return (

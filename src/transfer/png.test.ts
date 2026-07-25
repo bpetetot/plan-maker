@@ -145,6 +145,22 @@ describe('buildExportSvg', () => {
     expect(svg).not.toContain('4,10 m');
   });
 
+  // A stored placement is a wish, the Rail is the law — and the Rail is shorter
+  // at the export's wider font. Free-standing 1,20 m wall: extent -5..125, and a
+  // 6-character plate at 10 px is 40 wide, so its centre stops at 125-7-20 = 98.
+  it('holds a dimension plate on the rail of the size it is drawn at', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(120, 0);
+      b.wall(a, c);
+    });
+    Object.values(plan.walls)[0].dimPlacement = { t: 1, side: -1 };
+    const svg = buildExportSvg(plan, { measuresVisible: true })!;
+    expect(svg).toContain('1,30 m');
+    const x = Number(/translate\(([-\d.]+),/.exec(svg)![1]);
+    expect(x).toBeCloseTo(98, 3);
+  });
+
   // Without the pinned ink the export <style> gives text.text-note no fill and
   // it rasterizes black instead of the label slate.
   it('pins the free-text ink so it does not fall back to black', () => {
