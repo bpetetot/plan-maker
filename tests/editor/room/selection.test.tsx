@@ -6,6 +6,7 @@ import { emptyPlan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, key, pointer } from '../../kit';
+import { numberField, panel, panelTitle, rowValue } from '../../panel';
 
 beforeEach(() => {
   usePlanStore.setState({ plan: emptyPlan(), planEpoch: 0 });
@@ -25,17 +26,6 @@ const clickAt = async (svg: SVGSVGElement, x: number, y: number, init: PointerEv
 };
 
 const walls = () => Object.values(usePlanStore.getState().plan.walls);
-const panel = () => document.querySelector('.panel');
-
-// Scoped to the panel: a named room prints its name on the sheet too.
-const panelTitle = () => document.querySelector('.panel-title')?.textContent;
-
-// DOM query, not a locator: label and value are sibling spans, unnavigable.
-function rowValue(label: string) {
-  const rows = [...document.querySelectorAll('.panel-row')];
-  const row = rows.find((r) => r.querySelector('.panel-row-label')?.textContent === label);
-  return row?.querySelector('.panel-row-value')?.textContent;
-}
 
 describe('clicking a room', () => {
   it('selects its boundary walls', async () => {
@@ -398,11 +388,11 @@ describe('thickness beyond a single wall', () => {
   it('is absent from a room, however the room was selected', async () => {
     const { svg } = await setup();
     await clickAt(svg, 200, 200);
-    expect(document.querySelector('.panel-number-input')).toBeNull();
+    expect(numberField()).toBeNull();
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
     await pointer(svg, 'pointermove', clientAt(svg, 450, 450));
     await pointer(svg, 'pointerup');
-    expect(document.querySelector('.panel-number-input')).toBeNull();
+    expect(numberField()).toBeNull();
   });
 
   // Two paths to one Selection cannot offer different powers (ADR 0014):
@@ -413,6 +403,6 @@ describe('thickness beyond a single wall', () => {
     await pointer(svg, 'pointermove', clientAt(svg, 850, 450));
     await pointer(svg, 'pointerup');
     await expect.element(page.getByText('7 elements')).toBeInTheDocument();
-    expect(document.querySelector('.panel-number-input')).toBeNull();
+    expect(numberField()).toBeNull();
   });
 });

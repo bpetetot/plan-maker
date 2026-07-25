@@ -7,6 +7,7 @@ import { emptyPlan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, key, pointer } from '../../kit';
+import { numberField, panel, rowValue } from '../../panel';
 
 beforeEach(() => {
   usePlanStore.setState({ plan: emptyPlan(), planEpoch: 0 });
@@ -26,18 +27,9 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
   await pointer(svg, 'pointerup');
 }
 
-const panel = () => document.querySelector('.panel');
-
-// DOM query, not a locator: label and value are sibling spans, unnavigable.
-function rowValue(label: string) {
-  const rows = [...document.querySelectorAll('.panel-row')];
-  const row = rows.find((r) => r.querySelector('.panel-row-label')?.textContent === label);
-  return row?.querySelector('.panel-row-value')?.textContent;
-}
-
 // At most one number field: wall thickness or opening width, never both.
 const field = () => page.getByRole('spinbutton');
-const fieldValue = () => document.querySelector<HTMLInputElement>('.panel-number-input')!.value;
+const fieldValue = () => numberField()!.value;
 
 // A commit happens on blur or Enter, not per keystroke — the helper does both.
 async function setField(value: string) {
@@ -109,7 +101,7 @@ describe('tool panel on selected openings', () => {
     const { svg } = await setup(plan);
     await marqueeSelect(svg, { x: 230, y: 60 }, { x: 370, y: 140 });
     await expect.element(page.getByText('Window', { exact: true })).toBeInTheDocument();
-    expect(document.querySelector('.panel-number-input')).toBeTruthy();
+    expect(numberField()).toBeTruthy();
     await expect.element(page.getByText('Hinge')).not.toBeInTheDocument();
     await userEvent.click(page.getByLabelText('Delete'));
     expect(Object.values(usePlanStore.getState().plan.openings)).toHaveLength(0);
@@ -295,7 +287,7 @@ describe('tool panel on a selected Ruler', () => {
     await selectRuler(svg);
     await expect.element(page.getByText('Ruler', { exact: true })).toBeInTheDocument();
     expect(rowValue('Length')).toBe('5,00 m');
-    expect(document.querySelector('.panel-number-input')).toBeNull(); // no resize-by-typing
+    expect(numberField()).toBeNull(); // no resize-by-typing
     await expect.element(page.getByLabelText('Delete')).toBeInTheDocument();
   });
 
@@ -374,6 +366,6 @@ describe('tool panel on a multi-selection', () => {
   it('offers no thickness field', async () => {
     const { svg } = await setup(mixedPlan());
     await marqueeAll(svg);
-    expect(document.querySelector('.panel-number-input')).toBeNull();
+    expect(numberField()).toBeNull();
   });
 });

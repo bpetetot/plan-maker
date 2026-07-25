@@ -6,6 +6,7 @@ import { emptyPlan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, key, pointer } from '../../kit';
+import { panel, rowValue } from '../../panel';
 
 const plan = () => usePlanStore.getState().plan;
 const texts = () => Object.values(plan().texts) as TextNote[];
@@ -40,7 +41,6 @@ async function setup(p: Plan = oneTextPlan()) {
   return { svg: container.querySelector('svg')! };
 }
 
-const panel = () => document.querySelector('.panel');
 const grab = (svg: SVGSVGElement) => svg.querySelector('.text-grab')!;
 
 const selectText = async (svg: SVGSVGElement) => {
@@ -51,12 +51,6 @@ const selectText = async (svg: SVGSVGElement) => {
 // The three S/M/L preset buttons; the pressed one names the active size.
 const sizeButton = (s: string) => page.getByRole('button', { name: s, exact: true });
 const activeSize = () => document.querySelector('.panel-sizes .size[aria-pressed="true"]')?.textContent;
-
-const rowValue = (label: string) => {
-  const rows = [...document.querySelectorAll('.panel-row')];
-  const row = rows.find((r) => r.querySelector('.panel-row-label')?.textContent === label);
-  return row?.querySelector('.panel-row-value')?.textContent;
-};
 
 describe('tool panel on a selected Text', () => {
   it('titles it Text and shows the S/M/L size control with the live size active', async () => {

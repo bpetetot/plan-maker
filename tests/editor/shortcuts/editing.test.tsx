@@ -8,6 +8,7 @@ import type { Plan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, key, mouse, pointer } from '../../kit';
+import { panelTitle, rowValue } from '../../panel';
 
 // A closed square room (100,100)-(500,500); centroid at (300,300).
 const square = (): Plan => ({
@@ -52,14 +53,6 @@ const wallCount = () => Object.keys(plan().walls).length;
 const nameInput = () => page.getByRole('textbox');
 const pressed = (name: string) => page.getByLabelText(name).element().getAttribute('aria-pressed');
 // Scoped to the panel: a named room prints its name on the sheet too.
-const panelTitle = () => document.querySelector('.panel-title')?.textContent;
-
-// DOM query, not a locator: label and value are sibling spans, unnavigable.
-function rowValue(label: string) {
-  const rows = [...document.querySelectorAll('.panel-row')];
-  const row = rows.find((r) => r.querySelector('.panel-row-label')?.textContent === label);
-  return row?.querySelector('.panel-row-value')?.textContent;
-}
 
 async function setup(fixture?: Plan) {
   if (fixture) usePlanStore.setState({ plan: fixture });
