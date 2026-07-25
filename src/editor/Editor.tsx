@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
-import { nearestWall, projectOnWall, wallLength, wallPoints, wallSide } from '../model/geometry';
+import { nearestWall, projectOnWall, wallLength, wallPoints } from '../model/geometry';
 import {
   addRoomLabel,
   addRuler,
@@ -28,39 +28,32 @@ import {
   commitWall,
   deleteText,
   editTextContent,
-  movePoint,
-  moveOpening,
-  moveRoomLabel,
-  moveRulerEndpoint,
   placeOpening,
   renameRoomLabel,
-  setDimPlacement,
-  settleEdit,
   wallsAlongPath,
 } from '../model/operations';
-import type { Room } from '../model/rooms';
-import { clampToRoom, detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
+import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
   allElements,
   deleteElements,
   elementsInRect,
   isSelected,
-  movedPointIds,
   refKey,
   referencePoint,
-  roomSelection,
   selectedRoom,
   selectionDeletion,
+  selectionForRoom,
   toggleRef,
-  translateElements,
 } from '../model/selection';
 import type { Snap } from '../model/snap';
-import { realignDelta, snapPoint } from '../model/snap';
+import { snapPoint } from '../model/snap';
 import type { Opening, Plan, RoomLabel, TextNote, TextSize } from '../model/types';
 import { GRID, WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
+import type { PlanDrag, PlanDragSpec } from './planDrag';
+import { aimPlanDrag, beginPlanDrag, commitPlanDrag, snapTolerance } from './planDrag';
 import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
 import type { RoomTextBlock } from './render';
@@ -70,7 +63,6 @@ import {
   blockNameSlots,
   COLORS,
   DimLabel,
-  dimTravelBounds,
   Handle,
   JunctionPatches,
   OpeningGlyph,
@@ -98,45 +90,15 @@ import { useSpaceHeld, useView } from './useView';
 
 type Drag =
   | { kind: 'pan'; x: number; y: number }
-  // `orig`: plan at drag start (labels reconcile against it at gesture end).
-  // `grabDelta` fixes the grab point so the handle never recenters on the cursor.
-  | { kind: 'point'; id: string; orig: Plan; grabDelta: Vec }
-  | {
-      kind: 'group';
-      refs: ElementRef[];
-      start: Vec;
-      orig: Plan;
-      clickRef?: ElementRef;
-      // Fixed at pointer-down, not recomputed: the preview would jump when
-      // another candidate became the nearest.
-      refPoint: Vec | null;
-      moved?: boolean;
-    }
-  // `grabDelta` keeps the grab point under the cursor (CONTEXT.md: Grab zone).
-  | { kind: 'opening'; id: string; start: Vec; grabDelta: number; moved?: boolean }
-  // A Ruler endpoint: snaps with the placement ladder. `grabDelta` fixes the
-  // grab point so the handle never recenters.
-  | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec }
-  // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
-  // Room label) is defensive and moves freely.
-  | {
-      kind: 'label';
-      id: string;
-      room: Room | null;
-      start: Vec;
-      grabDelta: Vec;
-      additive: boolean;
-      moved?: boolean;
-    }
-  // The label is created only past the click threshold: a plain click must
-  // not touch the plan.
-  | { kind: 'newLabel'; start: Vec; room: Room; grabDelta: Vec; additive: boolean; id?: string }
-  | { kind: 'dim'; id: string; start: Vec; grabDelta: number; moved?: boolean }
   // `b` is mutated on the ref, not held in state: pointer-up would read a
   // stale React value.
-  | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec };
+  | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
+  // CONTEXT.md: Plan drag. Its whole composition — snap, threshold, grab point,
+  // settle, selection — lives in planDrag.ts (ADR 0023).
+  | { kind: 'plan'; g: PlanDrag };
 
-// Screen px; below this a drag is a plain click.
+// Screen px; below this a drag is a plain click. The Plan drags read it from
+// planDrag.ts; the marquee is the one drag left holding it here.
 const CLICK_PX = 4;
 
 const pointSnap = (p: Plan, id: string): Snap => ({
@@ -263,7 +225,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // The plan reconciles labels only at gesture end; the display previews it
   // live, so a default-placement block tracks its room's anchor mid-drag.
   const dragNow = drag.current;
-  const wallDrag = dragNow && (dragNow.kind === 'point' || dragNow.kind === 'group') ? dragNow : null;
+  const dragKind = dragNow?.kind === 'plan' ? dragNow.g.spec.kind : null;
+  const wallDrag =
+    dragNow?.kind === 'plan' && (dragKind === 'point' || dragKind === 'group') ? dragNow.g : null;
   const overlayLabels = useMemo(
     () => Object.values((wallDrag ? reconcileRoomLabels(wallDrag.orig, plan) : plan).roomLabels),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -281,7 +245,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       : null;
   const hoveredRoom = hovered && roomWallIds(plan, hovered) ? hovered : null;
 
-  const tolerance = () => 14 / pxPerCm();
+  // The tools aim through the same ladder at the same reach as a Plan drag.
+  const tolerance = () => snapTolerance(pxPerCm());
 
   const switchTool = (next: Tool) => {
     setTool(next);
@@ -320,14 +285,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     [setPlan],
   );
 
-  // A click reads the room under it (ADR 0014). Additive unions, never
-  // removes — the marquee's rule, not the wall's toggle.
-  const selectionForRoom = (room: Room | null, additive: boolean, prev: ElementRef[]): ElementRef[] => {
-    const refs = room ? roomSelection(plan, room) : null;
-    if (!refs) return additive ? prev : [];
-    return additive ? [...prev, ...refs.filter((r) => !isSelected(prev, r))] : refs;
-  };
-
   const toggleSnap = useCallback(() => {
     setSnapEnabled(!snapEnabled);
     saveSnapEnabled(!snapEnabled);
@@ -361,12 +318,23 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     zoomActual: () => zoomCenter(zoomRatio),
   }));
 
-  const startPlanDrag = (d: Drag) => {
+  // A Plan drag always opens a history group — there is no variant that does
+  // not, which is what closes ADR 0022's dangling precondition.
+  const startPlanDrag = (spec: PlanDragSpec) => {
     beginHistoryGroup();
-    drag.current = d;
+    drag.current = { kind: 'plan', g: beginPlanDrag(plan, spec) };
     // Or the tint flashes back onto the pre-drag room at pointer-up, and stays
     // there until the next pointermove.
     setHoverRoom(null);
+  };
+
+  // Everything the drag wants on screen, in one place. `live` goes false at
+  // commit: the placement dims track a slide under way, not one that landed.
+  const showPlanDrag = (d: PlanDrag, live: boolean) => {
+    const spec = d.spec;
+    setPlan(() => d.plan);
+    setSnap(d.snap);
+    setMovingOpeningId(live && spec.kind === 'opening' && d.moved ? spec.id : null);
   };
 
   const onSvgPointerDown = (e: React.PointerEvent) => {
@@ -463,7 +431,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   };
 
-  const onElementPointerDown = (ref: ElementRef, e: React.PointerEvent, soloDrag: (c: Vec) => Drag) => {
+  const onElementPointerDown = (
+    ref: ElementRef,
+    e: React.PointerEvent,
+    soloDrag: (c: Vec) => PlanDragSpec,
+  ) => {
     if (e.button !== 0 || space) return;
     if (e.shiftKey) {
       // Or the svg handler starts a marquee on top of this toggle.
@@ -477,7 +449,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         kind: 'group',
         refs: sel,
         start: c,
-        orig: plan,
         clickRef: ref,
         refPoint: referencePoint(plan, sel, c),
       });
@@ -487,6 +458,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   };
 
+  // A single ref-shaped element dragged alone is a group of one: same rigid
+  // translation, same grid realignment.
+  const soloGroup = (refs: ElementRef[], c: Vec): PlanDragSpec => ({
+    kind: 'group',
+    refs,
+    start: c,
+    refPoint: referencePoint(plan, refs, c),
+  });
+
   const onSvgPointerMove = (e: React.PointerEvent) => {
     const c = toPlan(e.clientX, e.clientY);
     const d = drag.current;
@@ -494,89 +474,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       if (d.kind === 'pan') {
         panByPx(e.clientX - d.x, e.clientY - d.y);
         drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
-      } else if (d.kind === 'point') {
-        const s = snapPoint(plan, c.x + d.grabDelta.x, c.y + d.grabDelta.y, {
-          tolerance: tolerance(),
-          exclude: new Set([d.id]),
-          free,
-        });
-        setPlan((p) => movePoint(p, d.id, s.x, s.y));
-        setSnap(s);
-      } else if (d.kind === 'group') {
-        if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-          d.moved = true;
-        }
-        if (d.moved) {
-          // e.altKey, not the tracked state: correct even when Alt went down
-          // before the window had focus.
-          const { dx, dy } = realignDelta(d.refPoint, c.x - d.start.x, c.y - d.start.y, isFree(e.altKey));
-          setPlan(() => translateElements(d.orig, d.refs, dx, dy));
-        }
       } else if (d.kind === 'marquee') {
         d.b = c;
         setMarquee({ a: d.a, b: c });
-      } else if (d.kind === 'opening') {
-        const opening = plan.openings[d.id];
-        if (opening) {
-          if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-            d.moved = true;
-            setMovingOpeningId(d.id);
-          }
-          if (d.moved) {
-            const { t } = projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y);
-            setPlan((p) => moveOpening(p, d.id, t + d.grabDelta));
-          }
-        }
-      } else if (d.kind === 'rulerEnd') {
-        const ruler = plan.rulers[d.id];
-        if (ruler) {
-          const s = snapPoint(plan, c.x + d.grabDelta.x, c.y + d.grabDelta.y, {
-            tolerance: tolerance(),
-            walls: true,
-            free,
-          });
-          setPlan((p) => moveRulerEndpoint(p, d.id, d.end, s.x, s.y));
-          setSnap(s);
-        }
-      } else if (d.kind === 'label') {
-        if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-          d.moved = true;
-        }
-        if (d.moved) {
-          const target = { x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y };
-          const t = d.room ? clampToRoom(target, d.room) : target;
-          setPlan((p) => moveRoomLabel(p, d.id, t.x, t.y));
-        }
-      } else if (d.kind === 'newLabel') {
-        const t = clampToRoom({ x: c.x + d.grabDelta.x, y: c.y + d.grabDelta.y }, d.room);
-        if (d.id) {
-          setPlan((p) => moveRoomLabel(p, d.id!, t.x, t.y));
-        } else if (Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-          const [next, id] = addRoomLabel(plan, '', t.x, t.y);
-          setPlan(() => next);
-          d.id = id;
-        }
-      } else if (d.kind === 'dim') {
-        const wall = plan.walls[d.id];
-        if (wall) {
-          if (!d.moved && Math.hypot(c.x - d.start.x, c.y - d.start.y) * pxPerCm() >= CLICK_PX) {
-            d.moved = true;
-          }
-          if (d.moved) {
-            const length = wallLength(plan, wall);
-            const { t } = projectOnWall(plan, wall, c.x, c.y);
-            const side = wallSide(plan, wall, c.x, c.y);
-            setPlan((p) =>
-              setDimPlacement(
-                p,
-                d.id,
-                length < 1 ? 0.5 : (t + d.grabDelta) / length,
-                side,
-                dimTravelBounds(plan, wall, side),
-              ),
-            );
-          }
-        }
+      } else {
+        // e.altKey, not the tracked state: correct even when Alt went down
+        // before the window had focus.
+        const next = aimPlanDrag(d.g, c, { pxPerCm: pxPerCm(), free: isFree(e.altKey) });
+        drag.current = { kind: 'plan', g: next };
+        showPlanDrag(next, true);
       }
       return;
     }
@@ -625,11 +531,12 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     const d = drag.current;
     if (!d) return;
     drag.current = null;
+    if (d.kind === 'pan') return;
     if (d.kind === 'marquee') {
       const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm();
       const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm();
       if (wPx < CLICK_PX && hPx < CLICK_PX) {
-        setSel(selectionForRoom(roomAt(rooms, d.a.x, d.a.y), d.additive, d.prev));
+        setSel(selectionForRoom(plan, roomAt(rooms, d.a.x, d.a.y), d.additive, d.prev));
       } else {
         const captured = elementsInRect(plan, d.a, d.b, measuresVisible);
         setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured);
@@ -637,22 +544,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setMarquee(null);
       return;
     }
-    if (d.kind === 'group' && !d.moved && d.clickRef) setSel([d.clickRef]);
-    // The dim label is a handle, not an element: only a click selects its wall.
-    if (d.kind === 'dim') {
-      if (!d.moved) setSel([{ type: 'wall', id: d.id }]);
-    }
-    // Same contract for the room text block, which selects the room it names.
-    if ((d.kind === 'label' && !d.moved) || (d.kind === 'newLabel' && !d.id)) {
-      setSel((s) => selectionForRoom(d.room, d.additive, s));
-    }
-    if (d.kind === 'point' || d.kind === 'rulerEnd') setSnap(null);
-    if (d.kind === 'opening') setMovingOpeningId(null);
-    // CONTEXT.md: Settle. Once at gesture end, inside the same history group.
-    if (d.kind === 'point' || d.kind === 'group') {
-      setPlan((p) => settleEdit(d.orig, p, d.kind === 'point' ? new Set([d.id]) : movedPointIds(p, d.refs)));
-    }
-    if (d.kind !== 'pan') endHistoryGroup();
+    // Settle included (CONTEXT.md: Settle) — inside the same history group.
+    const landed = commitPlanDrag(d.g);
+    showPlanDrag(landed, false);
+    if (landed.selection) setSel(landed.selection);
+    endHistoryGroup();
   };
 
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
@@ -712,6 +608,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         start: c,
         grabDelta,
         additive: e.shiftKey,
+        prev: sel,
       });
     } else if (block.room) {
       startPlanDrag({
@@ -720,6 +617,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         room: block.room,
         grabDelta,
         additive: e.shiftKey,
+        prev: sel,
       });
     }
   };
@@ -894,16 +792,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               interactive={tool === 'select'}
               selected={selKeys.has(refKey({ type: 'text', id: text.id }))}
               onPointerDown={(e) =>
-                onElementPointerDown({ type: 'text', id: text.id }, e, (c) => {
-                  const refs: ElementRef[] = [{ type: 'text', id: text.id }];
-                  return {
-                    kind: 'group',
-                    refs,
-                    start: c,
-                    orig: plan,
-                    refPoint: referencePoint(plan, refs, c),
-                  };
-                })
+                onElementPointerDown({ type: 'text', id: text.id }, e, (c) =>
+                  soloGroup([{ type: 'text', id: text.id }], c),
+                )
               }
               onDoubleClick={(e) => onTextDoubleClick(text, e)}
             />
@@ -917,16 +808,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               pxPerCm={zoomScale}
               cursor="move"
               onPointerDown={(e) =>
-                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) => {
-                  const refs: ElementRef[] = [{ type: 'wall', id: wall.id }];
-                  return {
-                    kind: 'group',
-                    refs,
-                    start: c,
-                    orig: plan,
-                    refPoint: referencePoint(plan, refs, c),
-                  };
-                })
+                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) =>
+                  soloGroup([{ type: 'wall', id: wall.id }], c),
+                )
               }
               onPointerEnter={() => setHoverWall(wall.id)}
               onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
@@ -958,16 +842,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               key={ruler.id}
               ruler={ruler}
               onPointerDown={(e) =>
-                onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) => {
-                  const refs: ElementRef[] = [{ type: 'ruler', id: ruler.id }];
-                  return {
-                    kind: 'group',
-                    refs,
-                    start: c,
-                    orig: plan,
-                    refPoint: referencePoint(plan, refs, c),
-                  };
-                })
+                onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) =>
+                  soloGroup([{ type: 'ruler', id: ruler.id }], c),
+                )
               }
               onPointerEnter={() => setHoverRuler(ruler.id)}
               onPointerLeave={() => setHoverRuler((h) => (h === ruler.id ? null : h))}
@@ -1025,7 +902,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                 startPlanDrag({
                   kind: 'point',
                   id: p.id,
-                  orig: plan,
                   grabDelta: { x: p.x - c.x, y: p.y - c.y },
                 });
                 svgRef.current!.setPointerCapture(e.pointerId);

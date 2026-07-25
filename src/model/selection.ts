@@ -106,6 +106,19 @@ export function roomSelection(plan: Plan, room: Room): ElementRef[] | null {
   ];
 }
 
+/** A click reads the room under it (ADR 0014). Additive unions, never removes —
+ *  the marquee's rule, not the wall's toggle. */
+export function selectionForRoom(
+  plan: Plan,
+  room: Room | null,
+  additive: boolean,
+  prev: ElementRef[],
+): ElementRef[] {
+  const refs = room ? roomSelection(plan, room) : null;
+  if (!refs) return additive ? prev : [];
+  return additive ? [...prev, ...refs.filter((r) => !isSelected(prev, r))] : refs;
+}
+
 export interface Contents {
   walls: number;
   doors: number;

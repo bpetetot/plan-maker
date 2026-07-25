@@ -286,6 +286,19 @@ per-session editor state: never part of the plan, reset to the built-in
 values on load.
 _Avoid_: Tool options, tool settings, presets
 
+**Plan drag**:
+A drag that edits the Plan: moving a Point, a group, an Opening along its Rail,
+a Ruler endpoint, a Room label, or a Dimension's placement. It is grabbed, then
+aimed for as long as the pointer is down, then lands — Settling if it moved a
+Point or a Wall, and taking at most one undo entry whole. Below the click
+threshold it was a click, not a drag: it leaves the plan alone and selects
+instead — the element clicked, the wall a Dimension label belongs to, the Room a
+text block names. The Pan and the Marquee are drags but not Plan drags: one
+moves the view, the other the Selection, and neither can touch the plan, which
+is why neither Settles and neither takes an undo entry (ADR 0023). Pure editor
+state: never part of the plan.
+_Avoid_: Gesture, drag operation, manipulation
+
 **Grab zone**:
 The invisible area around an element that reacts to the pointer — hover,
 click, drag. It covers the element's body plus a constant on-screen margin,
