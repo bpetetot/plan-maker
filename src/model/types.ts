@@ -85,6 +85,17 @@ export interface Plan {
   texts: Record<string, TextNote>;
 }
 
+/** A reading of the Plan alone, computed once per Plan (ADR 0029). Keyed on
+ *  identity, and what comes back is shared: no reader writes to it. */
+export function oncePerPlan<T>(read: (plan: Plan) => T): (plan: Plan) => T {
+  const readings = new WeakMap<Plan, T>();
+  return (plan) => {
+    // `has`, not a falsy check: a reading may legitimately be null or 0.
+    if (!readings.has(plan)) readings.set(plan, read(plan));
+    return readings.get(plan)!;
+  };
+}
+
 export const WALL_THICKNESS: Cm = 10;
 export const WALL_THICKNESS_MAX: Cm = 100;
 export const GRID: Cm = 10;

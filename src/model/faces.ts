@@ -1,6 +1,7 @@
 import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import type { Plan, Wall } from './types';
+import { oncePerPlan } from './types';
 
 // Faces: a wall's two long sides, half a thickness off the axis; mitered at
 // junctions, square-capped past free ends. Side +1 = left normal, as DimPlacement.
@@ -120,7 +121,7 @@ export interface JunctionPatch {
   corners: Vec[];
 }
 
-export function junctionPatches(plan: Plan): JunctionPatch[] {
+export const junctionPatches = oncePerPlan((plan: Plan): JunctionPatch[] => {
   const byPoint = new Map<string, { wall: Wall; end: 'start' | 'end' }[]>();
   for (const wall of Object.values(plan.walls)) {
     for (const end of ['start', 'end'] as const) {
@@ -141,17 +142,26 @@ export function junctionPatches(plan: Plan): JunctionPatch[] {
     corners.sort((c1, c2) => Math.atan2(c1.y - p.y, c1.x - p.x) - Math.atan2(c2.y - p.y, c2.x - p.x));
     patches.push({ pointId, wallIds: [...new Set(ends.map(({ wall }) => wall.id))], corners });
   }
+  // One list for every reader now (ADR 0029).
+  Object.freeze(patches);
   return patches;
-}
+});
+
+// Read per room and per hole loop by detectRooms, so it is the Plan's, not the
+// call's (ADR 0029).
+const wallByEdge = oncePerPlan((plan: Plan): Map<string, Wall> => {
+  const byEdge = new Map<string, Wall>();
+  for (const wall of Object.values(plan.walls)) {
+    byEdge.set(`${wall.startPointId}|${wall.endPointId}`, wall);
+    byEdge.set(`${wall.endPointId}|${wall.startPointId}`, wall);
+  }
+  return byEdge;
+});
 
 // Expects a positively-oriented loop (screen coordinates), as detectRooms
 // produces for interior faces.
 export function interiorPolygon(plan: Plan, pointIds: string[]): Vec[] {
-  const wallByEdge = new Map<string, Wall>();
-  for (const wall of Object.values(plan.walls)) {
-    wallByEdge.set(`${wall.startPointId}|${wall.endPointId}`, wall);
-    wallByEdge.set(`${wall.endPointId}|${wall.startPointId}`, wall);
-  }
+  const edgeWalls = wallByEdge(plan);
   interface OffsetEdge {
     from: Vec;
     to: Vec;
@@ -163,7 +173,7 @@ export function interiorPolygon(plan: Plan, pointIds: string[]): Vec[] {
   for (let i = 0; i < pointIds.length; i++) {
     const a = plan.points[pointIds[i]];
     const b = plan.points[pointIds[(i + 1) % pointIds.length]];
-    const wall = wallByEdge.get(`${a.id}|${b.id}`);
+    const wall = edgeWalls.get(`${a.id}|${b.id}`);
     if (!wall) continue;
     const length = Math.hypot(b.x - a.x, b.y - a.y);
     if (length < 1e-9) continue;

@@ -193,8 +193,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [planEpoch]);
 
-  const rooms = useMemo(() => detectRooms(plan), [plan]);
-  const blocks = useMemo(() => roomTextBlocks(rooms, Object.values(plan.roomLabels)), [rooms, plan]);
+  // No useMemo: a reading of the plan is already computed once per plan
+  // (ADR 0029), and that memo outlives this component's renders.
+  const rooms = detectRooms(plan);
   // The plan reconciles labels only at gesture end; the display previews it
   // live, so a default-placement block tracks its room's anchor mid-drag.
   const dragNow = drag.current;
@@ -209,7 +210,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
 
   // A reading, not a memory (ADR 0014): a marquee over the same walls lights
   // the room exactly as a click on it does.
-  const selRoom = useMemo(() => selectedRoom(plan, rooms, sel), [plan, rooms, sel]);
+  const selRoom = selectedRoom(plan, rooms, sel);
   // A room whose boundary does not resolve is unselectable, so it must not
   // announce itself either: the tint tracks what a click would select.
   const hovered =
@@ -622,6 +623,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       return;
     }
     const room = roomAt(rooms, c.x, c.y);
+    // Off the plan's own labels, not the drag overlay's: a double-click never
+    // lands mid-drag, so there is nothing to reconcile here.
+    const blocks = roomTextBlocks(rooms, Object.values(plan.roomLabels));
     const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
     if (block) startEditing(block, block.labels[0] ?? null);
   };
@@ -657,7 +661,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         {selRoom && <RoomFill room={selRoom} variant="selected" />}
         <PlanScene
           plan={plan}
-          rooms={rooms}
           measuresVisible={measuresVisible}
           decor={{
             element: dressElement,
@@ -938,7 +941,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       {/* CONTEXT.md: Tool panel */}
       <ToolPanel
         plan={plan}
-        rooms={rooms}
         sel={sel}
         tool={tool}
         defaults={defaults}

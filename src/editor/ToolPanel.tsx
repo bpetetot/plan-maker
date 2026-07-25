@@ -23,8 +23,7 @@ import {
   toggleHingeSide,
   toggleSwing,
 } from '../model/operations';
-import type { Room } from '../model/rooms';
-import { roomLabelAt, wallMeasures } from '../model/rooms';
+import { detectRooms, roomLabelAt, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
 import type { Plan, TextSize, Wall } from '../model/types';
@@ -42,7 +41,6 @@ const ELEMENT_META: Record<'wall' | 'door' | 'window', [LucideIcon, string]> = {
 
 interface ToolPanelProps {
   plan: Plan;
-  rooms: Room[];
   sel: ElementRef[];
   tool: Tool;
   defaults: ToolDefaults;
@@ -50,7 +48,7 @@ interface ToolPanelProps {
   onDelete: () => void;
 }
 
-export function ToolPanel({ plan, rooms, sel, tool, defaults, setDefaults, onDelete }: ToolPanelProps) {
+export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: ToolPanelProps) {
   if (sel.length === 0) {
     // Ruler configures nothing pre-placement; Text picks its size default here.
     if (tool === 'select' || tool === 'ruler') return null;
@@ -75,7 +73,7 @@ export function ToolPanel({ plan, rooms, sel, tool, defaults, setDefaults, onDel
 
   // The room is read from the selection, not held in it (ADR 0014), so a
   // marquee over the same walls reads the same room.
-  const room = selectedRoom(plan, rooms, sel);
+  const room = selectedRoom(plan, detectRooms(plan), sel);
 
   const [Icon, title]: [LucideIcon, string] = room
     ? [Scan, roomLabelAt(plan, room)?.name || 'Room']
@@ -103,7 +101,7 @@ export function ToolPanel({ plan, rooms, sel, tool, defaults, setDefaults, onDel
               <span className="panel-row-value">{formatArea(room.areaCm2)}</span>
             </div>
           )}
-          {wall && <WallRows plan={plan} rooms={rooms} wall={wall} />}
+          {wall && <WallRows plan={plan} wall={wall} />}
           {wall && (
             <div className="panel-row">
               <span className="panel-row-label">Thickness</span>
@@ -350,8 +348,8 @@ function ContentsRows({ contents, zeros }: { contents: Contents; zeros: boolean 
 
 // Spec §2: oriented Interior/Exterior when the wall borders exactly one room,
 // hors-tout Length otherwise.
-function WallRows({ plan, rooms, wall }: { plan: Plan; rooms: Room[]; wall: Wall }) {
-  const m = wallMeasures(plan, rooms, wall);
+function WallRows({ plan, wall }: { plan: Plan; wall: Wall }) {
+  const m = wallMeasures(plan, detectRooms(plan), wall);
   const rows =
     m.kind === 'oriented'
       ? ([

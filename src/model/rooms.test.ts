@@ -40,6 +40,11 @@ describe('detectRooms after planar insertion (ADR 0002)', () => {
 });
 
 describe('detectRooms', () => {
+  it('seals the list it shares', () => {
+    const rooms = detectRooms(squareRoomPlan());
+    expect(() => rooms.push(rooms[0])).toThrow(TypeError);
+  });
+
   it('finds no room in an empty plan or an open chain', () => {
     expect(detectRooms(buildPlan(() => {}))).toEqual([]);
     const chain = buildPlan((b) => {
@@ -208,9 +213,9 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
     return { plan, ...ids };
   };
 
+  // Copied before sorting: the reading is shared and sealed (ADR 0029).
   const byArea = (plan: Plan) => {
-    const rooms = detectRooms(plan);
-    rooms.sort((a, b) => a.areaCm2 - b.areaCm2);
+    const rooms = [...detectRooms(plan)].sort((a, b) => a.areaCm2 - b.areaCm2);
     return { inner: rooms[0], outer: rooms[1], rooms };
   };
 

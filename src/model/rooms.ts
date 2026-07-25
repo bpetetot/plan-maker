@@ -10,6 +10,7 @@ import {
   regionCentroid,
 } from './geometry';
 import type { Opening, Plan, RoomLabel, Wall } from './types';
+import { oncePerPlan } from './types';
 
 // Rooms are derived, never stored (spec §2; CONTEXT.md: Room): faces of the
 // wall graph. Positive area = interior, negative = silhouette, punches holes.
@@ -27,7 +28,7 @@ export interface Room {
 
 const MIN_ROOM_AREA_CM2 = 100;
 
-export function detectRooms(plan: Plan): Room[] {
+export const detectRooms = oncePerPlan((plan: Plan): Room[] => {
   const neighbors = new Map<string, string[]>();
   for (const wall of Object.values(plan.walls)) {
     const a = wall.startPointId;
@@ -154,8 +155,11 @@ export function detectRooms(plan: Plan): Room[] {
     room.anchor = roomAnchor(room);
   }
 
+  // One list for every reader now (ADR 0029); frozen after the loop above,
+  // which still writes the rooms themselves.
+  Object.freeze(rooms);
   return rooms;
-}
+});
 
 function roomAnchor(room: Room): Vec {
   if (room.holes.length === 0) return polygonCentroid(room.polygon);
@@ -188,14 +192,16 @@ export function clampToRoom(point: Vec, room: Room): Vec {
   return roomContains(room, out.x, out.y) ? out : room.anchor;
 }
 
-function wallIdByPair(plan: Plan): Map<string, string> {
+// Read per room by selectedRoom and roomDeletion, so it is the Plan's, not the
+// call's (ADR 0029).
+const wallIdByPair = oncePerPlan((plan: Plan): Map<string, string> => {
   const byPair = new Map<string, string>();
   for (const wall of Object.values(plan.walls)) {
     byPair.set(`${wall.startPointId}|${wall.endPointId}`, wall.id);
     byPair.set(`${wall.endPointId}|${wall.startPointId}`, wall.id);
   }
   return byPair;
-}
+});
 
 // An island's footprint is part of the room it holes (CONTEXT.md: Room), so
 // its loop is boundary too: a room moves whole or breaks its own geometry.

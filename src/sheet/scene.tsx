@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Room } from '../model/rooms';
+import { detectRooms } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import type { Plan, RoomLabel } from '../model/types';
 import { DimLabel, RulerLabel } from './measures';
@@ -36,20 +36,21 @@ export interface SheetDecor {
 // step. The export passes neither optional prop (ADR 0024).
 export function PlanScene({
   plan,
-  rooms,
   measuresVisible,
   dimFontPx,
   decor,
   chrome,
 }: {
   plan: Plan;
-  rooms: Room[];
   measuresVisible: boolean;
   dimFontPx?: number;
   decor?: SheetDecor;
   chrome?: ReactNode;
 }) {
   const dress = (type: ElementRef['type'], id: string) => decor?.element({ type, id });
+  // Read here rather than received: the rooms are the plan's, and reading them
+  // twice costs nothing (ADR 0029).
+  const rooms = detectRooms(plan);
   return (
     <>
       {Object.values(plan.walls).map((wall) => {

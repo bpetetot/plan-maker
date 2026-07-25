@@ -164,4 +164,9 @@ describe('junctionPatches', () => {
   it('emits one patch per shared corner of a closed room', () => {
     expect(junctionPatches(squareRoomPlan())).toHaveLength(4);
   });
+
+  it('seals the list it shares', () => {
+    const patches = junctionPatches(squareRoomPlan());
+    expect(() => patches.push(patches[0])).toThrow(TypeError);
+  });
 });
