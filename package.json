@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "lint": "oxlint src",
     "format": "oxfmt src",
-    "format:check": "oxfmt --check src"
+    "format:check": "oxfmt --check src",
+    "knip": "knip"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
@@ -34,6 +35,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/browser-playwright": "^4.1.10",
     "fake-indexeddb": "^6.2.5",
+    "knip": "^6.29.0",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.74.0",
     "playwright": "^1.61.1",

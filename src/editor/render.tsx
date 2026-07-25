@@ -532,13 +532,13 @@ export function RulerLabel({
 // S/M/L resolved to plan-coordinate cm (ticket 03): a real size on the sheet
 // that zooms with the plan, not a screen-constant one.
 export const TEXT_SIZE_CM: Record<TextSize, Cm> = { S: 8, M: 12, L: 18 };
-export const TEXT_LINE_HEIGHT = 1.25;
+const TEXT_LINE_HEIGHT = 1.25;
 // Halo stroke as a fraction of the font size (ticket 03): a sheet-coloured
 // backing that hugs the glyphs, so text stays legible where it crosses a wall.
 export const TEXT_HALO_RATIO = 0.28;
 // Rough system-ui advance per em — the block width is estimated from the longest
 // line, the same way the dimension plate estimates its own.
-export const TEXT_CHAR_ADVANCE = 0.55;
+const TEXT_CHAR_ADVANCE = 0.55;
 // The grab zone's on-screen margin around the block (ticket 08, Grab zone rules).
 const TEXT_GRAB_MARGIN_PX = 3;
 // On-screen padding between the glyphs and the selection outline. Wider on the

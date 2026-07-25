@@ -13,7 +13,7 @@ export interface StoredRecord {
 
 // Keyed by the version they migrate FROM.
 type Migration = (plan: unknown) => unknown;
-export const migrations: Record<number, Migration> = {
+const migrations: Record<number, Migration> = {
   // v2 only added the optional Wall.dimPlacement: v1 plans are already valid v2.
   1: (plan) => plan,
 };

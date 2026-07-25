@@ -10,7 +10,7 @@ export interface Point {
 
 // `t` is a ratio of the wall's length, not cm: the label holds its relative
 // position when the wall stretches (ADR 0001). Absent = midpoint, upper side.
-export interface DimPlacement {
+interface DimPlacement {
   t: number;
   side: 1 | -1;
 }
@@ -23,7 +23,7 @@ export interface Wall {
   dimPlacement?: DimPlacement;
 }
 
-export interface BaseOpening {
+interface BaseOpening {
   id: string;
   wallId: string;
   // from the wall's start point to the opening's center, not its edge
@@ -37,7 +37,7 @@ export interface Door extends BaseOpening {
   swing: 'in' | 'out';
 }
 
-export interface Window extends BaseOpening {
+interface Window extends BaseOpening {
   type: 'window';
 }
 

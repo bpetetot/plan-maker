@@ -51,5 +51,8 @@ jobs:
       - name: Typescript checking
         run: npm run typecheck
 
+      - name: Knip
+        run: npm run knip
+
       - name: Tests
         run: npm run test

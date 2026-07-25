@@ -10,6 +10,7 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `npm test` / `npm run test:watch` — Vitest
 - `npm run typecheck` — tsc
 - `npm run lint` / `npm run format` — oxlint / oxfmt
+- `npm run knip` — knip: unused files, dependencies and exports
 - `npm run build` — typecheck + production build (generates the service worker); `npm run preview` serves it
 - `node scripts/generate-icons.mjs` — regenerates the PWA icons in `public/`
 - `node scripts/generate-measure-font.mjs` — regenerates the embedded
@@ -30,6 +31,9 @@ idb-keyval (autosave), vite-plugin-pwa.
   migrations for existing plans are required until production
 - All code, comments, and documentation should be written in English
 - Comments: max 2 lines, five justified cases only — see `docs/agents/comments.md`
+- A symbol is `export`ed only when another module imports it — never ahead of a
+  hypothetical caller. Add the `export` in the commit that adds the import;
+  `knip` enforces it
 - UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
   Unicode glyphs (exception: the zoom-percentage button, which is a text
   indicator)

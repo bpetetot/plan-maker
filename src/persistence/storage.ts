@@ -17,7 +17,7 @@ function decodeRecord(value: unknown): Plan | null {
   }
 }
 
-export function makeRecord(plan: Plan): StoredRecord {
+function makeRecord(plan: Plan): StoredRecord {
   return { schemaVersion: SCHEMA_VERSION, savedAt: Date.now(), plan };
 }
 

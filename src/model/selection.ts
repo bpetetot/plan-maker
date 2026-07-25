@@ -30,7 +30,7 @@ export interface ElementRef {
   id: string;
 }
 
-export const sameRef = (a: ElementRef, b: ElementRef) => a.type === b.type && a.id === b.id;
+const sameRef = (a: ElementRef, b: ElementRef) => a.type === b.type && a.id === b.id;
 
 export const refKey = (ref: ElementRef) => `${ref.type}:${ref.id}`;
 

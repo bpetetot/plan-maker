@@ -39,7 +39,7 @@ function miter(p1: Vec, d1: Vec, p2: Vec, d2: Vec, corner: Vec, wallA: Wall, wal
   return Math.hypot(hit.x - corner.x, hit.y - corner.y) > limit ? null : hit;
 }
 
-export function facePoint(plan: Plan, wall: Wall, end: 'start' | 'end', side: 1 | -1): Vec {
+function facePoint(plan: Plan, wall: Wall, end: 'start' | 'end', side: 1 | -1): Vec {
   const frame = wallFrame(plan, wall);
   if (!frame) {
     // wall collapsed mid-drag: degrade to the Point itself

@@ -4,7 +4,7 @@ import { decodePlanPayload, SCHEMA_VERSION } from '../persistence/schema';
 // Transfer envelope, spec §7: `format` rejects foreign JSON, `version` replays
 // the storage migration chain.
 
-export const FILE_FORMAT = 'plan-maker';
+const FILE_FORMAT = 'plan-maker';
 
 export type ParseResult =
   | { ok: true; plan: Plan }
