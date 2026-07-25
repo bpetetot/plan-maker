@@ -4,7 +4,7 @@ import { detectRooms } from '../model/rooms';
 import type { Plan, RoomLabel } from '../model/types';
 import type { PlanBuilder } from '../model/testHelpers';
 import { buildPlan } from '../model/testHelpers';
-import { roomTextBlocks } from './render';
+import { roomTextBlocks } from './rooms';
 
 // 4×4 m square room, axis (0,0)-(400,400): centroid (200,200).
 const square = (build: (b: PlanBuilder) => void) =>

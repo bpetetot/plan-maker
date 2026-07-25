@@ -157,3 +157,27 @@ export function namedRoomPlan(name = 'Kitchen'): Plan {
     b.label(name, 200, 150);
   });
 }
+
+// A single free-standing wall with stable ids, so a render test can name the
+// wall it passes in. Bypasses the builder's counter for the same reason.
+export function oneWallPlan(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  thickness = 10,
+): { plan: Plan; wall: Wall } {
+  const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness };
+  const plan: Plan = {
+    points: {
+      a: { id: 'a', x: x1, y: y1 },
+      b: { id: 'b', x: x2, y: y2 },
+    },
+    walls: { w: wall },
+    openings: {},
+    roomLabels: {},
+    rulers: {},
+    texts: {},
+  };
+  return { plan, wall };
+}

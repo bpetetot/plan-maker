@@ -18,7 +18,7 @@ import { realignDelta, snapPoint } from '../model/snap';
 import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
 import type { Plan } from '../model/types';
-import { dimTravelBounds } from './render';
+import { dimTravelBounds } from '../sheet/measures';
 
 export type PlanDragSpec =
   // `grabDelta` fixes the grab point so the handle never recenters on the cursor.

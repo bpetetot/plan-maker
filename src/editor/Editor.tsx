@@ -56,33 +56,30 @@ import type { PlanDrag, PlanDragSpec } from './planDrag';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag, snapTolerance } from './planDrag';
 import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
-import type { RoomTextBlock } from './render';
+import type { RoomTextBlock } from '../sheet/rooms';
 import { ToolPanel } from './ToolPanel';
 import {
-  BLOCK_LINE_HEIGHT,
-  blockNameSlots,
-  COLORS,
-  DimLabel,
   Handle,
-  JunctionPatches,
-  OpeningGlyph,
   OpeningGrabZone,
   PlacementDims,
   RoomFill,
+  RubberWall,
+  RulerGrabZone,
+  SnapMarker,
+  WallGrabZone,
+} from './chrome';
+import { DimLabel, RulerLabel } from '../sheet/measures';
+import { OpeningGlyph } from '../sheet/openings';
+import { COLORS } from '../sheet/paint';
+import {
+  BLOCK_LINE_HEIGHT,
+  blockNameSlots,
   RoomOverlay,
   ROOM_TEXT_HIT,
   roomTextBlocks,
-  RubberWall,
-  RulerGrabZone,
-  RulerLabel,
-  SnapMarker,
-  TEXT_SIZE_CM,
-  textAtPoint,
-  textEditBox,
-  TextNoteView,
-  WallGrabZone,
-  WallLine,
-} from './render';
+} from '../sheet/rooms';
+import { TEXT_SIZE_CM, textAtPoint, textEditBox, TextNoteView } from '../sheet/texts';
+import { JunctionPatches, WallLine } from '../sheet/walls';
 import type { Tool, ToolDefaults } from './tools';
 import { initialToolDefaults } from './tools';
 import { keyHint } from './useAppHotkeys';

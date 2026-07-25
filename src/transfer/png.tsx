@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PlanScene } from '../editor/render';
+import { PlanScene } from '../sheet/scene';
 import { planBBox } from '../model/geometry';
 import { detectRooms } from '../model/rooms';
 import type { Plan } from '../model/types';

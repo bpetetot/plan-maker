@@ -6,7 +6,7 @@ import { emptyPlan } from '../model/types';
 import type { Opening, Plan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import Editor from './Editor';
-import { PlacementDims } from './render';
+import { PlacementDims } from './chrome';
 import { clientAt, pointer } from './testKit';
 
 beforeEach(() => {

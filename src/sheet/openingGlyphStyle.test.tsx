@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
 import type { Opening, Plan, Wall } from '../model/types';
-import { OpeningGlyph } from './render';
+import { OpeningGlyph } from './openings';
 
 function planWith(opening: Opening): Plan {
   const wall: Wall = { id: 'w', startPointId: 'a', endPointId: 'b', thickness: 10 };
