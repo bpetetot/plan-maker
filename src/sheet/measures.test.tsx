@@ -133,6 +133,18 @@ describe('dimTravelBounds', () => {
     expect(min).toBe(max);
     expect(min).toBeCloseTo(0.5, 5);
   });
+
+  // The Rail binds at every drawing, not only at the gesture (CONTEXT.md: Rail):
+  // a placement its own wall outgrew is drawn back on the Rail, not where stored.
+  it('draws a stored placement its wall no longer allows back on the rail', async () => {
+    const { plan, wall } = oneWallPlan(0, 0, 400, 0);
+    wall.dimPlacement = { t: 0.99, side: -1 };
+    const { max } = dimTravelBounds(plan, wall, -1);
+    const { group } = await renderDim(plan, wall);
+    const x = Number(/translate\(([-\d.]+),/.exec(group.getAttribute('transform')!)![1]);
+    expect(0.99).toBeGreaterThan(max);
+    expect(x).toBeCloseTo(max * 400, 3);
+  });
 });
 
 describe('DimLabel selection', () => {

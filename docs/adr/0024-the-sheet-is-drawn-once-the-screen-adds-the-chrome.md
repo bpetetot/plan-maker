@@ -63,9 +63,11 @@ structure: a layer is added in one place or it exists nowhere.
   drawn with a drawing component.
 - **The export borrows the stylesheet instead of restating it.**
   `sheet/sheet.css` holds the drawing's rules and `theme/light.css` the light
-  palette; `styles.css` imports both, `png.tsx` inlines both. Nothing is written
-  twice — not a rule, not a hex value — and the export is light by construction,
-  `:root` resolving to the exported `<svg>` where the dark override cannot match.
+  palette; `styles.css` imports both, `png.tsx` inlines both. No rule and no
+  token value is written twice, and the export is light by construction, `:root`
+  resolving to the exported `<svg>` where the dark override cannot match. The one
+  literal left is the export's white paper — the frame rect and the canvas
+  backdrop — which is the artifact's, not the theme's.
   Two costs came with it: vitest returns empty strings for CSS imports unless
   `css: true`, and the borrowed text must be wrapped in CDATA — the export is
   XML, so one `<` in a CSS comment closes the `<style>` element and the document
@@ -73,6 +75,7 @@ structure: a layer is added in one place or it exists nowhere.
   export test outside node: 709 tests never caught it, because none of them
   parsed what they built.
 - ADR 0021 is not amended. It was written ahead of the code; this makes it true.
-- The test count went up, not down: 708. The browser tests were kept as the
-  iso-behaviour net, and two node tests were added — the Rail at export size,
-  and the chrome not leaking.
+- The test count went up, not down: 711. The browser tests were kept as the
+  iso-behaviour net, and four were added — the Rail at export size, the Rail on
+  a screen placement its geometry outgrew, the chrome not leaking, and the
+  export parsing as XML.

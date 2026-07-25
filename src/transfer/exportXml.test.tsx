@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildPlan } from '../model/testHelpers';
 import { buildExportSvg } from './png';
 
-// The export is an XML document, not HTML. It borrows the app's stylesheet
-// (ADR 0024), and a single "<" anywhere in it — a CSS comment naming a tag is
-// enough — closes the <style> element and the file rasterizes to nothing. Only
-// a real parser sees that, which is why this one export test is in the browser
-// while every other lives in node.
+// Only a real parser catches a "<" in the borrowed stylesheet, hence the one
+// export test in the browser; every other lives in node.
 describe('the exported SVG', () => {
   it('parses as XML, borrowed stylesheet included', () => {
     const plan = buildPlan((b) => {

@@ -43,15 +43,12 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
   };
 }
 
-// The sheet's own rules and the light palette, verbatim from the app — nothing
-// is restated here, or the export drifts from the screen (ADR 0024). `:root`
-// resolves to the exported <svg>, so the palette lands and the dark override
-// cannot. Only the font is the export's own: rasterization goes through an
-// <img>, which loads no external resource, so the subset is inlined.
-// CDATA because this document is XML, not HTML: React writes style children
-// raw, so a single "<" anywhere in the borrowed CSS — a comment naming a tag is
-// enough — would close the element and make the whole SVG unrasterizable. The
-// markers sit inside CSS comments, which the stylesheet then ignores.
+// Borrowed whole, never restated (ADR 0024): `:root` resolves to the exported
+// svg, so the palette lands and the dark override cannot.
+// The font is the export's own: rasterizing through an <img> loads no external
+// resource, so the subset is inlined.
+// CDATA because this is XML: one "<" in the borrowed CSS would close the style
+// element. The markers sit in CSS comments, which the stylesheet ignores.
 const EXPORT_STYLE = `/* <![CDATA[ */
   @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
   ${LIGHT_PALETTE}

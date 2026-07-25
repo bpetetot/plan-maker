@@ -20,9 +20,8 @@ export interface ElementDecor {
   onDoubleClick?: (e: React.MouseEvent) => void;
 }
 
-// The screen's dressing of the whole sheet, absent from the export. `element`
-// covers the four families an ElementRef names; a Room label is not one of them,
-// so the overlay's own wiring rides beside it.
+// A Room label is not an ElementRef, so the overlay's wiring rides beside
+// `element` rather than through it.
 export interface SheetDecor {
   element: (ref: ElementRef) => ElementDecor | undefined;
   pxPerCm: number;
@@ -33,9 +32,8 @@ export interface SheetDecor {
   onLineDoubleClick?: (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => void;
 }
 
-// The sheet: everything the export prints and nothing else (spec §7, ADR 0005).
-// Both adapters call it, which is what keeps them in step — the screen adds its
-// dressing and its chrome, the export passes neither.
+// The Sheet (CONTEXT.md), called by both adapters — which is what keeps them in
+// step. The export passes neither optional prop (ADR 0024).
 export function PlanScene({
   plan,
   rooms,

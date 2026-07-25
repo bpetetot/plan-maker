@@ -1,5 +1,5 @@
-// Values live in styles.css; the PNG export pins the light ones in its own
-// <style>, so the standalone SVG resolves them without the document.
+// Values live in theme/light.css, which the PNG export inlines: the standalone
+// SVG resolves them without the document (ADR 0024).
 export const COLORS = {
   wall: 'var(--wall)',
   wallHover: 'var(--wall-hover)',

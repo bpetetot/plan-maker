@@ -16,8 +16,9 @@ junctions, openings, room names and areas, texts, dimensions, rulers. Defined by
 what leaves the app: the Sheet is exactly what the PNG export prints, which is
 why the screen and the export draw it from one place and cannot drift apart. The
 editor renders the same Sheet and dresses it — selection accents, hover tints,
-handlers — without adding to it.
-_Avoid_: Canvas, scene, page
+handlers — without adding to it. The one component both adapters call is named
+`PlanScene`, from before the term was settled (ADR 0021, ADR 0024).
+_Avoid_: Canvas, page, drawing surface
 
 **Interaction chrome**:
 Everything the editor draws that the Sheet does not contain: the Grid, room

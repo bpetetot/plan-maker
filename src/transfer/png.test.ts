@@ -153,9 +153,8 @@ describe('buildExportSvg', () => {
     expect(svg).not.toContain('4,10 m');
   });
 
-  // ADR 0005: the export prints the drawing, never what the editor adds to
-  // manipulate it. Both sides now call one PlanScene, so the screen's chrome
-  // reaches the sheet through a slot the export leaves empty (ADR 0024).
+  // ADR 0005: the export prints the drawing, never what manipulates it. The
+  // screen's chrome rides a slot the export leaves empty (ADR 0024).
   it('leaves the editor chrome out of the export', () => {
     const svg = buildExportSvg(fullPlan(), { measuresVisible: true })!;
     // The drawn elements only: the inlined stylesheet legitimately mentions a
@@ -175,9 +174,8 @@ describe('buildExportSvg', () => {
     expect(drawn).not.toContain('point-handle');
   });
 
-  // A stored placement is a wish, the Rail is the law — and the Rail is shorter
-  // at the export's wider font. Free-standing 1,20 m wall: extent -5..125, and a
-  // 6-character plate at 10 px is 40 wide, so its centre stops at 125-7-20 = 98.
+  // Free-standing 1,20 m wall: extent -5..125, a 6-character plate 40 wide at
+  // 10 px, so the Rail stops its centre at 125-7-20 = 98 (CONTEXT.md: Rail).
   it('holds a dimension plate on the rail of the size it is drawn at', () => {
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -191,9 +189,8 @@ describe('buildExportSvg', () => {
     expect(x).toBeCloseTo(98, 3);
   });
 
-  // A var the export leaves undefined rasterizes black. The free-text ink is
-  // the one defined through another (CONTEXT.md: Text), so the whole chain has
-  // to arrive, not just its first link.
+  // An undefined var rasterizes black, and this ink is defined through another
+  // one: the whole chain has to arrive, not just its first link.
   it('carries the free-text ink and what it resolves to', () => {
     const svg = buildExportSvg(textPlan(), { measuresVisible: true })!;
     expect(svg).toContain('--text-note: var(--label)');
