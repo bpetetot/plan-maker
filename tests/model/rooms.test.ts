@@ -1,0 +1,794 @@
+import { describe, expect, it } from 'vitest';
+import { commitWall } from '../../src/model/settle';
+import { deleteWall, setPoints } from '../../src/model/walls';
+import {
+  addRoomLabel,
+  clampToRoom,
+  detectRooms,
+  interiorSide,
+  reconcileRoomLabels,
+  roomAt,
+  roomContains,
+  moveRoomLabel,
+  renameRoomLabel,
+  roomOpenings,
+  roomWallIds,
+  wallMeasures,
+} from '../../src/model/rooms';
+import type { Plan } from '../../src/model/types';
+import { buildPlan, squareRoomPlan, stackedRoomsPlan } from '../helpers';
+
+describe('detectRooms after planar insertion (ADR 0002)', () => {
+  it('detects both rooms when a divider is drawn between two wall bodies', () => {
+    const square = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+    });
+    expect(detectRooms(square)).toHaveLength(1);
+    const [bottom, , top] = Object.keys(square.walls);
+    const [plan] = commitWall(
+      square,
+      { x: 200, y: 0, kind: 'wall', wallId: bottom },
+      { x: 200, y: 400, kind: 'wall', wallId: top },
+    );
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(2);
+    for (const room of rooms) expect(room.areaCm2).toBe(190 * 390);
+  });
+});
+
+describe('detectRooms', () => {
+  it('seals the list it shares', () => {
+    const rooms = detectRooms(squareRoomPlan());
+    expect(() => rooms.push(rooms[0])).toThrow(TypeError);
+  });
+
+  it('finds no room in an empty plan or an open chain', () => {
+    expect(detectRooms(buildPlan(() => {}))).toEqual([]);
+    const chain = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 300);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+    });
+    expect(detectRooms(chain)).toEqual([]);
+  });
+
+  it('detects a single rectangular room with its area and anchor', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].areaCm2).toBe(390 * 290);
+    expect(rooms[0].anchor).toEqual({ x: 200, y: 150 });
+  });
+
+  it('detects two rooms split by an inner wall', () => {
+    // 600×300 outer rectangle with a vertical wall at x=250
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m1 = b.point(250, 0);
+      const c = b.point(600, 0);
+      const d = b.point(600, 300);
+      const m2 = b.point(250, 300);
+      const e = b.point(0, 300);
+      b.wall(a, m1);
+      b.wall(m1, c);
+      b.wall(c, d);
+      b.wall(d, m2);
+      b.wall(m2, e);
+      b.wall(e, a);
+      b.wall(m1, m2);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(2);
+    const areas = rooms.map((r) => r.areaCm2).sort((x, y) => x - y);
+    expect(areas).toEqual([240 * 290, 340 * 290]);
+  });
+
+  it('subtracts the footprint of a dangling wall from the room area', () => {
+    // 400×300 room, stub from the bottom wall's midpoint to (200,100)
+    // subtracted slab: 10 wide, y=5 (inner face) to y=100 (tip at the Point)
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m = b.point(200, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      const tip = b.point(200, 100);
+      b.wall(a, m);
+      b.wall(m, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(m, tip);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].areaCm2).toBe(390 * 290 - 10 * 95);
+  });
+
+  it('still detects a single room around a diagonal spur from a corner', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      const spur = b.point(200, 150);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(a, spur);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(1);
+    // the diagonal spur slab eats into the 390×290 interior-face area
+    expect(rooms[0].areaCm2).toBeLessThan(390 * 290);
+    expect(rooms[0].areaCm2).toBeGreaterThan(390 * 290 - 10 * 250 - 100);
+  });
+
+  it('detects rooms in disconnected components', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(100, 0);
+      const d = b.point(100, 100);
+      const e = b.point(0, 100);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const f = b.point(500, 0);
+      const g = b.point(700, 0);
+      const h = b.point(700, 200);
+      const i = b.point(500, 200);
+      b.wall(f, g);
+      b.wall(g, h);
+      b.wall(h, i);
+      b.wall(i, f);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(2);
+    const areas = rooms.map((r) => r.areaCm2).sort((x, y) => x - y);
+    expect(areas).toEqual([90 * 90, 190 * 190]);
+  });
+
+  it('detects a concave (L-shaped) room', () => {
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 200);
+      const p4 = b.point(200, 200);
+      const p5 = b.point(200, 400);
+      const p6 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p5);
+      b.wall(p5, p6);
+      b.wall(p6, p1);
+    });
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].areaCm2).toBe(390 * 190 + 190 * 200);
+  });
+});
+
+describe('nested rooms (an island punches a hole in its containing room)', () => {
+  // 400×400 outer room with a disconnected 150×100 island at (100,100)
+  const nestedPlan = () => {
+    let ids = { islandTopWall: '', islandWallIds: [] as string[], islandPointIds: [] as string[] };
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const i1 = b.point(100, 100);
+      const i2 = b.point(250, 100);
+      const i3 = b.point(250, 200);
+      const i4 = b.point(100, 200);
+      const top = b.wall(i1, i2);
+      const walls = [top, b.wall(i2, i3), b.wall(i3, i4), b.wall(i4, i1)];
+      ids = {
+        islandTopWall: top.id,
+        islandWallIds: walls.map((w) => w.id),
+        islandPointIds: [i1, i2, i3, i4].map((p) => p.id),
+      };
+    });
+    return { plan, ...ids };
+  };
+
+  // Copied before sorting: the reading is shared and sealed (ADR 0029).
+  const byArea = (plan: Plan) => {
+    const rooms = [...detectRooms(plan)].sort((a, b) => a.areaCm2 - b.areaCm2);
+    return { inner: rooms[0], outer: rooms[1], rooms };
+  };
+
+  it('detects both rooms and excludes the island footprint from the outer area', () => {
+    const { plan } = nestedPlan();
+    const { inner, outer, rooms } = byArea(plan);
+    expect(rooms).toHaveLength(2);
+    expect(inner.areaCm2).toBe(140 * 90);
+    // outer interior faces 390×390, minus the island's exterior faces
+    // (160×110): the island walls belong to the hole
+    expect(outer.areaCm2).toBe(390 * 390 - 160 * 110);
+    expect(outer.holes).toHaveLength(1);
+    expect(inner.holes).toHaveLength(0);
+  });
+
+  it('resolves a point inside the island to the inner room only', () => {
+    const { plan } = nestedPlan();
+    const { inner, outer, rooms } = byArea(plan);
+    expect(roomAt(rooms, 175, 150)).toBe(inner);
+    expect(roomAt(rooms, 320, 300)).toBe(outer);
+    expect(roomContains(outer, 175, 150)).toBe(false);
+  });
+
+  it('anchors the outer block at the centroid of the holed region', () => {
+    const { plan } = nestedPlan();
+    const { outer } = byArea(plan);
+    expect(outer.anchor.x).toBeCloseTo(202.59, 1);
+    expect(outer.anchor.y).toBeCloseTo(205.17, 1);
+  });
+
+  it('falls back to the pole of inaccessibility when the centroid lands in the island', () => {
+    // centered island: the naive centroid (200,200) sits inside the hole
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const i1 = b.point(150, 150);
+      const i2 = b.point(250, 150);
+      const i3 = b.point(250, 250);
+      const i4 = b.point(150, 250);
+      b.wall(i1, i2);
+      b.wall(i2, i3);
+      b.wall(i3, i4);
+      b.wall(i4, i1);
+    });
+    const { outer } = byArea(plan);
+    expect(roomContains(outer, outer.anchor.x, outer.anchor.y)).toBe(true);
+    expect(Math.hypot(outer.anchor.x - 200, outer.anchor.y - 200)).toBeGreaterThan(50);
+  });
+
+  it('counts the island loop in the outer room boundary', () => {
+    const { plan, islandWallIds } = nestedPlan();
+    const { inner, outer } = byArea(plan);
+    const boundary = roomWallIds(plan, outer)!;
+    expect(boundary).toHaveLength(8);
+    for (const id of islandWallIds) expect(boundary).toContain(id);
+    // the island's own boundary stays its four walls: a hole is not a hole of
+    // itself
+    expect(roomWallIds(plan, inner)).toHaveLength(4);
+  });
+
+  it('treats an island wall as a party wall between the two rooms', () => {
+    const { plan, islandTopWall } = nestedPlan();
+    const rooms = detectRooms(plan);
+    const wall = plan.walls[islandTopWall];
+    expect(interiorSide(rooms, wall)).toBeNull();
+    // hors-tout across the mitered exterior faces: 150 + 2×5
+    expect(wallMeasures(plan, rooms, wall)).toEqual({ kind: 'plain', length: 160, thickness: 10 });
+  });
+
+  it('clamps a label drag out of the island', () => {
+    const { plan } = nestedPlan();
+    const { outer } = byArea(plan);
+    const clamped = clampToRoom({ x: 175, y: 180 }, outer);
+    expect(clamped.y).toBeGreaterThan(200);
+    expect(roomContains(outer, clamped.x, clamped.y)).toBe(true);
+    expect(clampToRoom({ x: 320, y: 300 }, outer)).toEqual({ x: 320, y: 300 });
+  });
+
+  it('keeps an island label with the inner room and pins the outer label to the outer anchor', () => {
+    const { plan: bare } = nestedPlan();
+    const plan: Plan = {
+      ...bare,
+      roomLabels: {
+        li: { id: 'li', name: 'Inner', x: 175, y: 150 },
+        lo: { id: 'lo', name: 'Outer', x: 320, y: 300 },
+      },
+    };
+    const next = reconcileRoomLabels(plan, plan);
+    expect(next.roomLabels.li).toMatchObject({ name: 'Inner', x: 175, y: 150 });
+    expect(next.roomLabels.lo).toMatchObject({ name: 'Outer', x: 203, y: 205 });
+  });
+
+  it('reverts a custom placement swallowed by a newly drawn island', () => {
+    const { plan: bare, islandWallIds, islandPointIds } = nestedPlan();
+    const after: Plan = {
+      ...bare,
+      roomLabels: { l: { id: 'l', name: 'Kitchen', x: 175, y: 150, placed: true } },
+    };
+    const before: Plan = {
+      ...after,
+      points: Object.fromEntries(Object.entries(after.points).filter(([id]) => !islandPointIds.includes(id))),
+      walls: Object.fromEntries(Object.entries(after.walls).filter(([id]) => !islandWallIds.includes(id))),
+    };
+    const next = reconcileRoomLabels(before, after);
+    expect(next.roomLabels.l).toEqual({ id: 'l', name: 'Kitchen', x: 203, y: 205 });
+  });
+});
+
+describe('interiorSide', () => {
+  it('gives the side of a perimeter wall facing its single room', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+    });
+    const rooms = detectRooms(plan);
+    const [bottom, right, top, left] = Object.values(plan.walls);
+    // screen coords: the interior is below the bottom wall, so side +1
+    expect(interiorSide(rooms, bottom)).toBe(1);
+    expect(interiorSide(rooms, right)).toBe(1);
+    expect(interiorSide(rooms, top)).toBe(1);
+    expect(interiorSide(rooms, left)).toBe(1);
+  });
+
+  it('returns null for a wall bordering no room', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    const wall = Object.values(plan.walls)[0];
+    expect(interiorSide(detectRooms(plan), wall)).toBeNull();
+  });
+
+  it('returns null for a party wall between two rooms', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m1 = b.point(250, 0);
+      const c = b.point(600, 0);
+      const d = b.point(600, 300);
+      const m2 = b.point(250, 300);
+      const e = b.point(0, 300);
+      b.wall(a, m1);
+      b.wall(m1, c);
+      b.wall(c, d);
+      b.wall(d, m2);
+      b.wall(m2, e);
+      b.wall(e, a);
+      b.wall(m1, m2);
+    });
+    const rooms = detectRooms(plan);
+    const divider = Object.values(plan.walls)[6];
+    expect(interiorSide(rooms, divider)).toBeNull();
+  });
+
+  it('returns null for a dangling wall inside a room (both sides face it)', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m = b.point(200, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      const tip = b.point(200, 100);
+      b.wall(a, m);
+      b.wall(m, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(m, tip);
+    });
+    const rooms = detectRooms(plan);
+    const stub = Object.values(plan.walls)[5];
+    expect(interiorSide(rooms, stub)).toBeNull();
+  });
+});
+
+describe('wallMeasures', () => {
+  it('gives interior, exterior and thickness for a wall bordering exactly one room', () => {
+    // 4×4 m axis square, 10 cm walls: interior faces 3,90 m, exterior 4,10 m
+    const plan = squareRoomPlan();
+    const rooms = detectRooms(plan);
+    for (const wall of Object.values(plan.walls)) {
+      expect(wallMeasures(plan, rooms, wall)).toEqual({
+        kind: 'oriented',
+        interior: 390,
+        exterior: 410,
+        thickness: 10,
+      });
+    }
+  });
+
+  it('gives the hors-tout length of a standalone wall', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+    });
+    const wall = Object.values(plan.walls)[0];
+    // free ends overhang the Points by half the thickness: 400 + 2×5
+    expect(wallMeasures(plan, detectRooms(plan), wall)).toEqual({
+      kind: 'plain',
+      length: 410,
+      thickness: 10,
+    });
+  });
+
+  it('gives the hors-tout length of a party wall between two rooms', () => {
+    // 600×300 rectangle split by a vertical divider at x=250
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m1 = b.point(250, 0);
+      const c = b.point(600, 0);
+      const d = b.point(600, 300);
+      const m2 = b.point(250, 300);
+      const e = b.point(0, 300);
+      b.wall(a, m1);
+      b.wall(m1, c);
+      b.wall(c, d);
+      b.wall(d, m2);
+      b.wall(m2, e);
+      b.wall(e, a);
+      b.wall(m1, m2);
+    });
+    const divider = Object.values(plan.walls)[6];
+    // both faces miter against the horizontal walls' inner faces: y=5 to y=295
+    expect(wallMeasures(plan, detectRooms(plan), divider)).toEqual({
+      kind: 'plain',
+      length: 290,
+      thickness: 10,
+    });
+  });
+
+  it('gives the hors-tout length of a wall jutting into its own room', () => {
+    // 400×300 room with a stub from the bottom wall's midpoint to (200,100)
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const m = b.point(200, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      const tip = b.point(200, 100);
+      b.wall(a, m);
+      b.wall(m, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(m, tip);
+    });
+    const stub = Object.values(plan.walls)[5];
+    // mitered at the bottom wall's inner face (y=5), overhang at the tip (y=105)
+    expect(wallMeasures(plan, detectRooms(plan), stub)).toEqual({
+      kind: 'plain',
+      length: 100,
+      thickness: 10,
+    });
+  });
+});
+
+describe('roomAt', () => {
+  it('returns the room containing a position, or null', () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+    });
+    const rooms = detectRooms(plan);
+    expect(roomAt(rooms, 200, 150)).toBe(rooms[0]);
+    expect(roomAt(rooms, 900, 900)).toBeNull();
+  });
+});
+
+describe('reconcileRoomLabels', () => {
+  // 4×4 m square room
+  const labeledSquare = (labelX: number, labelY: number) => {
+    let ids = { right: ['', ''], wall: '', label: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      const w = b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      const label = b.label('Kitchen', labelX, labelY);
+      ids = { right: [p2.id, p3.id], wall: w.id, label: label.id };
+    });
+    return { plan, ...ids };
+  };
+
+  it('returns the same plan when every label already sits at its centroid', () => {
+    const { plan } = labeledSquare(200, 200);
+    expect(reconcileRoomLabels(plan, plan)).toBe(plan);
+  });
+
+  it('pins a default label to the live centroid when the room deforms', () => {
+    const { plan, right, label } = labeledSquare(350, 200);
+    const after = setPoints(plan, { [right[0]]: { x: 300, y: 0 }, [right[1]]: { x: 300, y: 400 } });
+    const next = reconcileRoomLabels(plan, after);
+    expect(next.roomLabels[label]).toMatchObject({ name: 'Kitchen', x: 150, y: 200 });
+  });
+
+  it('deletes a label whose room is no longer detected', () => {
+    const { plan, wall } = labeledSquare(200, 200);
+    const after = deleteWall(plan, wall);
+    expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({});
+  });
+
+  it('keeps each label with its room when a shared wall sweeps past a label', () => {
+    const { plan, shared, top, bottom } = stackedRoomsPlan();
+    // drag the shared wall down past BBB's position: the room sizes invert
+    const after = setPoints(plan, { [shared[0]]: { x: 250, y: 250 }, [shared[1]]: { x: 450, y: 250 } });
+    const next = reconcileRoomLabels(plan, after);
+    expect(next.roomLabels[top]).toMatchObject({ name: 'AAA', x: 350, y: 80 });
+    expect(next.roomLabels[bottom]).toMatchObject({ name: 'BBB', x: 350, y: 275 });
+  });
+
+  it('keeps a label whose room loop changed but still contains it (position fallback)', () => {
+    const { plan, label } = labeledSquare(200, 200);
+    // planar insertion splits the left wall: the room loop gains a point
+    const left = Object.values(plan.walls).find(
+      (w) => plan.points[w.startPointId].x === 0 && plan.points[w.endPointId].x === 0,
+    )!;
+    const [after] = commitWall(
+      plan,
+      { x: 0, y: 200, kind: 'wall', wallId: left.id },
+      { x: 100, y: 200, kind: 'free' },
+    );
+    const next = reconcileRoomLabels(plan, after);
+    expect(next.roomLabels[label]).toMatchObject({ name: 'Kitchen' });
+  });
+
+  it('drops orphan labels when reconciling a plan against itself', () => {
+    let insideId = '';
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      insideId = b.label('Kitchen', 200, 200).id;
+      b.label('Orphan', 900, 900);
+    });
+    const next = reconcileRoomLabels(plan, plan);
+    expect(Object.keys(next.roomLabels)).toEqual([insideId]);
+  });
+});
+
+describe('reconcileRoomLabels — placement state', () => {
+  it('reverts a custom placement to default when the room deforms away from it', () => {
+    let ids = { right: ['', ''], label: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      ids = { right: [p2.id, p3.id], label: b.label('Kitchen', 350, 200, true).id };
+    });
+    const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
+    const next = reconcileRoomLabels(plan, after);
+    expect(next.roomLabels[ids.label]).toEqual({ id: ids.label, name: 'Kitchen', x: 150, y: 200 });
+  });
+
+  it('deletes a nameless label the revert strips of its custom placement', () => {
+    let ids = { right: ['', ''], label: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      ids = { right: [p2.id, p3.id], label: b.label('', 350, 200, true).id };
+    });
+    const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
+    expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({});
+  });
+
+  it('lets a named label survive a merge its older nameless neighbour would have won', () => {
+    const { plan, sharedWall, bottom } = stackedRoomsPlan('');
+    const next = reconcileRoomLabels(plan, deleteWall(plan, sharedWall));
+    expect(Object.keys(next.roomLabels)).toEqual([bottom]);
+  });
+
+  it('keeps a custom placement that is still inside the room', () => {
+    let ids = { right: ['', ''], label: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      ids = { right: [p2.id, p3.id], label: b.label('Kitchen', 150, 200, true).id };
+    });
+    const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
+    expect(reconcileRoomLabels(plan, after)).toBe(after);
+  });
+});
+
+// A boundary tally, not a dwelling inventory: a party wall belongs to both
+// rooms it separates, so its opening counts for both (ADR 0014).
+describe('roomOpenings', () => {
+  it('gives the openings its boundary walls carry, and no other', () => {
+    let ids = { door: '', stray: '' };
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const top = b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const away = b.wall(b.point(0, 900), b.point(400, 900));
+      ids = { door: b.opening(top, 'door', 200).id, stray: b.opening(away, 'window', 200).id };
+    });
+    const room = detectRooms(plan)[0];
+    expect(roomOpenings(plan, room).map((o) => o.id)).toEqual([ids.door]);
+    expect(roomOpenings(plan, room).map((o) => o.id)).not.toContain(ids.stray);
+  });
+
+  it('counts a party wall opening for both rooms it separates', () => {
+    let door = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      const f = b.point(800, 0);
+      const g = b.point(800, 400);
+      b.wall(a, c);
+      const party = b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.wall(c, f);
+      b.wall(f, g);
+      b.wall(g, d);
+      door = b.opening(party, 'door', 200).id;
+    });
+    const rooms = detectRooms(plan);
+    expect(roomOpenings(plan, roomAt(rooms, 200, 200)!).map((o) => o.id)).toEqual([door]);
+    expect(roomOpenings(plan, roomAt(rooms, 600, 200)!).map((o) => o.id)).toEqual([door]);
+  });
+
+  it('counts an island wall opening in the containing room', () => {
+    let door = '';
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 400);
+      const e = b.point(0, 400);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      const i1 = b.point(100, 100);
+      const i2 = b.point(250, 100);
+      const i3 = b.point(250, 200);
+      const i4 = b.point(100, 200);
+      const top = b.wall(i1, i2);
+      b.wall(i2, i3);
+      b.wall(i3, i4);
+      b.wall(i4, i1);
+      door = b.opening(top, 'door', 75).id;
+    });
+    const rooms = detectRooms(plan);
+    const outer = roomAt(rooms, 350, 350)!;
+    expect(roomOpenings(plan, outer).map((o) => o.id)).toEqual([door]);
+  });
+
+  it('gives nothing for a room without openings', () => {
+    const plan = squareRoomPlan();
+    expect(roomOpenings(plan, detectRooms(plan)[0])).toEqual([]);
+  });
+});
+
+describe('room labels', () => {
+  it('adds, renames, and moves a label', () => {
+    let plan = buildPlan(() => {});
+    let id: string;
+    [plan, id] = addRoomLabel(plan, 'Kitchen', 100, 100);
+    expect(plan.roomLabels[id]).toMatchObject({ name: 'Kitchen', x: 100, y: 100 });
+    plan = renameRoomLabel(plan, id, 'Living room');
+    expect(plan.roomLabels[id].name).toBe('Living room');
+    plan = moveRoomLabel(plan, id, 150.6, 80.2);
+    expect(plan.roomLabels[id]).toMatchObject({ x: 151, y: 80 });
+  });
+});
+
+// A 4×4 m room named at its anchor, or dragged off it.
+const roomWithLabel = (placed?: true) => {
+  let labelId = '';
+  const plan = buildPlan((b) => {
+    const p1 = b.point(0, 0);
+    const p2 = b.point(400, 0);
+    const p3 = b.point(400, 400);
+    const p4 = b.point(0, 400);
+    b.wall(p1, p2);
+    b.wall(p2, p3);
+    b.wall(p3, p4);
+    b.wall(p4, p1);
+    labelId = b.label('Kitchen', placed ? 350 : 200, placed ? 120 : 200, placed).id;
+  });
+  return { plan, labelId };
+};
+
+describe('room label placement state', () => {
+  it('addRoomLabel creates a default-placement label', () => {
+    const { plan } = roomWithLabel();
+    const [next, id] = addRoomLabel(plan, 'Office', 200, 200);
+    expect(next.roomLabels[id].placed).toBeUndefined();
+  });
+
+  it('moveRoomLabel gives the label a custom placement', () => {
+    const { plan, labelId } = roomWithLabel();
+    const next = moveRoomLabel(plan, labelId, 350, 120);
+    expect(next.roomLabels[labelId]).toMatchObject({ x: 350, y: 120, placed: true });
+  });
+
+  it('renameRoomLabel leaves the placement state alone', () => {
+    const { plan, labelId } = roomWithLabel();
+    const renamed = renameRoomLabel(plan, labelId, 'Office');
+    expect(renamed.roomLabels[labelId].placed).toBeUndefined();
+    const customThenRenamed = renameRoomLabel(moveRoomLabel(plan, labelId, 350, 120), labelId, 'Office');
+    expect(customThenRenamed.roomLabels[labelId].placed).toBe(true);
+  });
+});
+
+// A label carries a name, a custom placement, or both (CONTEXT.md: Room label).
+describe('a label that carries neither a name nor a placement', () => {
+  it('is gone once renaming empties the name of a default-placement label', () => {
+    const { plan, labelId } = roomWithLabel();
+    expect(renameRoomLabel(plan, labelId, '').roomLabels).toEqual({});
+  });
+
+  it('survives renaming to nothing while it holds a custom placement', () => {
+    const { plan, labelId } = roomWithLabel(true);
+    const next = renameRoomLabel(plan, labelId, '');
+    expect(next.roomLabels[labelId]).toMatchObject({ name: '', x: 350, y: 120, placed: true });
+  });
+
+  // The load path: alone in its room, so only the rule can be dropping it.
+  it('never survives arriving in a plan, whatever room it sits in', () => {
+    const square = squareRoomPlan();
+    const plan = { ...square, roomLabels: { l: { id: 'l', name: '', x: 200, y: 200 } } };
+    expect(reconcileRoomLabels(plan, plan).roomLabels).toEqual({});
+  });
+});

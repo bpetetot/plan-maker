@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => ({
       {
         test: {
           name: 'node',
-          include: ['src/**/*.test.ts'],
+          include: ['tests/**/*.test.ts'],
           environment: 'node',
           // The PNG export inlines the sheet's stylesheet (ADR 0024); left at
           // its default, vitest hands every CSS import back as an empty string.
@@ -56,8 +56,8 @@ export default defineConfig(({ mode }) => ({
       {
         test: {
           name: 'browser',
-          include: ['src/**/*.test.tsx'],
-          setupFiles: ['./src/testSetup.browser.ts'],
+          include: ['tests/**/*.test.tsx'],
+          setupFiles: ['./tests/setup.browser.ts'],
           browser: {
             enabled: true,
             headless: true,

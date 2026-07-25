@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "noUnusedLocals": false
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

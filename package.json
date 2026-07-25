@@ -12,9 +12,9 @@
     "test:node": "vitest run --project node",
     "test:browser": "vitest run --project browser",
     "test:watch": "vitest",
-    "lint": "oxlint src",
-    "format": "oxfmt src",
-    "format:check": "oxfmt --check src",
+    "lint": "oxlint src tests",
+    "format": "oxfmt src tests",
+    "format:check": "oxfmt --check src tests",
     "knip": "knip"
   },
   "dependencies": {
