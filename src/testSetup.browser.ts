@@ -1,7 +1,7 @@
 // The stylesheet is load-bearing: without it the absolute overlays fall back
 // into the flow, and Vitest locators check actionability against that layout.
 import { afterEach } from 'vitest';
-import { reloadPreferences } from './editor/preferences';
+import { reloadPreferences } from './preferences/preferences';
 import { blur } from './editor/testKit';
 import './styles.css';
 

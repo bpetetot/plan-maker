@@ -7,8 +7,8 @@
     <link rel="icon" type="image/png" href="/pwa-192.png" />
     <title>Plan Maker</title>
     <script>
-      // Anti-flash: stamp the resolved theme before first paint.
-      // Mirrors src/theme/theme.ts (storage key, resolution, bar colors) — keep in sync.
+      // Anti-flash: runs before any bundle, so it imports nothing (ADR 0026).
+      // Mirrors the theme key in src/preferences/, the rest in src/theme/theme.ts.
       ;(function () {
         var pref = null
         try {

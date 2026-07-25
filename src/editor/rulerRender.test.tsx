@@ -4,7 +4,7 @@ import type { Plan } from '../model/types';
 import { emptyPlan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import Editor from './Editor';
-import { reloadPreferences, usePreferences } from './preferences';
+import { reloadPreferences, usePreferences } from '../preferences/preferences';
 
 const planWithRuler = (): Plan => ({
   ...emptyPlan(),

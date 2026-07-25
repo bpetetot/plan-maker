@@ -5,7 +5,7 @@ import { useRef } from 'react';
 import type { EditorCommands } from './Editor';
 import Editor, { editorCommands } from './Editor';
 import { toggleHelp, useHelpDialog } from './helpStore';
-import { toggleGrid, toggleMeasures } from './preferences';
+import { togglePreference } from '../preferences/preferences';
 import type { AppHotkeyActions } from './useAppHotkeys';
 import { useAppHotkeys } from './useAppHotkeys';
 import { redo, undo } from '../store/planStore';
@@ -30,8 +30,8 @@ function BoundEditor({ actions, resetDisabled = false, ready = true }: Omit<Prop
       undo,
       redo,
       ...editorCommands(ref),
-      toggleGrid,
-      toggleMeasures,
+      toggleGrid: () => togglePreference('grid'),
+      toggleMeasures: () => togglePreference('measures'),
       toggleTheme: noop,
       open: noop,
       saveAs: noop,

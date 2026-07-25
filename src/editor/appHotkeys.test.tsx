@@ -4,7 +4,7 @@ import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import type { Plan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
-import { reloadPreferences } from './preferences';
+import { reloadPreferences } from '../preferences/preferences';
 import { key, zoomLabel } from './testKit';
 import { EditorWithHotkeys } from './testHarness';
 

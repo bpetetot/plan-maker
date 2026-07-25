@@ -6,7 +6,7 @@ import { buildPlan, namedRoomPlan } from '../model/testHelpers';
 import { emptyPlan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import Editor from './Editor';
-import { measuresVisible, reloadPreferences } from './preferences';
+import { getPreference, reloadPreferences } from '../preferences/preferences';
 import { clientAt, pointer } from './testKit';
 
 beforeEach(() => {
@@ -137,7 +137,7 @@ describe('measure visibility toggle', () => {
     try {
       await userEvent.click(toggle());
       expect(dims(svg)).toHaveLength(0);
-      expect(measuresVisible()).toBe(false);
+      expect(getPreference('measures')).toBe(false);
     } finally {
       Storage.prototype.setItem = setItem;
     }

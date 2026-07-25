@@ -51,15 +51,7 @@ describe('opening the help dialog', () => {
   it('opens from the burger menu', async () => {
     const { unmount } = await render(
       <>
-        <AppMenu
-          onOpen={noop}
-          onSaveAs={noop}
-          onExportImage={noop}
-          onReset={noop}
-          resetDisabled={false}
-          themePreference="system"
-          setThemePreference={noop}
-        />
+        <AppMenu onOpen={noop} onSaveAs={noop} onExportImage={noop} onReset={noop} resetDisabled={false} />
         <ShortcutsDialog />
       </>,
     );

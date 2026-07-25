@@ -5,14 +5,15 @@ import type { EditorCommands } from './editor/Editor';
 import Editor, { editorCommands } from './editor/Editor';
 import ShortcutsDialog from './editor/ShortcutsDialog';
 import { toggleHelp, useHelpDialog } from './editor/helpStore';
-import { measuresVisible, toggleGrid, toggleMeasures } from './editor/preferences';
+import { getPreference, togglePreference } from './preferences/preferences';
 import { useAppHotkeys } from './editor/useAppHotkeys';
 import ReloadPrompt from './pwa/ReloadPrompt';
 import { emptyPlan, isPlanEmpty } from './model/types';
 import { acquireWriterLock, requestPersistentStorage, startAutosave } from './persistence/autosave';
 import { loadPlan } from './persistence/storage';
 import { redo, replacePlan, undo, usePlanStore } from './store/planStore';
-import { useThemePreference } from './theme/useThemePreference';
+import { toggleTheme } from './theme/theme';
+import { useThemeEffect } from './theme/useThemeEffect';
 import { transferFileName } from './transfer/json';
 import { renderPlanPng } from './transfer/png';
 import { downloadBlob, exportPlanJson, importPlanJson } from './transfer/transferActions';
@@ -24,9 +25,7 @@ export default function App() {
   const [readOnly, setReadOnly] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const editor = useRef<EditorCommands>(null);
-  // Owned here, not in the menu: a second useThemePreference call would be a
-  // second state on the same key, deaf to the shortcut.
-  const [themePreference, setThemePreference, toggleTheme] = useThemePreference();
+  useThemeEffect();
 
   useEffect(() => {
     let stopAutosave: (() => void) | undefined;
@@ -71,7 +70,7 @@ export default function App() {
     try {
       // ADR 0008: export follows the on-screen Measure toggle.
       const blob = await renderPlanPng(usePlanStore.getState().plan, {
-        measuresVisible: measuresVisible(),
+        measuresVisible: getPreference('measures'),
       });
       if (!blob) {
         setNotice('Nothing to export yet — draw some walls first.');
@@ -92,8 +91,8 @@ export default function App() {
       undo,
       redo,
       ...editorCommands(editor),
-      toggleGrid,
-      toggleMeasures,
+      toggleGrid: () => togglePreference('grid'),
+      toggleMeasures: () => togglePreference('measures'),
       toggleTheme,
       open: openPlan,
       saveAs: savePlanAs,
@@ -115,8 +114,6 @@ export default function App() {
         onExportImage={exportPng}
         onReset={resetPlan}
         resetDisabled={planIsEmpty}
-        themePreference={themePreference}
-        setThemePreference={setThemePreference}
       />
       <ShortcutsDialog />
       {readOnly && (

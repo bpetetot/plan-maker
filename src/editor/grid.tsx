@@ -1,6 +1,5 @@
 // CONTEXT.md: Grid — minor lines every 10 cm (the snap step), major every 50 cm.
 import { GRID } from '../model/types';
-import { booleanPreference } from './preference';
 import type { View } from './useView';
 
 const MINOR = GRID;
@@ -65,9 +64,3 @@ export function GridLines({ view, pxPerCm }: { view: View; pxPerCm: number }) {
     </g>
   );
 }
-
-// CONTEXT.md: Grid — visibility is a per-device preference, shown by default.
-const pref = booleanPreference('plan-maker:grid', 'hidden');
-
-export const loadGridVisible = pref.load;
-export const saveGridVisible = pref.save;

@@ -1,10 +1,11 @@
-// CONTEXT.md: Theme — per-device preference, never part of the plan.
+// CONTEXT.md: Theme — per-device preference, never part of the plan. Its value
+// is an entry in the preference table (ADR 0026); what it looks like is here.
+import { getPreference, setPreference } from '../preferences/preferences';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
-// Also read by the anti-flash inline script in index.html — keep in sync.
-const STORAGE_KEY = 'plan-maker:theme';
+export const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)');
 
 export function resolveTheme(preference: ThemePreference, systemDark: boolean): ResolvedTheme {
   if (preference === 'system') return systemDark ? 'dark' : 'light';
@@ -16,14 +17,8 @@ export function toggledTheme(preference: ThemePreference, systemDark: boolean): 
   return resolveTheme(preference, systemDark) === 'dark' ? 'light' : 'dark';
 }
 
-export function loadThemePreference(): ThemePreference {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // localStorage throws in private mode: fall through to the default.
-  }
-  return 'system';
+export function toggleTheme(): void {
+  setPreference('theme', toggledTheme(getPreference('theme'), darkQuery().matches));
 }
 
 // Also set by the inline script in index.html — keep in sync.
@@ -35,13 +30,4 @@ const META_THEME_COLOR: Record<ResolvedTheme, string> = {
 export function applyResolvedTheme(theme: ResolvedTheme): void {
   document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', META_THEME_COLOR[theme]);
-}
-
-export function saveThemePreference(preference: ThemePreference): void {
-  try {
-    if (preference === 'system') localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, preference);
-  } catch {
-    // localStorage throws in private mode: the choice won't survive a reload.
-  }
 }

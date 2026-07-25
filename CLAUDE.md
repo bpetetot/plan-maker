@@ -21,6 +21,7 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `src/model/` — pure domain: types, geometry, snapping, plan operations, room detection
 - `src/store/` — zustand plan store, zundo history (drag grouping helpers)
 - `src/persistence/` — schema version + migrations + validation, IndexedDB storage, autosave
+- `src/preferences/` — the per-device preference table (grid, measures, snap, theme)
 - `src/transfer/` — JSON export/import envelope, PNG export
 - `src/sheet/` — the drawing itself, by family (walls, openings, rooms, texts,
   measures) behind `PlanScene`; called by both the editor and the PNG export

@@ -1,15 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  applyResolvedTheme,
-  loadThemePreference,
-  resolveTheme,
-  saveThemePreference,
-  toggledTheme,
-} from './theme';
-
-beforeEach(() => {
-  localStorage.clear();
-});
+import { afterEach, describe, expect, it } from 'vitest';
+import { getPreference, setPreference } from '../preferences/preferences';
+import { applyResolvedTheme, resolveTheme, toggleTheme, toggledTheme } from './theme';
 
 describe('resolveTheme', () => {
   it('follows the system when the preference is system', () => {
@@ -45,19 +36,33 @@ describe('toggledTheme', () => {
   });
 });
 
-describe('theme preference persistence', () => {
-  it('defaults to system when nothing is stored', () => {
-    expect(loadThemePreference()).toBe('system');
+// The shortcut's entry point: `toggledTheme` read against the live OS query,
+// landing in the preference table.
+describe('toggleTheme', () => {
+  // Browser mode has a real matchMedia, answering for the host machine.
+  const matchMedia = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = matchMedia;
   });
 
-  it('round-trips a saved preference', () => {
-    saveThemePreference('dark');
-    expect(loadThemePreference()).toBe('dark');
+  const stubSystemDark = (systemDark: boolean) => {
+    window.matchMedia = ((query: string) =>
+      ({ matches: systemDark && query.includes('dark') }) as MediaQueryList) as typeof window.matchMedia;
+  };
+
+  it('leaves system for the opposite of what the OS resolves to', () => {
+    stubSystemDark(true);
+    setPreference('theme', 'system');
+    toggleTheme();
+    expect(getPreference('theme')).toBe('light');
   });
 
-  it('falls back to system on a corrupted stored value', () => {
-    localStorage.setItem('plan-maker:theme', 'blue');
-    expect(loadThemePreference()).toBe('system');
+  it('flips an explicit preference and persists it', () => {
+    stubSystemDark(false);
+    setPreference('theme', 'dark');
+    toggleTheme();
+    expect(getPreference('theme')).toBe('light');
+    expect(localStorage.getItem('plan-maker:theme')).toBe('light');
   });
 });
 

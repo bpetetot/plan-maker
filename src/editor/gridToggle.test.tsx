@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-react';
 import { usePlanStore } from '../store/planStore';
 import { emptyPlan } from '../model/types';
 import Editor from './Editor';
-import { reloadPreferences } from './preferences';
+import { reloadPreferences } from '../preferences/preferences';
 
 beforeEach(() => {
   localStorage.clear();

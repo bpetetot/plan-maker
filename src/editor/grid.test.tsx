@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
-import { GridLines, gridLevels, loadGridVisible, saveGridVisible } from './grid';
+import { GridLines, gridLevels } from './grid';
 
 // CONTEXT.md: Grid — fade ramp. Opaque at 8 px cells, gone at 4 px,
 // linear between.
@@ -23,26 +23,6 @@ describe('gridLevels', () => {
 
   it('drops everything when even 50 cm cells are 4 px or less', () => {
     expect(gridLevels(0.08)).toEqual({ minor: 0, major: 0 });
-  });
-});
-
-// Per-device preference (CONTEXT.md: Grid — "shown by default").
-describe('grid visibility preference', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('defaults to visible when nothing is stored', () => {
-    expect(loadGridVisible()).toBe(true);
-  });
-
-  it('remembers hiding the grid', () => {
-    saveGridVisible(false);
-    expect(loadGridVisible()).toBe(false);
-  });
-
-  it('remembers showing it again', () => {
-    saveGridVisible(false);
-    saveGridVisible(true);
-    expect(loadGridVisible()).toBe(true);
   });
 });
 

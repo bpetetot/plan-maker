@@ -1,5 +1,11 @@
 # Hidden measures are hidden from the export too
 
+> **Amended by ADR 0026** — the last consequence below records the three boolean
+> preferences sharing a `booleanPreference` helper. That helper is gone: the four
+> preferences, the Theme included, are entries in one table. The "session holds
+> the value, storage only makes it outlive a reload" consequence is unchanged —
+> it now holds for all four rather than the Measure alone.
+
 Measures — every wall's Dimension, every Room area — were unconditional: drawn
 on every wall of every plan, printed on every export. A plan dense enough to be
 useful is therefore a plan too noisy to show anyone, and the only escape was to

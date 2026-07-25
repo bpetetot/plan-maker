@@ -3,7 +3,8 @@ import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
 import AppMenu, { type AppMenuProps } from './AppMenu';
 import { mouse, pointer } from './editor/testKit';
-import { useThemePreference } from './theme/useThemePreference';
+import { reloadPreferences } from './preferences/preferences';
+import { useThemeEffect } from './theme/useThemeEffect';
 
 // Browser mode has a real matchMedia, answering for the host machine.
 const stubMatchMedia = (systemDark: boolean) => {
@@ -18,10 +19,10 @@ const stubMatchMedia = (systemDark: boolean) => {
 
 const noop = () => {};
 
-// ADR 0012: the theme preference is App's, the menu is passed it.
-// This harness stands in for that owner.
+// ADR 0026: the menu reads the theme off the preference table; App is what
+// mounts the effect that stamps it. This harness stands in for that owner.
 function MenuWithTheme(props: Partial<AppMenuProps>) {
-  const [themePreference, setThemePreference] = useThemePreference();
+  useThemeEffect();
   return (
     <AppMenu
       onOpen={noop}
@@ -29,8 +30,6 @@ function MenuWithTheme(props: Partial<AppMenuProps>) {
       onExportImage={noop}
       onReset={noop}
       resetDisabled={false}
-      themePreference={themePreference}
-      setThemePreference={setThemePreference}
       {...props}
     />
   );
@@ -52,6 +51,7 @@ const clickOutside = async () => {
 
 beforeEach(() => {
   localStorage.clear();
+  reloadPreferences();
   stubMatchMedia(false);
   delete document.documentElement.dataset.theme;
 });

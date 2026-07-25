@@ -51,8 +51,7 @@ import {
   placementChrome,
   placementStage,
 } from './placement';
-import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
-import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
+import { setPreference, togglePreference, usePreferences } from '../preferences/preferences';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { ToolPanel } from './ToolPanel';
 import {
@@ -140,7 +139,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [tool, setTool] = useState<Tool>('select');
   const gridVisible = usePreferences((s) => s.grid);
   const measuresVisible = usePreferences((s) => s.measures);
-  const [snapEnabled, setSnapEnabled] = useState(loadSnapEnabled);
+  const snapEnabled = usePreferences((s) => s.snap);
   const [defaults, setDefaults] = useState<ToolDefaults>(initialToolDefaults);
   const [sel, setSel] = useState<ElementRef[]>([]);
   const [hoverWall, setHoverWall] = useState<string | null>(null);
@@ -223,7 +222,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     setTextEditing(null);
     if (next !== 'select') setSel([]);
     // A Ruler is measured, so drawing one reveals the measures (ticket 03).
-    if (next === 'ruler') setMeasures(true);
+    if (next === 'ruler') setPreference('measures', true);
   };
 
   // Everything a placement can ask of the editor, in one place. A completion
@@ -253,10 +252,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     [setPlan],
   );
 
-  const toggleSnap = useCallback(() => {
-    setSnapEnabled(!snapEnabled);
-    saveSnapEnabled(!snapEnabled);
-  }, [snapEnabled]);
+  const toggleSnap = useCallback(() => togglePreference('snap'), []);
 
   // No dependency list: a list naming the placement, sel, tool, snapEnabled and
   // the camera goes stale the first time someone forgets to extend it.
@@ -884,7 +880,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             title={`${gridVisible ? 'Hide' : 'Show'} grid (${keyHint('toggleGrid')})`}
             aria-label="Grid"
             aria-pressed={gridVisible}
-            onClick={toggleGrid}
+            onClick={() => togglePreference('grid')}
           >
             <Grid3x3 size={16} aria-hidden />
           </button>
@@ -893,7 +889,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             title={`${measuresVisible ? 'Hide' : 'Show'} measures (${keyHint('toggleMeasures')})`}
             aria-label="Measures"
             aria-pressed={measuresVisible}
-            onClick={toggleMeasures}
+            onClick={() => togglePreference('measures')}
           >
             <RulerDimensionLine size={16} aria-hidden />
           </button>

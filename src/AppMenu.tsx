@@ -13,6 +13,7 @@ import {
 import { openHelp } from './editor/helpStore';
 import { keyHint } from './editor/useAppHotkeys';
 import type { ShortcutAction } from './editor/useAppHotkeys';
+import { setPreference, usePreferences } from './preferences/preferences';
 import type { ThemePreference } from './theme/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; title: string; Icon: typeof Monitor }[] = [
@@ -27,8 +28,6 @@ export interface AppMenuProps {
   onExportImage: () => void;
   onReset: () => void;
   resetDisabled: boolean;
-  themePreference: ThemePreference;
-  setThemePreference: (preference: ThemePreference) => void;
 }
 
 // aria-hidden: the hint is glyphs ("⌘ ⇧ E"), unreadable aloud.
@@ -39,15 +38,8 @@ const Hint = ({ action }: { action: ShortcutAction }) => (
 );
 
 // Popover, not Menu: a menu's roving tabindex would strand the theme buttons.
-export default function AppMenu({
-  onOpen,
-  onSaveAs,
-  onExportImage,
-  onReset,
-  resetDisabled,
-  themePreference,
-  setThemePreference,
-}: AppMenuProps) {
+export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, resetDisabled }: AppMenuProps) {
+  const themePreference = usePreferences((s) => s.theme);
   return (
     <Popover>
       <div className="floating" style={{ position: 'fixed', top: 16, left: 16 }}>
@@ -92,7 +84,7 @@ export default function AppMenu({
                       title={title}
                       aria-label={title}
                       aria-pressed={themePreference === value}
-                      onClick={() => setThemePreference(value)}
+                      onClick={() => setPreference('theme', value)}
                     >
                       <Icon size={16} aria-hidden />
                     </button>
