@@ -354,7 +354,10 @@ aimed for as long as the pointer is down, then lands — Settling if it moved a
 Point or a Wall, and taking at most one undo entry whole. Below the click
 threshold it was a click, not a drag: it leaves the plan alone and selects
 instead — the element clicked, the wall a Dimension label belongs to, the Room a
-text block names. The Pan and the Marquee are drags but not Plan drags: one
+text block names. Landing is not its only ending: when the browser takes the
+pointer away — a scrolling gesture, a rejected palm — the drag is cancelled and
+puts the plan back where it grabbed it, leaving no undo entry, like every other
+cancelled gesture. The Pan and the Marquee are drags but not Plan drags: one
 moves the view, the other the Selection, and neither can touch the plan, which
 is why neither Settles and neither takes an undo entry (ADR 0023). Pure editor
 state: never part of the plan.

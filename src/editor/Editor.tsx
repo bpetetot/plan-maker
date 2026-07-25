@@ -428,6 +428,20 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (landed.selection) setSel(landed.selection);
   };
 
+  // The browser took the pointer — a scroll gesture, a palm, a rotation. The
+  // drag never lands: it drops what it holds, like every other cancel (ADR 0018).
+  const onSvgPointerCancel = () => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    if (d.kind === 'marquee') return setMarquee(null);
+    if (d.kind === 'pan') return;
+    // Landing on the pre-drag plan closes the Edit and records nothing: it is
+    // the snapshot beginEdit took.
+    d.edit.land(d.g.orig);
+    setMovingOpeningId(null);
+  };
+
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
   const only = sel.length === 1 ? sel[0] : null;
   const selWall = only?.type === 'wall' ? plan.walls[only.id] : null;
@@ -629,6 +643,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         }}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
+        onPointerCancel={onSvgPointerCancel}
         // A pointer that left the sheet hovers nothing; only pointermove would
         // ever clear the tint otherwise, and it stops arriving.
         onPointerLeave={() => setHoverRoom(null)}
