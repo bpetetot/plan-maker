@@ -1,6 +1,8 @@
 // CONTEXT.md: Placement. The interface is the surface: begin, aim, click,
 // finish, cancel — and the chrome the placement asks the screen to draw.
 import { describe, expect, it } from 'vitest';
+import { addRoomLabel } from '../model/operations';
+import { detectRooms } from '../model/rooms';
 import { emptyPlan } from '../model/types';
 import { buildPlan, squareRoomPlan } from '../model/testHelpers';
 import type { Plan } from '../model/types';
@@ -100,6 +102,54 @@ describe('a wall chain', () => {
     expect(cancelPlacement(started)).toBeNull();
     const chained = stroke(started, emptyPlan(), 0, 0).placement;
     expect(placementStage(cancelPlacement(chained)!)).toBe('wall');
+  });
+});
+
+// CONTEXT.md: Settle. A drawn wall creates one, so the chain settles like every
+// other edit — the pass that can act on it is the Room label reconciliation.
+describe('a wall chain that settles', () => {
+  const labelled = (x: number, y: number) => {
+    const [plan, id] = addRoomLabel(squareRoomPlan(), 'Kitchen', x, y);
+    return { plan, id };
+  };
+
+  it('re-pins the label of the room it cuts in two', () => {
+    const { plan: before, id } = labelled(200, 200);
+    const { plan } = draw(
+      'wall',
+      [
+        [300, 0],
+        [300, 400],
+      ],
+      before,
+    );
+
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(2);
+    const left = rooms.find((room) => room.anchor.x < 300)!;
+    expect(plan.roomLabels[id]).toMatchObject({
+      x: Math.round(left.anchor.x),
+      y: Math.round(left.anchor.y),
+    });
+  });
+
+  // A drawing only subdivides, so it can leave no label homeless: one sitting
+  // on the drawn line is claimed by one of the two halves, never dropped.
+  it('keeps a label the wall is drawn straight through', () => {
+    const { plan: before, id } = labelled(200, 200);
+    const { plan } = draw(
+      'wall',
+      [
+        [200, 0],
+        [200, 400],
+      ],
+      before,
+    );
+
+    const rooms = detectRooms(plan);
+    expect(rooms).toHaveLength(2);
+    const label = plan.roomLabels[id];
+    expect(rooms.map((room) => Math.round(room.anchor.x))).toContain(label.x);
   });
 });
 

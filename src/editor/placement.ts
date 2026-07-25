@@ -2,7 +2,14 @@
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
 import { nearestWall } from '../model/geometry';
-import { addRuler, commitPoint, commitWall, placeOpening, wallsAlongPath } from '../model/operations';
+import {
+  addRuler,
+  commitPoint,
+  commitWall,
+  placeOpening,
+  settleEdit,
+  wallsAlongPath,
+} from '../model/operations';
 import { railedOpeningOffset } from '../model/rail';
 import type { ElementRef } from '../model/selection';
 import type { Snap } from '../model/snap';
@@ -154,13 +161,18 @@ type WallPlacement = Extract<Placement, { tool: 'wall' }>;
 function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): PlacementResult {
   const s = aimPoint(plan, at, env);
   const chain = p.chain;
+  // CONTEXT.md: Settle. No `moving` set — a drawing displaces no Point, it
+  // creates one; the Room label pass is what commitWall lacked (ADR 0022).
+  const settled = (after: Plan) => settleEdit(plan, after);
   if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
-    const closed = commitWall(
-      plan,
-      pointSnap(plan, chain.last),
-      pointSnap(plan, chain.start),
-      env.defaults.wallThickness,
-    )[0];
+    const closed = settled(
+      commitWall(
+        plan,
+        pointSnap(plan, chain.last),
+        pointSnap(plan, chain.start),
+        env.defaults.wallThickness,
+      )[0],
+    );
     // The closing segment runs last→start, so the path loops back to start.
     return { plan: closed, ...finishChain(p, closed, [...p.anchors, chain.start]) };
   }
@@ -171,7 +183,7 @@ function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): Pl
   const [withStart, startId] = commitPoint(plan, startSnap);
   const [next, pointId] = commitWall(withStart, pointSnap(withStart, startId), s, env.defaults.wallThickness);
   return {
-    plan: next,
+    plan: settled(next),
     placement: {
       ...p,
       chain: { start: 'pending' in chain ? startId : chain.start, last: pointId },

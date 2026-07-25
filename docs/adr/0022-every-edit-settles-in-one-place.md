@@ -1,5 +1,13 @@
 # Every edit settles in one place — one operation restores the invariants
 
+> **Two statements below have since been overtaken.** The precondition "the
+> settle must sit inside a history group", left to the caller here, is now the
+> store's: an Edit is what one undo takes back, and no caller can see the group
+> (ADR 0028). And "drawing a wall does not settle yet" is no longer true —
+> `clickWall` settles each click against the plan that click started from, so a
+> wall drawn across a labelled room reconciles its label immediately. The rule
+> stated by this ADR is unchanged; only its two acknowledged gaps are closed.
+
 ADR 0002 ("walls only meet at shared Points") and ADR 0003 ("two Points never
 coincide") each state an invariant, and each says drag end restores it. But the
 sequence that restored them — merge, then planarize, then reconcile the room
