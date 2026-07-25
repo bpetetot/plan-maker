@@ -1,38 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { placeOpening } from './openings';
 import {
-  addRoomLabel,
-  addRuler,
-  addText,
   addWall,
   commitPoint,
   commitWall,
-  deleteOpening,
-  deleteRoomLabel,
-  deleteRuler,
-  deleteText,
   deleteWall,
-  editTextContent,
   ensurePoint,
   mergeCoincidentPoints,
   movePoint,
-  moveRoomLabel,
-  moveRulerEndpoint,
-  moveOpening,
-  placeOpening,
-  renameRoomLabel,
-  settleEdit,
   setDimPlacement,
-  moveText,
-  setOpeningWidth,
   setPoints,
-  setTextSize,
+  settleEdit,
   setWallThickness,
   splitWall,
-  toggleHingeSide,
-  toggleSwing,
 } from './operations';
 import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from './testHelpers';
-import { DOOR_WIDTH, emptyPlan, isPlanEmpty } from './types';
 
 const rectPlan = () =>
   buildPlan((b) => {
@@ -584,121 +566,6 @@ describe('deleteWall', () => {
   });
 });
 
-describe('openings', () => {
-  it('places a door with defaults at a clamped integer offset, returning its id', () => {
-    const base = rectPlan();
-    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'door', 200.4);
-    expect(id).not.toBeNull();
-    const door = plan.openings[id!];
-    expect(door).toMatchObject({ type: 'door', offset: 200, width: DOOR_WIDTH });
-    if (door.type === 'door') {
-      expect(door.hingeSide).toBe('start');
-      expect(door.swing).toBe('in');
-    }
-  });
-
-  it('places a door with the given width, hinge side and swing', () => {
-    const base = rectPlan();
-    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'door', 200, {
-      width: 80,
-      hingeSide: 'end',
-      swing: 'out',
-    });
-    expect(plan.openings[id!]).toMatchObject({ width: 80, hingeSide: 'end', swing: 'out' });
-  });
-
-  it('places a window with the given width, clamped to fit', () => {
-    const base = rectPlan();
-    const [plan, id] = placeOpening(base, Object.keys(base.walls)[0], 'window', 390, { width: 60 });
-    // free wall: the rail reaches the overhang at 405, so the window sits flush
-    expect(plan.openings[id!]).toMatchObject({ type: 'window', width: 60, offset: 375 });
-  });
-
-  it('refuses to place an opening on a wall narrower than it', () => {
-    const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(60, 0);
-      b.wall(p1, p2);
-    });
-    const wallId = Object.keys(plan.walls)[0];
-    const [next, id] = placeOpening(plan, wallId, 'door', 30);
-    expect(next).toBe(plan);
-    expect(id).toBeNull();
-  });
-
-  it('moves an opening along its wall, clamped', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'window', 200);
-    expect(moveOpening(plan, id!, 390).openings[id!].offset).toBe(345);
-  });
-
-  it('stops a move at the near edge of a neighbouring opening', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'window', 100, { width: 80 });
-    // a door (90) at 300 occupies 255 → 345; the window can reach 215 at most
-    [plan] = placeOpening(plan, wallId, 'door', 300, { width: 90 });
-    expect(moveOpening(plan, id!, 400).openings[id!].offset).toBe(215);
-  });
-
-  it('places a new opening beside the one already under the pointer', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    [plan] = placeOpening(plan, wallId, 'door', 200, { width: 90 }); // 155 → 245
-    const [next, id] = placeOpening(plan, wallId, 'window', 220, { width: 60 });
-    // 220 sits past the door's centre, so the new window takes the far side
-    expect(next.openings[id!].offset).toBe(275);
-  });
-
-  it('changes width, re-clamping the offset', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'door', 55);
-    const next = setOpeningWidth(plan, id!, 160);
-    expect(next.openings[id!].width).toBe(160);
-    expect(next.openings[id!].offset).toBe(75);
-  });
-
-  it('slides an opening to make room for its new width, and refuses when it cannot', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'window', 100, { width: 60 }); // 70 → 130
-    [plan] = placeOpening(plan, wallId, 'door', 200, { width: 90 }); // 155 → 245
-    // rail for the window: -5 → 155. Widening to 120 slides it up against the
-    // door, where it spans 35 → 155
-    const wider = setOpeningWidth(plan, id!, 120);
-    expect(wider.openings[id!]).toMatchObject({ width: 120, offset: 95 });
-    // 200 cannot fit in a 160-wide rail at all
-    expect(setOpeningWidth(plan, id!, 200)).toBe(plan);
-  });
-
-  it('toggles door hinge side and swing', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'door', 200);
-    let next = toggleHingeSide(plan, id!);
-    let door = next.openings[id!];
-    expect(door.type === 'door' && door.hingeSide).toBe('end');
-    next = toggleSwing(next, id!);
-    door = next.openings[id!];
-    expect(door.type === 'door' && door.swing).toBe('out');
-  });
-
-  it('deletes an opening', () => {
-    let plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    let id: string | null;
-    [plan, id] = placeOpening(plan, wallId, 'door', 200);
-    expect(Object.keys(deleteOpening(plan, id!).openings)).toHaveLength(0);
-  });
-});
-
 describe('setWallThickness', () => {
   it('sets the thickness of a wall', () => {
     const plan = rectPlan();
@@ -740,140 +607,5 @@ describe('setDimPlacement', () => {
   it('is a no-op for an unknown wall', () => {
     const plan = rectPlan();
     expect(setDimPlacement(plan, 'missing', 0.5, 1)).toBe(plan);
-  });
-});
-
-describe('room labels', () => {
-  it('adds, renames, moves, and deletes a label', () => {
-    let plan = buildPlan(() => {});
-    let id: string;
-    [plan, id] = addRoomLabel(plan, 'Kitchen', 100, 100);
-    expect(plan.roomLabels[id]).toMatchObject({ name: 'Kitchen', x: 100, y: 100 });
-    plan = renameRoomLabel(plan, id, 'Living room');
-    expect(plan.roomLabels[id].name).toBe('Living room');
-    plan = moveRoomLabel(plan, id, 150.6, 80.2);
-    expect(plan.roomLabels[id]).toMatchObject({ x: 151, y: 80 });
-    plan = deleteRoomLabel(plan, id);
-    expect(Object.keys(plan.roomLabels)).toHaveLength(0);
-  });
-});
-
-describe('room label placement state', () => {
-  const roomWithLabel = () => {
-    let labelId = '';
-    const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const p3 = b.point(400, 400);
-      const p4 = b.point(0, 400);
-      b.wall(p1, p2);
-      b.wall(p2, p3);
-      b.wall(p3, p4);
-      b.wall(p4, p1);
-      labelId = b.label('Kitchen', 200, 200).id;
-    });
-    return { plan, labelId };
-  };
-
-  it('addRoomLabel creates a default-placement label', () => {
-    const { plan } = roomWithLabel();
-    const [next, id] = addRoomLabel(plan, 'Office', 200, 200);
-    expect(next.roomLabels[id].placed).toBeUndefined();
-  });
-
-  it('moveRoomLabel gives the label a custom placement', () => {
-    const { plan, labelId } = roomWithLabel();
-    const next = moveRoomLabel(plan, labelId, 350, 120);
-    expect(next.roomLabels[labelId]).toMatchObject({ x: 350, y: 120, placed: true });
-  });
-
-  it('renameRoomLabel leaves the placement state alone', () => {
-    const { plan, labelId } = roomWithLabel();
-    const renamed = renameRoomLabel(plan, labelId, 'Office');
-    expect(renamed.roomLabels[labelId].placed).toBeUndefined();
-    const customThenRenamed = renameRoomLabel(moveRoomLabel(plan, labelId, 350, 120), labelId, 'Office');
-    expect(customThenRenamed.roomLabels[labelId].placed).toBe(true);
-  });
-});
-
-describe('rulers', () => {
-  it('addRuler stores a free-coordinate segment centered at t = 0.5', () => {
-    const [next, id] = addRuler(emptyPlan(), { x: 10, y: 20 }, { x: 300, y: 20 });
-    expect(next.rulers[id]).toEqual({ id, a: { x: 10, y: 20 }, b: { x: 300, y: 20 }, t: 0.5 });
-  });
-
-  it('addRuler rounds endpoints to integer centimeters', () => {
-    const [next, id] = addRuler(emptyPlan(), { x: 10.4, y: 19.6 }, { x: 300.5, y: 20.2 });
-    expect(next.rulers[id]).toMatchObject({ a: { x: 10, y: 20 }, b: { x: 301, y: 20 } });
-  });
-
-  it('moveRulerEndpoint moves one end, rounding, and leaves the other alone', () => {
-    const [withRuler, id] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
-    const next = moveRulerEndpoint(withRuler, id, 'b', 150.6, 40.2);
-    expect(next.rulers[id]).toMatchObject({ a: { x: 0, y: 0 }, b: { x: 151, y: 40 } });
-  });
-
-  it('moveRulerEndpoint ignores an unknown ruler', () => {
-    const plan = emptyPlan();
-    expect(moveRulerEndpoint(plan, 'nope', 'a', 5, 5)).toBe(plan);
-  });
-
-  it('deleteRuler removes the segment and no-ops on an unknown id', () => {
-    const [withRuler, id] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
-    expect(deleteRuler(withRuler, id).rulers).toEqual({});
-    expect(deleteRuler(withRuler, 'nope')).toBe(withRuler);
-  });
-
-  it('isPlanEmpty counts rulers alongside walls, openings, and labels', () => {
-    const [withRuler] = addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 });
-    expect(isPlanEmpty(emptyPlan())).toBe(true);
-    expect(isPlanEmpty(withRuler)).toBe(false);
-  });
-});
-
-describe('texts', () => {
-  it('addText stores a free-coordinate note at the medium default size', () => {
-    const [next, id] = addText(emptyPlan(), 10, 20, 'Hello');
-    expect(next.texts[id]).toEqual({ id, x: 10, y: 20, content: 'Hello', size: 'M' });
-  });
-
-  it('addText rounds coordinates to integer centimeters and keeps the chosen size', () => {
-    const [next, id] = addText(emptyPlan(), 10.4, 19.6, 'Note', 'L');
-    expect(next.texts[id]).toMatchObject({ x: 10, y: 20, size: 'L' });
-  });
-
-  it('moveText sets an absolute position, rounding to integer centimeters', () => {
-    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
-    const next = moveText(withText, id, 150.6, 80.2);
-    expect(next.texts[id]).toMatchObject({ x: 151, y: 80 });
-  });
-
-  it('moveText ignores an unknown text', () => {
-    const plan = emptyPlan();
-    expect(moveText(plan, 'nope', 5, 5)).toBe(plan);
-  });
-
-  it('editTextContent replaces the content and ignores an unknown text', () => {
-    const [withText, id] = addText(emptyPlan(), 0, 0, 'Old');
-    expect(editTextContent(withText, id, 'New').texts[id].content).toBe('New');
-    expect(editTextContent(withText, 'nope', 'New')).toBe(withText);
-  });
-
-  it('setTextSize changes the preset and ignores an unknown text', () => {
-    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
-    expect(setTextSize(withText, id, 'S').texts[id].size).toBe('S');
-    expect(setTextSize(withText, 'nope', 'S')).toBe(withText);
-  });
-
-  it('deleteText removes the note and no-ops on an unknown id', () => {
-    const [withText, id] = addText(emptyPlan(), 0, 0, 'Note');
-    expect(deleteText(withText, id).texts).toEqual({});
-    expect(deleteText(withText, 'nope')).toBe(withText);
-  });
-
-  it('isPlanEmpty counts texts alongside walls, openings, labels, and rulers', () => {
-    const [withText] = addText(emptyPlan(), 0, 0, 'Note');
-    expect(isPlanEmpty(emptyPlan())).toBe(true);
-    expect(isPlanEmpty(withText)).toBe(false);
   });
 });

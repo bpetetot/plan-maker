@@ -2,17 +2,11 @@
 // Pure: no React, no store. The Editor advances it and mirrors what it renders.
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallLength, wallSide } from '../model/geometry';
-import {
-  addRoomLabel,
-  movePoint,
-  moveOpening,
-  moveRoomLabel,
-  moveRulerEndpoint,
-  setDimPlacement,
-  settleEdit,
-} from '../model/operations';
+import { moveOpening } from '../model/openings';
+import { movePoint, setDimPlacement, settleEdit } from '../model/operations';
 import type { Room } from '../model/rooms';
-import { clampToRoom } from '../model/rooms';
+import { addRoomLabel, clampToRoom, moveRoomLabel } from '../model/rooms';
+import { moveRulerEndpoint } from '../model/rulers';
 import type { Snap } from '../model/snap';
 import { realignDelta, snapPoint } from '../model/snap';
 import type { ElementRef } from '../model/selection';

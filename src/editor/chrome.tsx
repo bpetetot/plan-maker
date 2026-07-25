@@ -1,8 +1,8 @@
 import type { Vec } from '../model/geometry';
 import { labelAngle, wallAxis, wallPoints } from '../model/geometry';
 import { formatLength } from '../model/format';
-import { openingPlacement } from '../model/openings';
-import { DIM_FONT_PX, openingRail, plateBox } from '../model/rail';
+import { openingPlacement, openingRail } from '../model/openings';
+import { DIM_FONT_PX, plateBox } from '../model/rail';
 import type { Room } from '../model/rooms';
 import type { Snap } from '../model/snap';
 import type { Opening, Plan, Ruler, Wall } from '../model/types';

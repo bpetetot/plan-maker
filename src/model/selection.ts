@@ -1,15 +1,7 @@
 import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
-import { openingPlacement } from './openings';
-import {
-  deleteOpening,
-  deleteRuler,
-  deleteText,
-  deleteWall,
-  setPoints,
-  settleEdit,
-  translateRoomLabel,
-} from './operations';
+import { deleteOpening, openingPlacement } from './openings';
+import { deleteWall, setPoints, settleEdit } from './operations';
 import type { Room } from './rooms';
 import {
   detectRooms,
@@ -19,7 +11,10 @@ import {
   roomOpenings,
   roomOutlineWallIds,
   roomWallIds,
+  translateRoomLabel,
 } from './rooms';
+import { deleteRuler, translateRuler } from './rulers';
+import { deleteText, translateText } from './texts';
 import type { Opening, Plan, Point } from './types';
 
 // CONTEXT.md: Selection. Editor state, never the plan; room labels are never
@@ -251,26 +246,8 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
   if (!movesWalls && rulerRefs.length === 0 && textRefs.length === 0) return plan;
 
   let next = movesWalls ? setPoints(plan, updates) : plan;
-  if (rulerRefs.length > 0) {
-    const rulers = { ...next.rulers };
-    for (const ref of rulerRefs) {
-      const r = next.rulers[ref.id];
-      rulers[ref.id] = {
-        ...r,
-        a: { x: Math.round(r.a.x + dx), y: Math.round(r.a.y + dy) },
-        b: { x: Math.round(r.b.x + dx), y: Math.round(r.b.y + dy) },
-      };
-    }
-    next = { ...next, rulers };
-  }
-  if (textRefs.length > 0) {
-    const texts = { ...next.texts };
-    for (const ref of textRefs) {
-      const t = next.texts[ref.id];
-      texts[ref.id] = { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) };
-    }
-    next = { ...next, texts };
-  }
+  for (const ref of rulerRefs) next = translateRuler(next, ref.id, dx, dy);
+  for (const ref of textRefs) next = translateText(next, ref.id, dx, dy);
 
   const labels = Object.values(plan.roomLabels);
   if (movesWalls && labels.length > 0) {

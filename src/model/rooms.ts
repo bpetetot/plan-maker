@@ -10,7 +10,7 @@ import {
   regionCentroid,
 } from './geometry';
 import type { Opening, Plan, RoomLabel, Wall } from './types';
-import { oncePerPlan } from './types';
+import { newId, oncePerPlan } from './types';
 
 // Rooms are derived, never stored (spec §2; CONTEXT.md: Room): faces of the
 // wall graph. Positive area = interior, negative = silhouette, punches holes.
@@ -341,4 +341,42 @@ export function wallMeasures(plan: Plan, rooms: Room[], wall: Wall): WallMeasure
   const s2 = faceSpan(plan, wall, -1);
   const length = Math.max(0, Math.max(s1.to, s2.to) - Math.min(s1.from, s2.from));
   return { kind: 'plain', length, thickness: wall.thickness };
+}
+
+export function addRoomLabel(plan: Plan, name: string, x: number, y: number): [Plan, string] {
+  const id = newId();
+  const label = { id, name, x: Math.round(x), y: Math.round(y) };
+  return [{ ...plan, roomLabels: { ...plan.roomLabels, [id]: label } }, id];
+}
+
+export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {
+  const label = plan.roomLabels[id];
+  if (!label) return plan;
+  return { ...plan, roomLabels: { ...plan.roomLabels, [id]: { ...label, name } } };
+}
+
+// A move is the user's placement gesture (CONTEXT.md: Room label).
+export function moveRoomLabel(plan: Plan, id: string, x: number, y: number): Plan {
+  const label = plan.roomLabels[id];
+  if (!label) return plan;
+  return {
+    ...plan,
+    roomLabels: {
+      ...plan.roomLabels,
+      [id]: { ...label, x: Math.round(x), y: Math.round(y), placed: true },
+    },
+  };
+}
+
+// Not moveRoomLabel: the room carries its label along, so `placed` stays put.
+export function translateRoomLabel(plan: Plan, id: string, dx: number, dy: number): Plan {
+  const label = plan.roomLabels[id];
+  if (!label) return plan;
+  return {
+    ...plan,
+    roomLabels: {
+      ...plan.roomLabels,
+      [id]: { ...label, x: Math.round(label.x + dx), y: Math.round(label.y + dy) },
+    },
+  };
 }

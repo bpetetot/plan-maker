@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildPlan } from '../model/testHelpers';
-import { addRoomLabel, addRuler, moveRulerEndpoint } from '../model/operations';
+import { addRoomLabel } from '../model/rooms';
+import { addRuler, moveRulerEndpoint } from '../model/rulers';
 import { emptyPlan } from '../model/types';
 import { beginEdit, editPlan, redo, replacePlan, undo, usePlanStore } from './planStore';
 

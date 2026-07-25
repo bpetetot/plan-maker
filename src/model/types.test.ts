@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { addRuler } from './rulers';
+import { addText } from './texts';
 import type { Plan } from './types';
-import { emptyPlan, oncePerPlan } from './types';
+import { emptyPlan, isPlanEmpty, oncePerPlan } from './types';
+
+describe('isPlanEmpty', () => {
+  it('counts rulers and texts alongside walls, openings, and labels', () => {
+    expect(isPlanEmpty(emptyPlan())).toBe(true);
+    expect(isPlanEmpty(addRuler(emptyPlan(), { x: 0, y: 0 }, { x: 100, y: 0 })[0])).toBe(false);
+    expect(isPlanEmpty(addText(emptyPlan(), 0, 0, 'Note')[0])).toBe(false);
+  });
+});
 
 describe('oncePerPlan', () => {
   it('reads once per plan and hands the same value back', () => {

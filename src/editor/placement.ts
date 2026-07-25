@@ -2,15 +2,9 @@
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
 import { nearestWall } from '../model/geometry';
-import {
-  addRuler,
-  commitPoint,
-  commitWall,
-  placeOpening,
-  settleEdit,
-  wallsAlongPath,
-} from '../model/operations';
-import { railedOpeningOffset } from '../model/rail';
+import { placeOpening, railedOpeningOffset } from '../model/openings';
+import { commitPoint, commitWall, settleEdit, wallsAlongPath } from '../model/operations';
+import { addRuler } from '../model/rulers';
 import type { ElementRef } from '../model/selection';
 import type { Snap } from '../model/snap';
 import { snapPoint } from '../model/snap';

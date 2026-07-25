@@ -1,12 +1,11 @@
 // CONTEXT.md: Rail — the bounded travel line two things slide on (ADR 0027).
-// A railed value is where a stored wish actually sits, so the sheet draws and
-// the gesture grabs the same position.
-import { faceSpan, fullThicknessSpan } from './faces';
+// The Dimension's binds the drawing; the Opening's binds the plan and lives
+// with its own name, in `openings.ts`.
+import { faceSpan } from './faces';
 import { formatLength } from './format';
 import { wallAxis, wallLength } from './geometry';
 import type { Span } from './openings';
-import { clampCenter, openingPlacement } from './openings';
-import type { Opening, Plan, Wall } from './types';
+import type { Plan, Wall } from './types';
 
 // The editor's measure size, in plan centimetres: a Dimension is drawing and
 // zooms with the sheet. Advance width is JetBrains Mono's 0.6 em.
@@ -64,41 +63,4 @@ export function railedDimT(plan: Plan, wall: Wall, side: 1 | -1, t: number, font
   const span = faceSpan(plan, wall, side);
   const half = plateBox(formatLength(Math.max(0, span.to - span.from)), fontPx).halfW;
   return railedRatio(span, length, half, t);
-}
-
-// The Opening's Rail. `referenceOffset`, not the gesture's own overshoot,
-// decides which end a neighbour bounds — so a rail never spans a neighbour.
-export function openingRail(plan: Plan, wall: Wall, referenceOffset: number, excludeId?: string): Span {
-  const { from: spanFrom, to: spanTo } = fullThicknessSpan(plan, wall);
-  let from = spanFrom;
-  let to = spanTo;
-  for (const other of Object.values(plan.openings)) {
-    if (other.wallId !== wall.id || other.id === excludeId) continue;
-    const placement = openingPlacement(plan, other);
-    if (!placement) continue;
-    const half = other.width / 2;
-    if (placement.offset <= referenceOffset) from = Math.max(from, placement.offset + half);
-    else to = Math.min(to, placement.offset - half);
-  }
-  return { from, to };
-}
-
-// Unlike the Dimension's, this Rail binds the plan: `null` is the refusal a
-// wall too short pronounces (CONTEXT.md: Rail). `opening` is the one being
-// moved or widened — it bounds nothing itself. Omit it when placing a new one,
-// where the desired offset plays that part.
-export function railedOpeningOffset(
-  plan: Plan,
-  wall: Wall | undefined,
-  offset: number,
-  width: number,
-  opening?: Opening,
-): number | null {
-  if (!wall) return null;
-  const reference = (opening && openingPlacement(plan, opening)?.offset) ?? offset;
-  const rail = openingRail(plan, wall, reference, opening?.id);
-  if (rail.to - rail.from < width) return null;
-  // Mitered rail ends are not whole centimetres: round first, rail last, so a
-  // flush opening lands exactly on its bound.
-  return clampCenter(rail, width, Math.round(clampCenter(rail, width, offset)));
 }

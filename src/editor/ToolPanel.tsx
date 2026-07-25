@@ -16,16 +16,12 @@ import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
-import {
-  setOpeningWidth,
-  setTextSize,
-  setWallThickness,
-  toggleHingeSide,
-  toggleSwing,
-} from '../model/operations';
+import { setOpeningWidth, toggleHingeSide, toggleSwing } from '../model/openings';
+import { setWallThickness } from '../model/operations';
 import { detectRooms, roomLabelAt, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
+import { setTextSize } from '../model/texts';
 import type { Plan, TextSize, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
 import { editPlan } from '../store/planStore';

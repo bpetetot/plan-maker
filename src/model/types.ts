@@ -1,4 +1,5 @@
 // Domain model per spec §2 — shared-point planar graph, integer centimeters.
+import { nanoid } from 'nanoid';
 
 export type Cm = number;
 
@@ -95,6 +96,8 @@ export function oncePerPlan<T>(read: (plan: Plan) => T): (plan: Plan) => T {
     return readings.get(plan)!;
   };
 }
+
+export const newId = () => nanoid(10);
 
 export const WALL_THICKNESS: Cm = 10;
 export const WALL_THICKNESS_MAX: Cm = 100;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DIM_FONT_PX, dimSide, openingRail, railedDimT, railedOpeningOffset } from './rail';
-import { buildPlan, oneWallPlan, squareRoomPlan } from './testHelpers';
+import { DIM_FONT_PX, dimSide, railedDimT } from './rail';
+import { oneWallPlan, squareRoomPlan } from './testHelpers';
 
 const horizontal = (x1: number, y1: number, x2: number, y2: number) => {
   const { plan, wall } = oneWallPlan(x1, y1, x2, y2);
@@ -71,113 +71,5 @@ describe('railedDimT', () => {
   it('centres the placement on a wall too short to measure', () => {
     const { plan, wall } = oneWallPlan(0, 0, 0, 0);
     expect(railedDimT(plan, wall, -1, 0.9, DIM_FONT_PX)).toBe(0.5);
-  });
-});
-
-describe('openingRail', () => {
-  it('runs the full-thickness stretch of the wall when nothing else is on it', () => {
-    const plan = buildPlan((b) => {
-      b.wall(b.point(0, 0), b.point(400, 0));
-    });
-    const wall = Object.values(plan.walls)[0];
-    expect(openingRail(plan, wall, 200)).toEqual({ from: -5, to: 405 });
-  });
-
-  it('stops at the mitered corners of a room wall', () => {
-    const plan = squareRoomPlan();
-    const bottom = Object.values(plan.walls)[0];
-    expect(openingRail(plan, bottom, 200)).toEqual({ from: 5, to: 395 });
-  });
-
-  it('cuts back to the near edge of the openings flanking the reference position', () => {
-    const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(400, 0));
-      b.opening(wall, 'window', 60, 60); // edges 30 / 90
-      b.opening(wall, 'door', 300, 80); // edges 260 / 340
-    });
-    const wall = Object.values(plan.walls)[0];
-    expect(openingRail(plan, wall, 200)).toEqual({ from: 90, to: 260 });
-  });
-
-  it('excludes the opening being placed from its own bounds', () => {
-    const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(400, 0));
-      b.opening(wall, 'window', 200, 80);
-    });
-    const wall = Object.values(plan.walls)[0];
-    const opening = Object.values(plan.openings)[0];
-    expect(openingRail(plan, wall, 200, opening.id)).toEqual({ from: -5, to: 405 });
-  });
-
-  it('sides a neighbour by the reference position, so a rail never spans one', () => {
-    const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(400, 0));
-      b.opening(wall, 'window', 200, 80); // edges 160 / 240
-    });
-    const wall = Object.values(plan.walls)[0];
-    expect(openingRail(plan, wall, 300)).toEqual({ from: 240, to: 405 });
-    expect(openingRail(plan, wall, 100)).toEqual({ from: -5, to: 160 });
-  });
-
-  it('reads a neighbour where it is drawn, not where it is stored', () => {
-    const plan = buildPlan((b) => {
-      const wall = b.wall(b.point(0, 0), b.point(200, 0));
-      b.opening(wall, 'window', 380, 80);
-    });
-    const wall = Object.values(plan.walls)[0];
-    // full-thickness span -5 → 205, so the neighbour renders centred on 165
-    expect(openingRail(plan, wall, 50)).toEqual({ from: -5, to: 125 });
-  });
-
-  it('ignores the openings of other walls', () => {
-    const plan = buildPlan((b) => {
-      b.wall(b.point(0, 0), b.point(400, 0));
-      const other = b.wall(b.point(0, 200), b.point(400, 200));
-      b.opening(other, 'door', 200, 80);
-    });
-    const wall = Object.values(plan.walls)[0];
-    expect(openingRail(plan, wall, 200)).toEqual({ from: -5, to: 405 });
-  });
-});
-
-describe('railedOpeningOffset', () => {
-  it('lands the offset flush against each end of the rail', () => {
-    const plan = buildPlan((b) => {
-      b.wall(b.point(0, 0), b.point(400, 0));
-    });
-    const wall = Object.values(plan.walls)[0];
-    // rail -5 → 405: a 90 opening centres between 40 and 360
-    expect(railedOpeningOffset(plan, wall, 10, 90)).toBe(40);
-    expect(railedOpeningOffset(plan, wall, 395, 90)).toBe(360);
-    expect(railedOpeningOffset(plan, wall, 200, 90)).toBe(200);
-  });
-
-  it('lands exactly on a rail end that is not a whole centimetre', () => {
-    // a 45° corner miters the rail end to an irrational offset: rounding to
-    // whole centimetres must not push the opening off its bound
-    const plan = buildPlan((b) => {
-      const a = b.point(0, 0);
-      const corner = b.point(400, 0);
-      b.wall(a, corner);
-      b.wall(corner, b.point(700, 300));
-    });
-    const wall = Object.values(plan.walls)[0];
-    const rail = openingRail(plan, wall, 200);
-    expect(Number.isInteger(rail.to)).toBe(false);
-    expect(railedOpeningOffset(plan, wall, 400, 90)).toBe(rail.to - 45);
-  });
-
-  // Unlike the Dimension's, this Rail binds the plan (CONTEXT.md: Rail).
-  it('refuses a rail shorter than the opening', () => {
-    const plan = buildPlan((b) => {
-      b.wall(b.point(0, 0), b.point(60, 0));
-    });
-    const wall = Object.values(plan.walls)[0];
-    expect(railedOpeningOffset(plan, wall, 30, 90)).toBe(null);
-  });
-
-  it('refuses a wall that is not there', () => {
-    const plan = buildPlan(() => {});
-    expect(railedOpeningOffset(plan, undefined, 30, 90)).toBe(null);
   });
 });

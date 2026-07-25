@@ -1,7 +1,7 @@
 // CONTEXT.md: Placement. The interface is the surface: begin, aim, click,
 // finish, cancel — and the chrome the placement asks the screen to draw.
 import { describe, expect, it } from 'vitest';
-import { addRoomLabel } from '../model/operations';
+import { addRoomLabel } from '../model/rooms';
 import { detectRooms } from '../model/rooms';
 import { emptyPlan } from '../model/types';
 import { buildPlan, squareRoomPlan } from '../model/testHelpers';

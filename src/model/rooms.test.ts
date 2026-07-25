@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { commitWall, deleteWall, setPoints } from './operations';
 import {
+  addRoomLabel,
   clampToRoom,
   detectRooms,
   interiorSide,
   reconcileRoomLabels,
   roomAt,
   roomContains,
+  moveRoomLabel,
+  renameRoomLabel,
   roomOpenings,
   roomWallIds,
   wallMeasures,
@@ -690,5 +693,56 @@ describe('roomOpenings', () => {
   it('gives nothing for a room without openings', () => {
     const plan = squareRoomPlan();
     expect(roomOpenings(plan, detectRooms(plan)[0])).toEqual([]);
+  });
+});
+
+describe('room labels', () => {
+  it('adds, renames, and moves a label', () => {
+    let plan = buildPlan(() => {});
+    let id: string;
+    [plan, id] = addRoomLabel(plan, 'Kitchen', 100, 100);
+    expect(plan.roomLabels[id]).toMatchObject({ name: 'Kitchen', x: 100, y: 100 });
+    plan = renameRoomLabel(plan, id, 'Living room');
+    expect(plan.roomLabels[id].name).toBe('Living room');
+    plan = moveRoomLabel(plan, id, 150.6, 80.2);
+    expect(plan.roomLabels[id]).toMatchObject({ x: 151, y: 80 });
+  });
+});
+
+describe('room label placement state', () => {
+  const roomWithLabel = () => {
+    let labelId = '';
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      labelId = b.label('Kitchen', 200, 200).id;
+    });
+    return { plan, labelId };
+  };
+
+  it('addRoomLabel creates a default-placement label', () => {
+    const { plan } = roomWithLabel();
+    const [next, id] = addRoomLabel(plan, 'Office', 200, 200);
+    expect(next.roomLabels[id].placed).toBeUndefined();
+  });
+
+  it('moveRoomLabel gives the label a custom placement', () => {
+    const { plan, labelId } = roomWithLabel();
+    const next = moveRoomLabel(plan, labelId, 350, 120);
+    expect(next.roomLabels[labelId]).toMatchObject({ x: 350, y: 120, placed: true });
+  });
+
+  it('renameRoomLabel leaves the placement state alone', () => {
+    const { plan, labelId } = roomWithLabel();
+    const renamed = renameRoomLabel(plan, labelId, 'Office');
+    expect(renamed.roomLabels[labelId].placed).toBeUndefined();
+    const customThenRenamed = renameRoomLabel(moveRoomLabel(plan, labelId, 350, 120), labelId, 'Office');
+    expect(customThenRenamed.roomLabels[labelId].placed).toBe(true);
   });
 });
