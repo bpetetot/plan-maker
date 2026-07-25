@@ -52,6 +52,7 @@ import type { Opening, Plan, RoomLabel, TextNote, TextSize, Wall } from '../mode
 import { GRID, WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
+import { InlineEditor } from './inlineEditor';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
 import { CLICK_PX, snapTolerance } from './gesture';
@@ -174,7 +175,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     y: number;
     initial: string;
   } | null>(null);
-  const editCancelled = useRef(false);
   // A Text under edit: `id` null while placing (the node is born only on a
   // non-empty commit, so an aborted placement leaves no orphan).
   const [textEditing, setTextEditing] = useState<{
@@ -184,10 +184,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     size: TextSize;
     initial: string;
   } | null>(null);
-  // Live value of the open editor, mirrored from the uncontrolled textarea so the
-  // editing box can grow with the text (down and to the right).
-  const [textDraft, setTextDraft] = useState('');
-  const textCancelled = useRef(false);
   // A Text placement mousedown must not run its focus fixup, or it blurs the
   // just-mounted editor and commits it empty before a key can land.
   const placingText = useRef(false);
@@ -413,7 +409,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       // The paired mousedown (next event) must skip its focus fixup so the
       // editor's autoFocus survives — see onMouseDown below.
       placingText.current = true;
-      setTextDraft('');
       setTextEditing({ id: null, x: s.x, y: s.y, size: defaults.textSize, initial: '' });
     } else if (tool === 'select') {
       drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
@@ -635,15 +630,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     });
   };
 
-  // Commit path shared by Enter, Escape and clicking away — all end in a blur.
-  const finishEditing = (value: string) => {
+  // Null means Escape cancelled the box (CONTEXT.md: Interaction chrome).
+  const finishEditing = (value: string | null) => {
     const ed = editing;
     setEditing(null);
-    if (!ed) return;
-    if (editCancelled.current) {
-      editCancelled.current = false;
-      return;
-    }
+    if (!ed || value === null) return;
     const name = value.trim();
     if (name === ed.initial) return;
     if (ed.labelId) setPlan((p) => renameRoomLabel(p, ed.labelId!, name));
@@ -662,22 +653,17 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (tool !== 'select') return;
     e.stopPropagation();
     setSnap(null);
-    setTextDraft(text.content);
     setTextEditing({ id: text.id, x: text.x, y: text.y, size: text.size, initial: text.content });
   };
 
-  // Commit path shared by Ctrl+Enter, Escape and clicking away — all end in a
-  // blur. A just-placed node is born here; an emptied one is discarded.
-  const finishTextEditing = (value: string) => {
+  // A just-placed node is born here; an emptied one is discarded. Null is
+  // Escape: the box closes and the tool hands back, but nothing is written.
+  const finishTextEditing = (value: string | null) => {
     const ed = textEditing;
     setTextEditing(null);
     // One-shot: placement hands back to Select; a re-edit is already there.
     if (tool === 'text') switchTool('select');
-    if (!ed) return;
-    if (textCancelled.current) {
-      textCancelled.current = false;
-      return;
-    }
+    if (!ed || value === null) return;
     const empty = value.trim() === '';
     if (ed.id) {
       setPlan((p) => (empty ? deleteText(p, ed.id!) : editTextContent(p, ed.id!, value)));
@@ -932,52 +918,26 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           <SnapMarker snap={snap} pxPerCm={zoomScale} />
         )}
         {editing && (
-          <foreignObject x={editing.x - 100} y={editing.y - 13} width={200} height={17}>
-            <input
-              className="room-name-input"
-              defaultValue={editing.initial}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
-                else if (e.key === 'Escape') {
-                  editCancelled.current = true;
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={(e) => finishEditing(e.currentTarget.value)}
-            />
-          </foreignObject>
+          <InlineEditor
+            className="room-name-input"
+            initial={editing.initial}
+            box={() => ({ x: editing.x - 100, y: editing.y - 13, width: 200, height: 17 })}
+            onClose={finishEditing}
+          />
         )}
         {textEditing && (
-          <foreignObject
-            x={textEditing.x}
-            y={textEditing.y}
-            width={textEditBox(textDraft, textEditing.size).width}
-            height={textEditBox(textDraft, textEditing.size).height}
-          >
-            <textarea
-              className="text-note-input"
-              style={{ fontSize: `${TEXT_SIZE_CM[textEditing.size]}px` }}
-              defaultValue={textEditing.initial}
-              autoFocus
-              onFocus={(e) => e.currentTarget.select()}
-              onInput={(e) => setTextDraft(e.currentTarget.value)}
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  textCancelled.current = true;
-                  e.currentTarget.blur();
-                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  // Plain Enter is a newline; Mod+Enter commits (ticket 02).
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={(e) => finishTextEditing(e.currentTarget.value)}
-            />
-          </foreignObject>
+          <InlineEditor
+            multiline
+            className="text-note-input"
+            initial={textEditing.initial}
+            style={{ fontSize: `${TEXT_SIZE_CM[textEditing.size]}px` }}
+            box={(value) => ({
+              x: textEditing.x,
+              y: textEditing.y,
+              ...textEditBox(value, textEditing.size),
+            })}
+            onClose={finishTextEditing}
+          />
         )}
       </svg>
 
