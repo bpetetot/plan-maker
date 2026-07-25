@@ -1,25 +1,28 @@
 import type { DimensionLine } from '../model/dimension';
 import { rulerDimension, wallDimension } from '../model/dimension';
-import { ARROW_LEN, plateBox } from '../model/rail';
+import { ARROW_LEN } from '../model/rail';
 import type { Plan, Ruler, Wall } from '../model/types';
 import { COLORS, seamStroke } from './paint';
 
 const PLATE_RX = 2;
 
+// The plate covers the whole text box, spaces included: grid, walls and
+// neighbouring dimension lines must never show through a measure.
 export function DimText({
   label,
   className,
   fontPx,
+  plate: { halfW, halfH },
   x = 0,
   y = 0,
 }: {
   label: string;
   className: string;
   fontPx: number;
+  plate: { halfW: number; halfH: number };
   x?: number;
   y?: number;
 }) {
-  const { halfW, halfH } = plateBox(label, fontPx);
   return (
     <>
       <rect
@@ -50,12 +53,12 @@ const ARROW_HALF_WIDTH = 2.2;
 // ISO: the heads sit inside the extent pointing outward, and flip outside
 // pointing inward when the span runs out of room — which the reading decided.
 function ExtentLine({ dim, stroke }: { dim: DimensionLine; stroke: string }) {
-  const { origin, u, from, to, t, plate, arrowsInside } = dim;
+  const { origin, u, from, to, plateAt, plate, arrowsInside } = dim;
   const at = (s: number) => ({ x: origin.x + u.x * s, y: origin.y + u.y * s });
   const start = arrowsInside ? from + ARROW_LEN : from;
   const end = arrowsInside ? to - ARROW_LEN : to;
-  const g1 = Math.max(start, Math.min(t - plate.halfW, end));
-  const g2 = Math.min(end, Math.max(t + plate.halfW, start));
+  const g1 = Math.max(start, Math.min(plateAt - plate.halfW, end));
+  const g2 = Math.min(end, Math.max(plateAt + plate.halfW, start));
   const seg = (key: string, t1: number, t2: number) => {
     const p = at(t1);
     const q = at(t2);
@@ -104,7 +107,7 @@ function DimensionLineView({
 }) {
   // Line and arrows tint on hover like a wall body; the plate text stays plain.
   const stroke = selected ? COLORS.wallSelected : hovered ? COLORS.wallHover : 'var(--dim-line)';
-  const mid = { x: dim.origin.x + dim.u.x * dim.t, y: dim.origin.y + dim.u.y * dim.t };
+  const mid = { x: dim.origin.x + dim.u.x * dim.plateAt, y: dim.origin.y + dim.u.y * dim.plateAt };
   const margin = pxPerCm ? PLATE_GRAB_MARGIN_PX / pxPerCm : 0;
   const halfW = dim.plate.halfW + margin;
   const halfH = dim.plate.halfH + margin;
@@ -127,7 +130,12 @@ function DimensionLineView({
             fill="transparent"
           />
         )}
-        <DimText label={dim.label} fontPx={dim.fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
+        <DimText
+          label={dim.label}
+          fontPx={dim.fontPx}
+          plate={dim.plate}
+          className={selected ? 'dim dim-selected' : 'dim'}
+        />
       </g>
     </g>
   );

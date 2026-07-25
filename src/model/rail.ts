@@ -8,9 +8,8 @@ import type { Span } from './openings';
 import { clampCenter, openingPlacement } from './openings';
 import type { Opening, Plan, Wall } from './types';
 
-// The editor's measure size, in plan centimetres — a Dimension is drawing, so
-// it zooms with the sheet. The PNG export names its own. Advance width is
-// JetBrains Mono's 0.6 em.
+// The editor's measure size, in plan centimetres: a Dimension is drawing and
+// zooms with the sheet. Advance width is JetBrains Mono's 0.6 em.
 export const DIM_FONT_PX = 8;
 const PLATE_PAD_X = 2;
 const PLATE_PAD_Y = 1;
@@ -44,9 +43,8 @@ export function dimSide(plan: Plan, wall: Wall): 1 | -1 {
   return axis.angle !== raw ? 1 : -1;
 }
 
-// The Rail a plated value slides on: a ratio of the run's length keeping the
-// plate clear of the arrowheads. A Dimension and a Ruler share it — both are
-// drawn as a DimensionLine, whatever the run underneath is.
+// The Rail a plated value slides on, as a ratio of the run's length. Shared:
+// a Dimension and a Ruler are drawn as one DimensionLine (CONTEXT.md).
 export function railedRatio(span: Span, length: number, halfW: number, t: number): number {
   const margin = arrowsFitInside(span.to - span.from, 2 * halfW) ? ARROW_LEN + halfW : halfW;
   let min = (span.from + margin) / length;

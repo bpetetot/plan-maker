@@ -2,7 +2,7 @@ import type { Vec } from '../model/geometry';
 import { labelAngle, wallAxis, wallPoints } from '../model/geometry';
 import { formatLength } from '../model/format';
 import { openingPlacement } from '../model/openings';
-import { DIM_FONT_PX, openingRail } from '../model/rail';
+import { DIM_FONT_PX, openingRail, plateBox } from '../model/rail';
 import type { Room } from '../model/rooms';
 import type { Snap } from '../model/snap';
 import type { Opening, Plan, Ruler, Wall } from '../model/types';
@@ -320,6 +320,7 @@ export function RubberWall({
 }) {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   const angle = labelAngle(to.x - from.x, to.y - from.y);
+  const label = formatLength(length + thickness);
   return (
     <g pointerEvents="none">
       <line
@@ -335,9 +336,10 @@ export function RubberWall({
       {length > 20 && (
         <g transform={`translate(${(from.x + to.x) / 2},${(from.y + to.y) / 2}) rotate(${angle})`}>
           <DimText
-            label={formatLength(length + thickness)}
+            label={label}
             className="dim dim-live"
             fontPx={DIM_FONT_PX}
+            plate={plateBox(label, DIM_FONT_PX)}
             y={-thickness - 7}
           />
         </g>

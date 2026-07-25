@@ -25,9 +25,8 @@ export interface WallAxis {
   angle: number;
 }
 
-// The frame every reading of a wall starts from. `null` says only that no
-// direction exists; "too short for this" is each caller's own threshold, and
-// stays where it means something.
+// `null` says only that no direction exists: "too short for this" is each
+// caller's own threshold, and stays where it means something.
 export function wallAxis(plan: Plan, wall: Wall): WallAxis | null {
   const [a, b] = wallPoints(plan, wall);
   if (!a || !b) return null;
@@ -39,11 +38,13 @@ export function wallAxis(plan: Plan, wall: Wall): WallAxis | null {
 }
 
 export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t: number; d: number } {
-  const [a] = wallPoints(plan, wall);
   const axis = wallAxis(plan, wall);
   // A wall too short to project on answers from its start Point.
-  if (!axis || axis.length < 1) return { t: 0, d: distance(a.x, a.y, x, y) };
-  const { u, length } = axis;
+  if (!axis || axis.length < 1) {
+    const [a] = wallPoints(plan, wall);
+    return { t: 0, d: distance(a.x, a.y, x, y) };
+  }
+  const { a, u, length } = axis;
   const t = Math.max(0, Math.min(length, (x - a.x) * u.x + (y - a.y) * u.y));
   return { t, d: distance(a.x + u.x * t, a.y + u.y * t, x, y) };
 }

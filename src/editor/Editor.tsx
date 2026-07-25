@@ -381,7 +381,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         // last drag rails the plate elsewhere, and the grab must start there.
         const dim = wallDimension(plan, wall, DIM_FONT_PX);
         if (!dim) return null;
-        return { kind: 'dim', id: wall.id, grabDelta: dim.t - projectOnWall(plan, wall, c.x, c.y).t };
+        return { kind: 'dim', id: wall.id, grabDelta: dim.plateAt - projectOnWall(plan, wall, c.x, c.y).t };
       }
       case 'label': {
         const { block, label } = target;

@@ -1,6 +1,5 @@
 // CONTEXT.md: DimensionLine — the ISO figure a Dimension and a Ruler are both
-// drawn as. Read here so the sheet only places what the model decided, and so
-// the screen and the export read the same rule at two font sizes (ADR 0024).
+// drawn as, read here so the sheet only places what the model decided.
 import { faceSpan } from './faces';
 import { formatLength } from './format';
 import type { Vec } from './geometry';
@@ -9,18 +8,21 @@ import type { Span } from './openings';
 import { arrowsFitInside, dimSide, plateBox, railedRatio } from './rail';
 import type { Plan, Ruler, Wall } from './types';
 
-export interface DimensionLine {
-  /** Axis parameter 0, already off the Face it measures. */
+/** Where the line runs: its origin at axis parameter 0, already off the Face. */
+interface Run {
   origin: Vec;
   u: Vec;
   angle: number;
+}
+
+export interface DimensionLine extends Run {
   /** The measured extent, as axis parameters from `origin`. */
   from: number;
   to: number;
   value: number;
   label: string;
-  /** Where the plate sits, railed, as an axis parameter. */
-  t: number;
+  /** Where the plate sits once railed — an axis parameter, not a ratio. */
+  plateAt: number;
   fontPx: number;
   plate: { halfW: number; halfH: number };
   arrowsInside: boolean;
@@ -37,9 +39,7 @@ const MIN_DIM_LENGTH = 20;
 // One place decides the plate's box, its position on the Rail and whether the
 // heads point inward — the drawing re-deciding any of them is how they drift.
 function dimensionLine(
-  origin: Vec,
-  u: Vec,
-  angle: number,
+  run: Run,
   span: Span,
   length: number,
   value: number,
@@ -49,14 +49,12 @@ function dimensionLine(
   const label = formatLength(value);
   const plate = plateBox(label, fontPx);
   return {
-    origin,
-    u,
-    angle,
+    ...run,
     from: span.from,
     to: span.to,
     value,
     label,
-    t: railedRatio(span, length, plate.halfW, t) * length,
+    plateAt: railedRatio(span, length, plate.halfW, t) * length,
     fontPx,
     plate,
     arrowsInside: arrowsFitInside(span.to - span.from, 2 * plate.halfW),
@@ -74,7 +72,8 @@ export function wallDimension(plan: Plan, wall: Wall, fontPx: number): Dimension
   const off = wall.thickness / 2 + FACE_CLEARANCE;
   const origin = { x: a.x - u.y * side * off, y: a.y + u.x * side * off };
   const value = Math.max(0, span.to - span.from);
-  return dimensionLine(origin, u, angle, span, length, value, wall.dimPlacement?.t ?? 0.5, fontPx);
+  const run = { origin, u, angle };
+  return dimensionLine(run, span, length, value, wall.dimPlacement?.t ?? 0.5, fontPx);
 }
 
 // A hand-placed Ruler (CONTEXT.md): the same figure laid directly on its own
@@ -85,7 +84,10 @@ export function rulerDimension(ruler: Ruler, fontPx: number): DimensionLine | nu
   const dy = b.y - a.y;
   const length = Math.hypot(dx, dy);
   if (length < 1) return null;
-  const u = { x: dx / length, y: dy / length };
-  const span = { from: 0, to: length };
-  return dimensionLine({ x: a.x, y: a.y }, u, labelAngle(dx, dy), span, length, length, t, fontPx);
+  const run = {
+    origin: { x: a.x, y: a.y },
+    u: { x: dx / length, y: dy / length },
+    angle: labelAngle(dx, dy),
+  };
+  return dimensionLine(run, { from: 0, to: length }, length, length, t, fontPx);
 }

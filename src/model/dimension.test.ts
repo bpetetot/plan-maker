@@ -4,7 +4,8 @@ import { DIM_FONT_PX } from './rail';
 import { oneWallPlan, squareRoomPlan } from './testHelpers';
 import type { Ruler } from './types';
 
-const EXPORT_FONT_PX = 10;
+// Wider than the editor's, as the export's is (ADR 0024).
+const WIDER_FONT_PX = 10;
 
 const wallDim = (x1: number, y1: number, x2: number, y2: number, thickness = 10, fontPx = DIM_FONT_PX) => {
   const { plan, wall } = oneWallPlan(x1, y1, x2, y2, thickness);
@@ -57,23 +58,23 @@ describe('wallDimension on the Rail', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     wall.dimPlacement = { t: 0.99, side: -1 };
     // silhouette -5..405, plate half-width 16.4, heads inside → margin 23.4
-    expect(wallDimension(plan, wall, DIM_FONT_PX)?.t).toBeCloseTo(405 - 23.4, 5);
+    expect(wallDimension(plan, wall, DIM_FONT_PX)?.plateAt).toBeCloseTo(405 - 23.4, 5);
   });
 
   it('rails shorter at export size, the same stored wish sitting elsewhere', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     wall.dimPlacement = { t: 1, side: -1 };
     const editor = wallDimension(plan, wall, DIM_FONT_PX)!;
-    const exported = wallDimension(plan, wall, EXPORT_FONT_PX)!;
+    const exported = wallDimension(plan, wall, WIDER_FONT_PX)!;
     expect(exported.plate.halfW).toBeGreaterThan(editor.plate.halfW);
-    expect(exported.t).toBeLessThan(editor.t);
+    expect(exported.plateAt).toBeLessThan(editor.plateAt);
   });
 
   it('pins the plate to the middle of a span too narrow to hold it', () => {
     // 20 cm wall, thickness 5: silhouette -2.5..22.5 (25 cm) < the 28 cm plate
     const { plan, wall } = oneWallPlan(0, 0, 20, 0, 5);
     wall.dimPlacement = { t: 0.9, side: -1 };
-    expect(wallDimension(plan, wall, DIM_FONT_PX)?.t).toBeCloseTo(10, 5);
+    expect(wallDimension(plan, wall, DIM_FONT_PX)?.plateAt).toBeCloseTo(10, 5);
   });
 });
 
@@ -100,15 +101,15 @@ describe('rulerDimension', () => {
   });
 
   it('leaves a placement the segment has room for alone', () => {
-    expect(rulerDimension(ruler(400, 0, 0.25), DIM_FONT_PX)?.t).toBe(100);
+    expect(rulerDimension(ruler(400, 0, 0.25), DIM_FONT_PX)?.plateAt).toBe(100);
   });
 
   // CONTEXT.md: Rail — it binds at every drawing, and a Ruler is drawn as the
   // same DimensionLine. An imported extreme would otherwise plate its own head.
   it('rails an extreme stored t back off its own arrowhead', () => {
     const dim = rulerDimension(ruler(400, 0, 0), DIM_FONT_PX)!;
-    expect(dim.t).toBeCloseTo(23.4, 5);
-    expect(dim.t - dim.plate.halfW).toBeGreaterThanOrEqual(7);
+    expect(dim.plateAt).toBeCloseTo(23.4, 5);
+    expect(dim.plateAt - dim.plate.halfW).toBeGreaterThanOrEqual(7);
   });
 
   it('states nothing for a segment shorter than a centimetre', () => {
