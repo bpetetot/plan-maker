@@ -90,6 +90,29 @@ describe('clicking a room', () => {
   });
 });
 
+// One euclidean predicate for click-vs-drag, the Plan drag's (ADR 0030): 4 px
+// of pointer travel is a drag, whatever the axes say.
+describe('the click threshold', () => {
+  it('still reads a tiny wobble as a room click', async () => {
+    const { svg } = await setup();
+    const c = clientAt(svg, 200, 200);
+    await pointer(svg, 'pointerdown', { button: 0, ...c });
+    await pointer(svg, 'pointermove', { clientX: c.clientX + 2, clientY: c.clientY + 2 });
+    await pointer(svg, 'pointerup');
+    expect(panelTitle()).toBe('Room');
+  });
+
+  it('reads a 3-by-3 px diagonal as a marquee — the per-axis box called it a click', async () => {
+    const { svg } = await setup();
+    const c = clientAt(svg, 200, 200);
+    await pointer(svg, 'pointerdown', { button: 0, ...c });
+    await pointer(svg, 'pointermove', { clientX: c.clientX + 3, clientY: c.clientY + 3 });
+    await pointer(svg, 'pointerup');
+    // hypot(3, 3) ≈ 4.24 ≥ 4: an empty 3 px marquee, selecting nothing
+    expect(panel()).toBeNull();
+  });
+});
+
 describe('the tool panel reading a room', () => {
   it('titles itself with the room name and states its area', async () => {
     // 4×3 m axis-to-axis, walls 10 cm: interior faces 3,90 × 2,90 m

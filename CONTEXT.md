@@ -363,6 +363,18 @@ is why neither Settles and neither takes an undo entry (ADR 0023). Pure editor
 state: never part of the plan.
 _Avoid_: Gesture, drag operation, manipulation
 
+**Intent**:
+What one pointer event means to the editor, resolved once before anything acts
+on it. The button and a held Space pick the gesture — panning, selecting,
+grabbing, placing — whatever sits under the pointer: Space + drag Pans from a
+Point handle exactly as from the sheet. Alt resolves whether the move is Free,
+read from the event itself. One click threshold tells a click from a drag for
+every gesture alike — a distance travelled on screen, not a box, and a drag
+that returns to its start was still a drag. What was under the pointer names
+the subject; the Intent names the verb, and no gesture re-decides any of it.
+Pure editor behavior: never part of the plan.
+_Avoid_: gesture, action, command
+
 **Grab zone**:
 The invisible area around an element that reacts to the pointer — hover,
 click, drag. It covers the element's body plus a constant on-screen margin,

@@ -3,7 +3,7 @@ import { render } from 'vitest-browser-react';
 import { emptyPlan } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import Editor from './Editor';
-import { blur, key, keyUp } from './testKit';
+import { blur, clientAt, key, keyUp, pointer, viewBoxOf } from './testKit';
 
 beforeEach(() => {
   localStorage.clear();
@@ -33,6 +33,38 @@ describe('space held', () => {
     // Alt+Tab away: the keyup lands in the other window and never arrives here
     await blur(window);
     expect(svg.style.cursor).toBe('default');
+    await unmount();
+  });
+
+  // CONTEXT.md: Pan — "Space + drag" has no exception for what sits under the
+  // pointer. A Point handle used to win over the held Space (ADR 0030).
+  it('pans from a Point handle, leaving the plan alone', async () => {
+    usePlanStore.setState({
+      plan: {
+        points: { a: { id: 'a', x: 0, y: 0 }, b: { id: 'b', x: 400, y: 0 } },
+        walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
+        openings: {},
+        roomLabels: {},
+        rulers: {},
+        texts: {},
+      },
+      planEpoch: 0,
+    });
+    const { container, unmount } = await render(<Editor />);
+    const svg = container.querySelector('svg')!;
+    // Select the wall by marquee, so its endpoint handles show.
+    await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, -50, -50) });
+    await pointer(svg, 'pointermove', clientAt(svg, 450, 50));
+    await pointer(svg, 'pointerup');
+    const handle = svg.querySelectorAll('.point-handle')[1];
+    const before = viewBoxOf(container);
+    await key(' ', { code: 'Space' });
+    await pointer(handle, 'pointerdown', { button: 0, ...clientAt(svg, 400, 0) });
+    await pointer(svg, 'pointermove', clientAt(svg, 300, 50));
+    await pointer(svg, 'pointerup');
+    await keyUp(' ', { code: 'Space' });
+    expect(usePlanStore.getState().plan.points.b).toMatchObject({ x: 400, y: 0 });
+    expect(viewBoxOf(container)).not.toEqual(before);
     await unmount();
   });
 });

@@ -36,14 +36,15 @@ import {
   selectionForRoom,
   toggleRef,
 } from '../model/selection';
-import type { Opening, RoomLabel, TextNote, TextSize, Wall } from '../model/types';
+import type { Opening, RoomLabel, TextNote, TextSize } from '../model/types';
 import type { OpenEdit } from '../store/planStore';
 import { beginEdit, editPlan, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
 import { InlineEditor } from './inlineEditor';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
-import { CLICK_PX } from './gesture';
+import type { GrabTarget, Intent, PointerInput, PointerState, PointerTarget } from './pointer';
+import { IDLE, routePointerCancel, routePointerDown, routePointerMove, routePointerUp } from './pointer';
 import type { Placement, PlacementResult, PlacementStage } from './placement';
 import {
   aimPlacement,
@@ -80,13 +81,14 @@ import { initialToolDefaults } from './tools';
 import { keyHint } from './useAppHotkeys';
 import { useSpaceHeld, useView } from './useView';
 
+// What the live drag holds; when it begins, aims and ends is the pointer
+// router's call (ADR 0030). A Pan holds nothing: the router carries its deltas.
 type Drag =
-  | { kind: 'pan'; x: number; y: number }
   // `b` is mutated on the ref, not held in state: pointer-up would read a
   // stale React value.
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
-  // CONTEXT.md: Plan drag. Its whole composition — snap, threshold, grab point,
-  // settle, selection — lives in planDrag.ts (ADR 0023).
+  // CONTEXT.md: Plan drag. Its whole composition — snap, grab point, settle,
+  // selection — lives in planDrag.ts (ADR 0023).
   | { kind: 'plan'; g: PlanDrag; edit: OpenEdit };
 
 // One line per Placement stage; a missing one is a type error, not a blank hint.
@@ -131,9 +133,11 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
 
 export default function Editor({ ref: commands }: { ref?: React.Ref<EditorCommands> }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // The router says what the stream means; `drag` holds what it advances.
+  const pointerState = useRef<PointerState>(IDLE);
   const drag = useRef<Drag | null>(null);
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
-    useView(svgRef, () => drag.current?.kind === 'pan');
+    useView(svgRef, () => pointerState.current.phase === 'pan');
   const plan = usePlanStore((s) => s.plan);
   const planEpoch = usePlanStore((s) => s.planEpoch);
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0);
@@ -177,12 +181,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // just-mounted editor and commits it empty before a key can land.
   const placingText = useRef(false);
   const space = useSpaceHeld();
-  // Tracked, not sampled: the snap toggle shows the *effective* state, so Alt
-  // transitions must re-render. The keyup after an Alt+Tab never arrives.
+  // Tracked only so the snap toggle re-renders on Alt transitions: every
+  // gesture reads Alt off its own event (ADR 0007, ADR 0030).
   const altHeld = useKeyHold('Alt');
-  // Alt inverts the current snap state for the gesture (ADR 0007).
-  const isFree = (alt: boolean) => !snapEnabled !== alt;
-  const free = isFree(altHeld);
+  // Alt inverts the current snap state (ADR 0007).
+  const free = !snapEnabled !== altHeld;
   const placementEnv = (freeNow: boolean) => ({ pxPerCm: pxPerCm(), free: freeNow, defaults });
 
   // Fit on any plan replacement (open, restore, reset); mount included, which
@@ -214,7 +217,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // A room whose boundary does not resolve is unselectable, so it must not
   // announce itself either: the tint tracks what a click would select.
   const hovered =
-    tool === 'select' && !dragNow && hoverRoom
+    tool === 'select' && pointerState.current.phase === 'idle' && hoverRoom
       ? (rooms.find((room) => roomKey(room) === hoverRoom) ?? null)
       : null;
   const hoveredRoom = hovered && roomWallIds(plan, hovered) ? hovered : null;
@@ -300,63 +303,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     setMovingOpeningId(live && spec.kind === 'opening' && d.moved ? spec.id : null);
   };
 
-  const onSvgPointerDown = (e: React.PointerEvent) => {
-    const svg = svgRef.current!;
-    if (drag.current) {
-      svg.setPointerCapture(e.pointerId);
-      return;
-    }
-    if (space || e.button === 1) {
-      drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
-      svg.setPointerCapture(e.pointerId);
-      return;
-    }
-    if (e.button !== 0) return;
-    // An open Text editor swallows the click: it commits on blur, and the sheet
-    // must not place a second Text or start a marquee underneath it.
-    if (textEditing) return;
-    const c = toPlan(e.clientX, e.clientY);
-    if (placement) {
-      // Alt off the event for a Text and off the tracked state for the others:
-      // an inconsistency this move preserves rather than settles.
-      applyPlacement(
-        clickPlacement(placement, plan, c, placementEnv(placement.tool === 'text' ? isFree(e.altKey) : free)),
-      );
-      return;
-    }
-    drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
-    setHoverRoom(null);
-    setMarquee({ a: c, b: c });
-    svg.setPointerCapture(e.pointerId);
-  };
-
-  const onElementPointerDown = (
-    ref: ElementRef,
-    e: React.PointerEvent,
-    soloDrag: (c: Vec) => PlanDragSpec,
-  ) => {
-    if (e.button !== 0 || space) return;
-    if (e.shiftKey) {
-      // Or the svg handler starts a marquee on top of this toggle.
-      e.stopPropagation();
-      setSel((s) => toggleRef(s, ref));
-      return;
-    }
-    const c = toPlan(e.clientX, e.clientY);
-    if (sel.length > 1 && isSelected(sel, ref)) {
-      startPlanDrag({
-        kind: 'group',
-        refs: sel,
-        start: c,
-        clickRef: ref,
-        refPoint: referencePoint(plan, sel, c),
-      });
-    } else {
-      setSel([ref]);
-      startPlanDrag(soloDrag(c));
-    }
-  };
-
   // A single ref-shaped element dragged alone is a group of one: same rigid
   // translation, same grid realignment.
   const soloGroup = (refs: ElementRef[], c: Vec): PlanDragSpec => ({
@@ -366,81 +312,224 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     refPoint: referencePoint(plan, refs, c),
   });
 
-  const onSvgPointerMove = (e: React.PointerEvent) => {
-    const c = toPlan(e.clientX, e.clientY);
-    const d = drag.current;
-    if (d) {
-      if (d.kind === 'pan') {
-        panByPx(e.clientX - d.x, e.clientY - d.y);
-        drag.current = { kind: 'pan', x: e.clientX, y: e.clientY };
-      } else if (d.kind === 'marquee') {
-        d.b = c;
-        setMarquee({ a: d.a, b: c });
-      } else {
-        // e.altKey, not the tracked state: correct even when Alt went down
-        // before the window had focus.
-        const next = aimPlanDrag(d.g, c, { pxPerCm: pxPerCm(), free: isFree(e.altKey) });
-        drag.current = { kind: 'plan', g: next, edit: d.edit };
-        showPlanDrag(next, d.edit, true);
+  // The one place the stream converts to plan coordinates.
+  const pointerInput = (e: React.PointerEvent): PointerInput => ({
+    pointerId: e.pointerId,
+    button: e.button,
+    shiftKey: e.shiftKey,
+    altKey: e.altKey,
+    clientX: e.clientX,
+    clientY: e.clientY,
+    at: toPlan(e.clientX, e.clientY),
+  });
+
+  const pointerCtx = () => ({
+    space,
+    snapEnabled,
+    placementOpen: placement !== null,
+    textEditing: textEditing !== null,
+  });
+
+  // One capture protocol: whatever the source, a gesture holds the svg.
+  const capture = (e: React.PointerEvent) => svgRef.current!.setPointerCapture(e.pointerId);
+
+  // A grabbed member of a multi-selection drags the group; anything else alone.
+  const grabSpec = (target: GrabTarget, c: Vec, additive: boolean): PlanDragSpec | null => {
+    switch (target.kind) {
+      case 'element': {
+        const ref = target.ref;
+        if (sel.length > 1 && isSelected(sel, ref)) {
+          return {
+            kind: 'group',
+            refs: sel,
+            start: c,
+            clickRef: ref,
+            refPoint: referencePoint(plan, sel, c),
+          };
+        }
+        setSel([ref]);
+        if (ref.type === 'opening') {
+          const opening = plan.openings[ref.id];
+          return {
+            kind: 'opening',
+            id: ref.id,
+            // Drawn, not stored: on a shrunk wall the glyph sits on its Rail
+            // while the offset still holds the wish.
+            grabDelta:
+              (openingPlacement(plan, opening)?.offset ?? opening.offset) -
+              projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
+          };
+        }
+        return soloGroup([ref], c);
       }
-      return;
+      case 'handle': {
+        const h = target.handle;
+        if (h.type === 'point') {
+          const p = plan.points[h.id];
+          return p ? { kind: 'point', id: p.id, grabDelta: { x: p.x - c.x, y: p.y - c.y } } : null;
+        }
+        const p = plan.rulers[h.id]?.[h.end];
+        return p
+          ? { kind: 'rulerEnd', id: h.id, end: h.end, grabDelta: { x: p.x - c.x, y: p.y - c.y } }
+          : null;
+      }
+      case 'dim': {
+        const wall = plan.walls[target.wallId];
+        if (!wall) return null;
+        // The drawn position, not the stored wish: a wall shortened since the
+        // last drag rails the plate elsewhere, and the grab must start there.
+        const t = railedDimT(plan, wall, dimSide(plan, wall), wall.dimPlacement?.t ?? 0.5);
+        const textT = t * wallLength(plan, wall);
+        return { kind: 'dim', id: wall.id, grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t };
+      }
+      case 'label': {
+        const { block, label } = target;
+        const grabDelta = { x: block.x - c.x, y: block.y - c.y };
+        if (label) {
+          return { kind: 'label', id: label.id, room: block.room ?? null, grabDelta, additive, prev: sel };
+        }
+        return block.room ? { kind: 'newLabel', room: block.room, grabDelta, additive, prev: sel } : null;
+      }
     }
-    if (placement) {
-      setPlacement(aimPlacement(placement, plan, c, placementEnv(free)));
-      return;
-    }
-    // The browser's hit test decides what a click takes: anything above the
-    // sheet outranks the room, except the block the room is clicked by.
-    const target = e.target as Element;
-    const onSheet = target === svgRef.current || target.classList?.contains(ROOM_TEXT_HIT);
-    const room = onSheet ? roomAt(rooms, c.x, c.y) : null;
-    // Same value bails React out: tracking costs a render only on a change.
-    setHoverRoom(room ? roomKey(room) : null);
   };
+
+  const dispatch = (intent: Intent, e: React.PointerEvent) => {
+    switch (intent.type) {
+      case 'none':
+        return;
+      case 'toggleSelection':
+        setSel((s) => toggleRef(s, intent.ref));
+        return;
+      case 'beginPan':
+        capture(e);
+        return;
+      case 'beginMarquee':
+        drag.current = {
+          kind: 'marquee',
+          additive: intent.additive,
+          prev: sel,
+          a: intent.at,
+          b: intent.at,
+        };
+        setHoverRoom(null);
+        setMarquee({ a: intent.at, b: intent.at });
+        capture(e);
+        return;
+      case 'beginGrab': {
+        const spec = grabSpec(intent.target, intent.at, intent.additive);
+        // A target with nothing to edit starts no gesture: the router must not
+        // stay in a grab it would otherwise hold until an unrelated up.
+        if (!spec) {
+          pointerState.current = IDLE;
+          return;
+        }
+        startPlanDrag(spec);
+        capture(e);
+        return;
+      }
+      case 'placementClick':
+        if (placement) applyPlacement(clickPlacement(placement, plan, intent.at, placementEnv(intent.free)));
+        return;
+      case 'panBy':
+        panByPx(intent.dxPx, intent.dyPx);
+        return;
+      case 'aimMarquee': {
+        const g = drag.current;
+        if (g?.kind !== 'marquee') return;
+        g.b = intent.at;
+        setMarquee({ a: g.a, b: intent.at });
+        return;
+      }
+      case 'aimGrab': {
+        const g = drag.current;
+        if (g?.kind !== 'plan') return;
+        const next = aimPlanDrag(g.g, intent.at, {
+          pxPerCm: pxPerCm(),
+          free: intent.free,
+          moved: intent.moved,
+        });
+        drag.current = { kind: 'plan', g: next, edit: g.edit };
+        showPlanDrag(next, g.edit, true);
+        return;
+      }
+      case 'aimPlacement':
+        if (placement) setPlacement(aimPlacement(placement, plan, intent.at, placementEnv(intent.free)));
+        return;
+      case 'hover': {
+        // The browser's hit test decides what a click takes: anything above the
+        // sheet outranks the room, except the block the room is clicked by.
+        const target = e.target as Element;
+        const onSheet = target === svgRef.current || target.classList?.contains(ROOM_TEXT_HIT);
+        const room = onSheet ? roomAt(rooms, intent.at.x, intent.at.y) : null;
+        // Same value bails React out: tracking costs a render only on a change.
+        setHoverRoom(room ? roomKey(room) : null);
+        return;
+      }
+      case 'end': {
+        const g = drag.current;
+        drag.current = null;
+        if (g?.kind === 'marquee') {
+          if (intent.moved) {
+            const captured = elementsInRect(plan, g.a, g.b, measuresVisible);
+            setSel(g.additive ? [...g.prev, ...captured.filter((r) => !isSelected(g.prev, r))] : captured);
+          } else {
+            setSel(selectionForRoom(plan, roomAt(rooms, g.a.x, g.a.y), g.additive, g.prev));
+          }
+          setMarquee(null);
+        } else if (g?.kind === 'plan') {
+          // Settle included (CONTEXT.md: Settle) — inside the same Edit.
+          const landed = commitPlanDrag(g.g);
+          showPlanDrag(landed, g.edit, false);
+          if (landed.selection) setSel(landed.selection);
+        }
+        return;
+      }
+      case 'cancel': {
+        // The browser took the pointer — a scroll gesture, a palm, a rotation.
+        // The drag never lands: it drops what it holds (ADR 0018).
+        const g = drag.current;
+        drag.current = null;
+        if (g?.kind === 'marquee') setMarquee(null);
+        else if (g?.kind === 'plan') {
+          // Landing on the pre-drag plan closes the Edit and records nothing:
+          // it is the snapshot beginEdit took.
+          g.edit.land(g.g.orig);
+          setMovingOpeningId(null);
+        }
+        return;
+      }
+    }
+  };
+
+  const routed = (e: React.PointerEvent, [next, intent]: [PointerState, Intent]) => {
+    pointerState.current = next;
+    dispatch(intent, e);
+  };
+
+  const onDown = (e: React.PointerEvent, target: PointerTarget) =>
+    routed(e, routePointerDown(pointerState.current, pointerInput(e), target, pointerCtx()));
+
+  // Every non-svg source stops the bubble and declares what was hit: a down
+  // reaches the router exactly once, with the most specific target.
+  const downFrom = (target: PointerTarget) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    onDown(e, target);
+  };
+
+  const onMove = (e: React.PointerEvent) =>
+    routed(e, routePointerMove(pointerState.current, pointerInput(e), pointerCtx()));
+
+  const onUp = (e: React.PointerEvent) => routed(e, routePointerUp(pointerState.current, pointerInput(e)));
+
+  const onCancel = (e: React.PointerEvent) =>
+    routed(e, routePointerCancel(pointerState.current, pointerInput(e)));
 
   const onSvgContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (drag.current) return;
+    if (pointerState.current.phase !== 'idle') return;
     const dropped = placement && cancelPlacement(placement);
     if (dropped) setPlacement(dropped);
     else if (tool !== 'select') switchTool('select');
-  };
-
-  const onSvgPointerUp = () => {
-    const d = drag.current;
-    if (!d) return;
-    drag.current = null;
-    if (d.kind === 'pan') return;
-    if (d.kind === 'marquee') {
-      const wPx = Math.abs(d.b.x - d.a.x) * pxPerCm();
-      const hPx = Math.abs(d.b.y - d.a.y) * pxPerCm();
-      if (wPx < CLICK_PX && hPx < CLICK_PX) {
-        setSel(selectionForRoom(plan, roomAt(rooms, d.a.x, d.a.y), d.additive, d.prev));
-      } else {
-        const captured = elementsInRect(plan, d.a, d.b, measuresVisible);
-        setSel(d.additive ? [...d.prev, ...captured.filter((r) => !isSelected(d.prev, r))] : captured);
-      }
-      setMarquee(null);
-      return;
-    }
-    // Settle included (CONTEXT.md: Settle) — inside the same Edit.
-    const landed = commitPlanDrag(d.g);
-    showPlanDrag(landed, d.edit, false);
-    if (landed.selection) setSel(landed.selection);
-  };
-
-  // The browser took the pointer — a scroll gesture, a palm, a rotation. The
-  // drag never lands: it drops what it holds, like every other cancel (ADR 0018).
-  const onSvgPointerCancel = () => {
-    const d = drag.current;
-    if (!d) return;
-    drag.current = null;
-    if (d.kind === 'marquee') return setMarquee(null);
-    if (d.kind === 'pan') return;
-    // Landing on the pre-drag plan closes the Edit and records nothing: it is
-    // the snapshot beginEdit took.
-    d.edit.land(d.g.orig);
-    setMovingOpeningId(null);
   };
 
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
@@ -472,29 +561,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // Room labels are never selected (CONTEXT.md: Selection): a line is dragged
   // and double-click-edited directly.
   const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
-    if (tool !== 'select' || e.button !== 0 || space) return;
-    const c = toPlan(e.clientX, e.clientY);
-    const grabDelta = { x: block.x - c.x, y: block.y - c.y };
-    if (label) {
-      startPlanDrag({
-        kind: 'label',
-        id: label.id,
-        room: block.room ?? null,
-        start: c,
-        grabDelta,
-        additive: e.shiftKey,
-        prev: sel,
-      });
-    } else if (block.room) {
-      startPlanDrag({
-        kind: 'newLabel',
-        start: c,
-        room: block.room,
-        grabDelta,
-        additive: e.shiftKey,
-        prev: sel,
-      });
-    }
+    e.stopPropagation();
+    onDown(e, { kind: 'label', block, label });
   };
 
   const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
@@ -571,7 +639,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         return {
           selected,
           hovered: hoverWall === ref.id && selectable,
-          onPointerDown: selectable ? (e) => onDimPointerDown(plan.walls[ref.id], e) : undefined,
+          onPointerDown: selectable ? downFrom({ kind: 'dim', wallId: ref.id }) : undefined,
         };
       case 'opening':
         return { selected };
@@ -581,27 +649,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         return {
           selected,
           hidden: textEditing?.id === ref.id,
-          onPointerDown: selectable
-            ? (e) => onElementPointerDown(ref, e, (c) => soloGroup([ref], c))
-            : undefined,
+          onPointerDown: selectable ? downFrom({ kind: 'element', ref }) : undefined,
           onDoubleClick: selectable ? (e) => onTextDoubleClick(plan.texts[ref.id], e) : undefined,
         };
     }
-  };
-
-  const onDimPointerDown = (wall: Wall, e: React.PointerEvent) => {
-    if (e.button !== 0 || space) return;
-    const c = toPlan(e.clientX, e.clientY);
-    // The drawn position, not the stored wish: a wall shortened since the last
-    // drag rails the plate elsewhere, and the grab must start from there.
-    const t = railedDimT(plan, wall, dimSide(plan, wall), wall.dimPlacement?.t ?? 0.5);
-    const textT = t * wallLength(plan, wall);
-    startPlanDrag({
-      kind: 'dim',
-      id: wall.id,
-      start: c,
-      grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t,
-    });
   };
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
@@ -636,7 +687,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         style={{ width: '100%', height: '100%', background: 'var(--sheet)', display: 'block', cursor }}
-        onPointerDown={onSvgPointerDown}
+        onPointerDown={(e) => onDown(e, { kind: 'sheet' })}
         // Placing a Text just mounted and focused the editor; the paired
         // mousedown's focus fixup would blur it. Cancel only that one.
         onMouseDown={(e) => {
@@ -645,9 +696,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             e.preventDefault();
           }
         }}
-        onPointerMove={onSvgPointerMove}
-        onPointerUp={onSvgPointerUp}
-        onPointerCancel={onSvgPointerCancel}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onCancel}
         // A pointer that left the sheet hovers nothing; only pointermove would
         // ever clear the tint otherwise, and it stops arriving.
         onPointerLeave={() => setHoverRoom(null)}
@@ -680,11 +731,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                     wall={wall}
                     pxPerCm={zoomScale}
                     cursor="move"
-                    onPointerDown={(e) =>
-                      onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) =>
-                        soloGroup([{ type: 'wall', id: wall.id }], c),
-                      )
-                    }
+                    onPointerDown={downFrom({ kind: 'element', ref: { type: 'wall', id: wall.id } })}
                     onPointerEnter={() => setHoverWall(wall.id)}
                     onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
                   />
@@ -696,18 +743,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                     plan={plan}
                     opening={opening}
                     pxPerCm={zoomScale}
-                    onPointerDown={(e) =>
-                      onElementPointerDown({ type: 'opening', id: opening.id }, e, (c) => ({
-                        kind: 'opening',
-                        id: opening.id,
-                        start: c,
-                        // Drawn, not stored: on a shrunk wall the glyph sits
-                        // on its Rail while the offset still holds the wish.
-                        grabDelta:
-                          (openingPlacement(plan, opening)?.offset ?? opening.offset) -
-                          projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
-                      }))
-                    }
+                    onPointerDown={downFrom({ kind: 'element', ref: { type: 'opening', id: opening.id } })}
                   />
                 ))}
               {/* Only while drawn: measures hidden ⇒ a Ruler is inert (ticket 02).
@@ -718,11 +754,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                   <RulerGrabZone
                     key={ruler.id}
                     ruler={ruler}
-                    onPointerDown={(e) =>
-                      onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) =>
-                        soloGroup([{ type: 'ruler', id: ruler.id }], c),
-                      )
-                    }
+                    onPointerDown={downFrom({ kind: 'element', ref: { type: 'ruler', id: ruler.id } })}
                     onPointerEnter={() => setHoverRuler(ruler.id)}
                     onPointerLeave={() => setHoverRuler((h) => (h === ruler.id ? null : h))}
                   />
@@ -740,17 +772,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
               x={p.x}
               y={p.y}
               pxPerCm={zoomScale}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.stopPropagation();
-                const c = toPlan(e.clientX, e.clientY);
-                startPlanDrag({
-                  kind: 'point',
-                  id: p.id,
-                  grabDelta: { x: p.x - c.x, y: p.y - c.y },
-                });
-                svgRef.current!.setPointerCapture(e.pointerId);
-              }}
+              onPointerDown={downFrom({ kind: 'handle', handle: { type: 'point', id: p.id } })}
             />
           ))}
         {selRuler &&
@@ -763,18 +785,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                 x={p.x}
                 y={p.y}
                 pxPerCm={zoomScale}
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  e.stopPropagation();
-                  const c = toPlan(e.clientX, e.clientY);
-                  startPlanDrag({
-                    kind: 'rulerEnd',
-                    id: selRuler.id,
-                    end,
-                    grabDelta: { x: p.x - c.x, y: p.y - c.y },
-                  });
-                  svgRef.current!.setPointerCapture(e.pointerId);
-                }}
+                onPointerDown={downFrom({
+                  kind: 'handle',
+                  handle: { type: 'rulerEnd', id: selRuler.id, end },
+                })}
               />
             );
           })}

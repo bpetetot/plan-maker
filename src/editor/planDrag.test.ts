@@ -10,9 +10,11 @@ import { buildPlan, squareRoomPlan } from '../model/testHelpers';
 import type { Plan } from '../model/types';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
 
-// pxPerCm 1 puts the click threshold at 4 cm and the snap tolerance at 14 cm.
-const AIM = { pxPerCm: 1, free: false };
-const FREE = { pxPerCm: 1, free: true };
+// pxPerCm 1 puts the snap tolerance at 14 cm. The click-vs-drag verdict comes
+// with the env: the pointer router owns the threshold (ADR 0030).
+const AIM = { pxPerCm: 1, free: false, moved: true };
+const FREE = { pxPerCm: 1, free: true, moved: true };
+const CLICK = { pxPerCm: 1, free: false, moved: false };
 
 const wallPlan = () => {
   let ids = { a: '', b: '', wall: '' };
@@ -137,7 +139,7 @@ describe('a group drag', () => {
 
   it('stays put below the click threshold', () => {
     const { plan, wall, a } = wallPlan();
-    const drag = aimPlanDrag(groupDrag(plan, wall, at(0, 0)), at(103, 2), AIM);
+    const drag = aimPlanDrag(groupDrag(plan, wall, at(0, 0)), at(103, 2), CLICK);
     expect(drag.moved).toBe(false);
     expect(drag.plan).toBe(plan);
     expect(drag.plan.points[a]).toMatchObject({ x: 0, y: 0 });
@@ -167,7 +169,7 @@ describe('a group drag', () => {
   it('falls back to the clicked element when the drag was really a click', () => {
     const { plan, wall } = wallPlan();
     const clickRef: ElementRef = { type: 'wall', id: wall };
-    const drag = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0), clickRef), at(103, 2), AIM));
+    const drag = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0), clickRef), at(103, 2), CLICK));
     expect(drag.selection).toEqual([clickRef]);
   });
 
@@ -192,11 +194,11 @@ describe('an opening drag', () => {
   };
 
   const openingDrag = (plan: Plan, opening: string, grabDelta: number) =>
-    beginPlanDrag(plan, { kind: 'opening', id: opening, start: at(200, 0), grabDelta });
+    beginPlanDrag(plan, { kind: 'opening', id: opening, grabDelta });
 
   it('stays put below the click threshold', () => {
     const { plan, opening } = openingPlan();
-    const drag = aimPlanDrag(openingDrag(plan, opening, 0), at(203, 0), AIM);
+    const drag = aimPlanDrag(openingDrag(plan, opening, 0), at(203, 0), CLICK);
     expect(drag.moved).toBe(false);
     expect(drag.plan.openings[opening].offset).toBe(200);
   });
@@ -226,12 +228,11 @@ describe('an opening drag', () => {
 });
 
 describe('a dimension-placement drag', () => {
-  const dimDrag = (plan: Plan, wall: string) =>
-    beginPlanDrag(plan, { kind: 'dim', id: wall, start: at(200, 10), grabDelta: 0 });
+  const dimDrag = (plan: Plan, wall: string) => beginPlanDrag(plan, { kind: 'dim', id: wall, grabDelta: 0 });
 
   it('selects the wall when the drag was really a click', () => {
     const { plan, wall } = wallPlan();
-    const drag = commitPlanDrag(aimPlanDrag(dimDrag(plan, wall), at(202, 11), AIM));
+    const drag = commitPlanDrag(aimPlanDrag(dimDrag(plan, wall), at(202, 11), CLICK));
     expect(drag.moved).toBe(false);
     expect(drag.plan.walls[wall].dimPlacement).toBeUndefined();
     expect(drag.selection).toEqual([{ type: 'wall', id: wall }]);
@@ -274,7 +275,6 @@ describe('a room-label drag', () => {
       kind: 'label',
       id,
       room,
-      start: at(200, 200),
       grabDelta: at(0, 0),
       additive,
       prev,
@@ -282,7 +282,7 @@ describe('a room-label drag', () => {
 
   it('stays put below the click threshold and selects the Room it names', () => {
     const { plan, room, id } = labelPlan();
-    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(202, 201), AIM));
+    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(202, 201), CLICK));
     expect(drag.plan.roomLabels[id]).toMatchObject({ x: 200, y: 200 });
     expect(drag.selection).toEqual(selectionForRoom(plan, room, false, []));
     expect(drag.selection).toHaveLength(4);
@@ -304,7 +304,7 @@ describe('a room-label drag', () => {
   it('unions rather than replaces when the click is additive', () => {
     const { plan, room, id } = labelPlan();
     const prev: ElementRef[] = [{ type: 'text', id: 'keep-me' }];
-    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room, true, prev), at(201, 200), AIM));
+    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room, true, prev), at(201, 200), CLICK));
     expect(drag.selection).toContainEqual(prev[0]);
     expect(drag.selection).toHaveLength(5);
   });
@@ -315,7 +315,6 @@ describe('a new-label drag', () => {
     beginPlanDrag(plan, {
       kind: 'newLabel',
       room,
-      start: at(200, 200),
       grabDelta: at(0, 0),
       additive: false,
       prev: [],
@@ -324,7 +323,7 @@ describe('a new-label drag', () => {
   it('creates nothing below the threshold: a plain click must not touch the plan', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const drag = commitPlanDrag(aimPlanDrag(newLabelDrag(plan, room), at(202, 201), AIM));
+    const drag = commitPlanDrag(aimPlanDrag(newLabelDrag(plan, room), at(202, 201), CLICK));
     expect(Object.keys(drag.plan.roomLabels)).toHaveLength(0);
     expect(drag.selection).toHaveLength(4);
   });

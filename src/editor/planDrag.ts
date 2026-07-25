@@ -19,7 +19,7 @@ import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
 import { railedDimT } from '../model/rail';
 import type { Plan } from '../model/types';
-import { CLICK_PX, snapTolerance } from './gesture';
+import { snapTolerance } from './gesture';
 
 export type PlanDragSpec =
   // `grabDelta` fixes the grab point so the handle never recenters on the cursor.
@@ -39,24 +39,22 @@ export type PlanDragSpec =
       kind: 'label';
       id: string;
       room: Room | null;
-      start: Vec;
       grabDelta: Vec;
       additive: boolean;
       prev: ElementRef[];
     }
-  // The label is created only past the click threshold: a plain click must not
+  // The label is created only once the gesture moved: a plain click must not
   // touch the plan.
   | {
       kind: 'newLabel';
       room: Room;
-      start: Vec;
       grabDelta: Vec;
       additive: boolean;
       prev: ElementRef[];
     }
   // `grabDelta` is along the wall here, not a Vec: both slide on a Rail.
-  | { kind: 'opening'; id: string; start: Vec; grabDelta: number }
-  | { kind: 'dim'; id: string; start: Vec; grabDelta: number }
+  | { kind: 'opening'; id: string; grabDelta: number }
+  | { kind: 'dim'; id: string; grabDelta: number }
   // A Ruler endpoint: snaps with the placement ladder, wall bodies included.
   | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec };
 
@@ -77,6 +75,8 @@ export interface AimEnv {
   pxPerCm: number;
   /** Read off the live event, never the tracked state (ADR 0007). */
   free: boolean;
+  /** The click-vs-drag verdict, owned by the pointer router (ADR 0030). */
+  moved: boolean;
 }
 
 export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
@@ -87,12 +87,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const spec = drag.spec;
   const tolerance = snapTolerance(env.pxPerCm);
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
-  // The threshold, written once for the whole module. A handle has no click to
-  // tell a drag from, so it reads as moved from its first aim.
-  const moved =
-    'start' in spec
-      ? drag.moved || Math.hypot(at.x - spec.start.x, at.y - spec.start.y) * env.pxPerCm >= CLICK_PX
-      : true;
+  const moved = env.moved;
 
   switch (spec.kind) {
     // A Point drag aims at Points and the grid, never at a wall body: it would
