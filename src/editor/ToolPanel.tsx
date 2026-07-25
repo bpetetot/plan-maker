@@ -29,6 +29,7 @@ import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
 import type { Plan, TextSize, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
+import { editPlan } from '../store/planStore';
 import type { Tool, ToolDefaults } from './tools';
 
 const TEXT_SIZES: TextSize[] = ['S', 'M', 'L'];
@@ -46,20 +47,10 @@ interface ToolPanelProps {
   tool: Tool;
   defaults: ToolDefaults;
   setDefaults: (updater: (defaults: ToolDefaults) => ToolDefaults) => void;
-  setPlan: (updater: (plan: Plan) => Plan) => void;
   onDelete: () => void;
 }
 
-export function ToolPanel({
-  plan,
-  rooms,
-  sel,
-  tool,
-  defaults,
-  setDefaults,
-  setPlan,
-  onDelete,
-}: ToolPanelProps) {
+export function ToolPanel({ plan, rooms, sel, tool, defaults, setDefaults, onDelete }: ToolPanelProps) {
   if (sel.length === 0) {
     // Ruler configures nothing pre-placement; Text picks its size default here.
     if (tool === 'select' || tool === 'ruler') return null;
@@ -121,7 +112,7 @@ export function ToolPanel({
                 max={WALL_THICKNESS_MAX}
                 value={wall.thickness}
                 onCommit={(value) => {
-                  setPlan((p) => setWallThickness(p, wall.id, value));
+                  editPlan((p) => setWallThickness(p, wall.id, value));
                   // sticky measure (CONTEXT.md: Tool defaults) — last used wins
                   setDefaults((d) => ({ ...d, wallThickness: value }));
                 }}
@@ -145,7 +136,7 @@ export function ToolPanel({
         <SizeSection
           value={text.size}
           onSelect={(size) => {
-            setPlan((p) => setTextSize(p, text.id, size));
+            editPlan((p) => setTextSize(p, text.id, size));
             // sticky preset (CONTEXT.md: Tool defaults) — last used wins
             setDefaults((d) => ({ ...d, textSize: size }));
           }}
@@ -158,11 +149,10 @@ export function ToolPanel({
           <NumberField
             value={opening.width}
             onCommit={(width) => {
-              const next = setOpeningWidth(plan, opening.id, width);
-              setPlan(() => next);
               // sticky measure (CONTEXT.md: Tool defaults) — a width that will not
               // fit is rejected, so adopt what applied, never the raw entry
-              const applied = next.openings[opening.id].width;
+              const landed = editPlan((p) => setOpeningWidth(p, opening.id, width));
+              const applied = landed.openings[opening.id].width;
               setDefaults((d) =>
                 opening.type === 'door' ? { ...d, doorWidth: applied } : { ...d, windowWidth: applied },
               );
@@ -172,8 +162,8 @@ export function ToolPanel({
       )}
       {opening?.type === 'door' && (
         <FlipSection
-          onHinge={() => setPlan((p) => toggleHingeSide(p, opening.id))}
-          onSwing={() => setPlan((p) => toggleSwing(p, opening.id))}
+          onHinge={() => editPlan((p) => toggleHingeSide(p, opening.id))}
+          onSwing={() => editPlan((p) => toggleSwing(p, opening.id))}
         />
       )}
       <button className="danger panel-delete" title="Delete" aria-label="Delete" onClick={onDelete}>

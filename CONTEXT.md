@@ -124,12 +124,21 @@ several labels in one room (e.g. deleting a dividing wall merges two named
 rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room name, tag
 
+**Edit**:
+What one undo takes back. Most edits are a single change to the plan, but a
+Plan drag is one Edit stretched over its whole run: it opens, is aimed as many
+times as the pointer moves, and lands — and only the landing is a plan the user
+could be given back. What an Edit writes before landing is never persisted, and never
+takes an undo entry of its own. An Edit that is opened and never landed is
+closed by the next one (ADR 0028).
+_Avoid_: History group, transaction, batch
+
 **Settle**:
-What the plan does the moment an edit that moved a Point or a Wall lands:
-coincident Points merge into one, walls that touch or cross away from a shared
-Point split at the junction, and every Room label reconciles against the plan
-the edit started from. An edit is never observable half-settled — the whole
-settling belongs to the gesture that caused it, and one undo takes it back.
+What the plan does the moment an Edit that moved or created a Point or a Wall
+lands: coincident Points merge into one, walls that touch or cross away from a
+shared Point split at the junction, and every Room label reconciles against the
+plan the edit started from. An edit is never observable half-settled — the whole
+settling belongs to the Edit that caused it, and one undo takes it back.
 _Avoid_: Normalize, cleanup, heal
 
 **Measure**:

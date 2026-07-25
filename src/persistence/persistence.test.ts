@@ -5,7 +5,7 @@ import { addRoomLabel } from '../model/operations';
 import { detectRooms } from '../model/rooms';
 import { buildPlan } from '../model/testHelpers';
 import { emptyPlan } from '../model/types';
-import { usePlanStore } from '../store/planStore';
+import { beginEdit, editPlan, usePlanStore } from '../store/planStore';
 import { startAutosave } from './autosave';
 import { runMigrations, SCHEMA_VERSION, validatePlan, type StoredRecord } from './schema';
 import { BACKUP_KEY, CURRENT_KEY, loadPlan, savePlan } from './storage';
@@ -199,8 +199,8 @@ describe('autosave', () => {
     usePlanStore.setState({ plan: emptyPlan() });
     const stop = startAutosave({ debounceMs: 400 });
 
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'Two', 2, 2)[0]);
+    editPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
+    editPlan((p) => addRoomLabel(p, 'Two', 2, 2)[0]);
     expect(await get(CURRENT_KEY)).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(500);
@@ -209,11 +209,30 @@ describe('autosave', () => {
     stop();
   });
 
+  it('saves nothing while an Edit is open, then the plan it landed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    usePlanStore.setState({ plan: emptyPlan(), editOpen: false });
+    const stop = startAutosave({ debounceMs: 400 });
+
+    const edit = beginEdit();
+    edit.aim(addRoomLabel(usePlanStore.getState().plan, 'Aimed', 1, 1)[0]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(await get(CURRENT_KEY)).toBeUndefined();
+
+    // The settle can return the aimed plan untouched, so the landing shares its
+    // reference: the save must still happen.
+    edit.land(usePlanStore.getState().plan);
+    await vi.advanceTimersByTimeAsync(500);
+    const record = (await get(CURRENT_KEY)) as StoredRecord;
+    expect(Object.keys(record.plan.roomLabels)).toHaveLength(1);
+    stop();
+  });
+
   it('flushes the pending save on stop', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     usePlanStore.setState({ plan: emptyPlan() });
     const stop = startAutosave({ debounceMs: 400 });
-    usePlanStore.getState().setPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
+    editPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
     stop();
     await vi.advanceTimersByTimeAsync(0);
     vi.useRealTimers();

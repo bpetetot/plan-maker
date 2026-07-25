@@ -37,7 +37,8 @@ import {
   toggleRef,
 } from '../model/selection';
 import type { Opening, RoomLabel, TextNote, TextSize, Wall } from '../model/types';
-import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
+import type { OpenEdit } from '../store/planStore';
+import { beginEdit, editPlan, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
 import { InlineEditor } from './inlineEditor';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
@@ -86,7 +87,7 @@ type Drag =
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
   // CONTEXT.md: Plan drag. Its whole composition — snap, threshold, grab point,
   // settle, selection — lives in planDrag.ts (ADR 0023).
-  | { kind: 'plan'; g: PlanDrag };
+  | { kind: 'plan'; g: PlanDrag; edit: OpenEdit };
 
 // One line per Placement stage; a missing one is a type error, not a blank hint.
 const placementHint = (stage: PlacementStage): string =>
@@ -134,7 +135,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const { view, toPlan, pxPerCm, zoomScale, zoomRatio, canZoomIn, canZoomOut, zoomCenter, panByPx, fitPlan } =
     useView(svgRef, () => drag.current?.kind === 'pan');
   const plan = usePlanStore((s) => s.plan);
-  const setPlan = usePlanStore((s) => s.setPlan);
   const planEpoch = usePlanStore((s) => s.planEpoch);
   const canUndo = useStore(usePlanStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(usePlanStore.temporal, (s) => s.futureStates.length > 0);
@@ -231,7 +231,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // names the Tool it hands back to, which reseeds the placement itself.
   const applyPlacement = (r: PlacementResult) => {
     const next = r.plan;
-    if (next) setPlan(() => next);
+    if (next) editPlan(() => next);
     if (r.tool) switchTool(r.tool);
     else setPlacement(r.placement);
     if (r.selection) setSel(r.selection);
@@ -243,16 +243,13 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   };
 
-  const deleteSelection = useCallback(
-    (selection: ElementRef[]) => {
-      if (selection.length === 0) return;
-      // A room keeps other rooms' walls (ADR 0015); rooms read from the latest
-      // plan, not a render-time closure.
-      setPlan((p) => deleteElements(p, selectionDeletion(p, detectRooms(p), selection)));
-      setSel([]);
-    },
-    [setPlan],
-  );
+  const deleteSelection = useCallback((selection: ElementRef[]) => {
+    if (selection.length === 0) return;
+    // A room keeps other rooms' walls (ADR 0015); rooms read from the latest
+    // plan, not a render-time closure.
+    editPlan((p) => deleteElements(p, selectionDeletion(p, detectRooms(p), selection)));
+    setSel([]);
+  }, []);
 
   const toggleSnap = useCallback(() => togglePreference('snap'), []);
 
@@ -284,11 +281,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     zoomActual: () => zoomCenter(zoomRatio),
   }));
 
-  // A Plan drag always opens a history group — there is no variant that does
-  // not, which is what closes ADR 0022's dangling precondition.
+  // A Plan drag always opens an Edit — there is no variant that does not, and
+  // the handle rides on the drag, so the two end together (ADR 0028).
   const startPlanDrag = (spec: PlanDragSpec) => {
-    beginHistoryGroup();
-    drag.current = { kind: 'plan', g: beginPlanDrag(plan, spec) };
+    drag.current = { kind: 'plan', g: beginPlanDrag(plan, spec), edit: beginEdit() };
     // Or the tint flashes back onto the pre-drag room at pointer-up, and stays
     // there until the next pointermove.
     setHoverRoom(null);
@@ -296,9 +292,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
 
   // Everything the drag wants on screen, in one place. `live` goes false at
   // commit: the placement dims track a slide under way, not one that landed.
-  const showPlanDrag = (d: PlanDrag, live: boolean) => {
+  const showPlanDrag = (d: PlanDrag, edit: OpenEdit, live: boolean) => {
     const spec = d.spec;
-    setPlan(() => d.plan);
+    if (live) edit.aim(d.plan);
+    else edit.land(d.plan);
     setMovingOpeningId(live && spec.kind === 'opening' && d.moved ? spec.id : null);
   };
 
@@ -382,8 +379,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         // e.altKey, not the tracked state: correct even when Alt went down
         // before the window had focus.
         const next = aimPlanDrag(d.g, c, { pxPerCm: pxPerCm(), free: isFree(e.altKey) });
-        drag.current = { kind: 'plan', g: next };
-        showPlanDrag(next, true);
+        drag.current = { kind: 'plan', g: next, edit: d.edit };
+        showPlanDrag(next, d.edit, true);
       }
       return;
     }
@@ -425,11 +422,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       setMarquee(null);
       return;
     }
-    // Settle included (CONTEXT.md: Settle) — inside the same history group.
+    // Settle included (CONTEXT.md: Settle) — inside the same Edit.
     const landed = commitPlanDrag(d.g);
-    showPlanDrag(landed, false);
+    showPlanDrag(landed, d.edit, false);
     if (landed.selection) setSel(landed.selection);
-    endHistoryGroup();
   };
 
   const selKeys = useMemo(() => new Set(sel.map(refKey)), [sel]);
@@ -512,8 +508,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (!ed || value === null) return;
     const name = value.trim();
     if (name === ed.initial) return;
-    if (ed.labelId) setPlan((p) => renameRoomLabel(p, ed.labelId!, name));
-    else if (name) setPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0]);
+    if (ed.labelId) editPlan((p) => renameRoomLabel(p, ed.labelId!, name));
+    else if (name) editPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0]);
   };
 
   const onLineDoubleClick = (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => {
@@ -540,12 +536,12 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (!ed || value === null) return;
     const empty = value.trim() === '';
     if (ed.id) {
-      setPlan((p) => (empty ? deleteText(p, ed.id!) : editTextContent(p, ed.id!, value)));
+      editPlan((p) => (empty ? deleteText(p, ed.id!) : editTextContent(p, ed.id!, value)));
     } else if (!empty) {
       // A placed Text hands back to Select, selected (the 06 auto-select
       // deferral) — mirroring a placed Ruler and Opening.
       const [next, id] = addText(plan, ed.x, ed.y, value, ed.size);
-      setPlan(() => next);
+      editPlan(() => next);
       setSel([{ type: 'text', id }]);
     }
   };
@@ -596,7 +592,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
     if (placement) {
       // Latest plan, not the render closure: the double-click's own clicks just
-      // committed through setPlan and the closure reads stale.
+      // committed through editPlan and the closure reads stale.
       applyPlacement(finishPlacement(placement, usePlanStore.getState().plan));
       return;
     }
@@ -932,7 +928,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         tool={tool}
         defaults={defaults}
         setDefaults={setDefaults}
-        setPlan={setPlan}
         onDelete={() => deleteSelection(sel)}
       />
     </div>

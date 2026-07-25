@@ -11,6 +11,9 @@ export interface AutosaveOptions {
 export function startAutosave({ debounceMs = 400, onError }: AutosaveOptions = {}): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Plan | null = null;
+  // The last plan offered for writing, not the store's previous state: an Edit
+  // can land the very reference its last aim wrote.
+  let seen = usePlanStore.getState().plan;
 
   const write = (plan: Plan) => {
     savePlan(plan).catch((error) => onError?.(error));
@@ -26,8 +29,11 @@ export function startAutosave({ debounceMs = 400, onError }: AutosaveOptions = {
     }
   };
 
-  const unsubscribe = usePlanStore.subscribe((state, previous) => {
-    if (state.plan === previous.plan) return;
+  // An open Edit writes half-settled plans (CONTEXT.md: Edit, Settle) — none of
+  // them is what the user would want back after a crash.
+  const unsubscribe = usePlanStore.subscribe((state) => {
+    if (state.editOpen || state.plan === seen) return;
+    seen = state.plan;
     pending = state.plan;
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(flush, debounceMs);
