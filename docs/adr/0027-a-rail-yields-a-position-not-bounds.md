@@ -73,3 +73,11 @@ They are deliberately asymmetric, and the module says so:
   the editor draws at. The export never drags.
 - The stored ratio's `[0, 1]` schema invariant now rests on the Rail, which
   clamps there, rather than on a guard inside the setter.
+
+## Superseded on its address by ADR 0032
+
+The Opening's Rail — `openingRail`, `railedOpeningOffset` — lives in
+`openings.ts` since ADR 0032, with the noun it binds; `rail.ts` keeps the
+Dimension's alone. Nothing above changes but the file names: the law, the
+asymmetry between the two Rails, and the single implementation of each all
+stand.

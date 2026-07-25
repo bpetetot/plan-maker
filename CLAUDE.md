@@ -18,7 +18,8 @@ idb-keyval (autosave), vite-plugin-pwa.
 
 ## Structure
 
-- `src/model/` — pure domain: types, geometry, snapping, plan operations, room detection
+- `src/model/` — pure domain, one module per noun (walls, openings, rooms,
+  rulers, texts) plus geometry, snapping, and the `settle.ts` graph kernel
 - `src/store/` — zustand plan store, zundo history (drag grouping helpers)
 - `src/persistence/` — schema version + migrations + validation, IndexedDB storage, autosave
 - `src/preferences/` — the per-device preference table (grid, measures, snap, theme)
@@ -37,6 +38,13 @@ idb-keyval (autosave), vite-plugin-pwa.
 - A symbol is `export`ed only when another module imports it — never ahead of a
   hypothetical caller. Add the `export` in the commit that adds the import;
   `knip` enforces it
+- **A test is not a caller** (ADR 0032). An `export` needs a *production*
+  importer: an internal seam kept public for its own test is a frozen seam, and
+  `knip` cannot see it — a test file is a module like any other. Assert the
+  behaviour through the interface that has a real caller
+- A module in `src/model/` is named for a domain noun and owns that noun's
+  readings *and* its writes (ADR 0032); `settle.ts` is the one exception, named
+  for what it does because the graph it settles has no single noun
 - UI icons come from `lucide-react` exclusively — never hand-rolled SVG or
   Unicode glyphs (exception: the zoom-percentage button, which is a text
   indicator)

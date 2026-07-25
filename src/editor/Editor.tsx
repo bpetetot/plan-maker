@@ -28,13 +28,12 @@ import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '
 import type { ElementRef } from '../model/selection';
 import {
   allElements,
-  deleteElements,
+  deleteSelection,
   elementsInRect,
   isSelected,
   refKey,
   referencePoint,
   selectedRoom,
-  selectionDeletion,
   selectionForRoom,
   toggleRef,
 } from '../model/selection';
@@ -249,11 +248,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   };
 
-  const deleteSelection = useCallback((selection: ElementRef[]) => {
+  const deleteSelected = useCallback((selection: ElementRef[]) => {
     if (selection.length === 0) return;
-    // A room keeps other rooms' walls (ADR 0015); rooms read from the latest
-    // plan, not a render-time closure.
-    editPlan((p) => deleteElements(p, selectionDeletion(p, detectRooms(p), selection)));
+    editPlan((p) => deleteSelection(p, selection));
     setSel([]);
   }, []);
 
@@ -276,7 +273,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       // Rulers join only while measures are shown (ticket 02).
       setSel(allElements(plan, measuresVisible));
     },
-    deleteSelection: () => deleteSelection(sel),
+    deleteSelection: () => deleteSelected(sel),
     selectTool: switchTool,
     toggleSnap,
     zoomIn: () => zoomCenter(1 / 1.25),
@@ -964,7 +961,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         tool={tool}
         defaults={defaults}
         setDefaults={setDefaults}
-        onDelete={() => deleteSelection(sel)}
+        onDelete={() => deleteSelected(sel)}
       />
     </div>
   );

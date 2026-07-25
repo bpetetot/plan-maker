@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   allElements,
-  deleteElements,
+  deleteSelection,
   elementsInRect,
   isSelected,
   refKey,
   referencePoint,
   roomContents,
-  roomDeletion,
   roomSelection,
   selectedRoom,
   selectionContents,
-  selectionDeletion,
   toggleRef,
   translateElements,
 } from './selection';
@@ -167,7 +165,7 @@ describe('allElements', () => {
   });
 });
 
-describe('deleteElements', () => {
+describe('deleteSelection', () => {
   it('deletes walls with their openings and orphan points, plus openings', () => {
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -181,7 +179,7 @@ describe('deleteElements', () => {
     const [w1, w2] = Object.values(plan.walls);
     const [, onW2] = Object.values(plan.openings);
 
-    const next = deleteElements(plan, [wallRef(w1.id), openingRef(onW2.id)]);
+    const next = deleteSelection(plan, [wallRef(w1.id), openingRef(onW2.id)]);
 
     expect(next.walls[w1.id]).toBeUndefined();
     expect(next.walls[w2.id]).toBeDefined();
@@ -198,7 +196,7 @@ describe('deleteElements', () => {
     });
     const wall = Object.values(plan.walls)[0];
     const opening = Object.values(plan.openings)[0];
-    const next = deleteElements(plan, [wallRef(wall.id), openingRef(opening.id)]);
+    const next = deleteSelection(plan, [wallRef(wall.id), openingRef(opening.id)]);
     expect(Object.keys(next.walls)).toHaveLength(0);
     expect(Object.keys(next.openings)).toHaveLength(0);
   });
@@ -211,7 +209,7 @@ describe('deleteElements', () => {
         keep: { id: 'keep', a: { x: 0, y: 50 }, b: { x: 100, y: 50 }, t: 0.5 },
       },
     };
-    const next = deleteElements(plan, [rulerRef('r')]);
+    const next = deleteSelection(plan, [rulerRef('r')]);
     expect(next.rulers.r).toBeUndefined();
     expect(next.rulers.keep).toBeDefined();
   });
@@ -224,7 +222,7 @@ describe('deleteElements', () => {
         keep: { id: 'keep', x: 50, y: 50, content: 'Stay', size: 'M' as const },
       },
     };
-    const next = deleteElements(plan, [textRef('t')]);
+    const next = deleteSelection(plan, [textRef('t')]);
     expect(next.texts.t).toBeUndefined();
     expect(next.texts.keep).toBeDefined();
   });
@@ -339,7 +337,7 @@ describe('refKey', () => {
   });
 });
 
-describe('deleteElements — room label cascade', () => {
+describe('deleteSelection — room label cascade', () => {
   // two 3×3 m rooms side by side sharing a divider, one label in each
   const twoLabeledRooms = () => {
     let ids = { leftWalls: [] as string[], divider: '', leftLabel: '', rightLabel: '' };
@@ -369,20 +367,20 @@ describe('deleteElements — room label cascade', () => {
 
   it('deletes the label of a room whose wall is deleted', () => {
     const { plan, leftWalls, rightLabel } = twoLabeledRooms();
-    const next = deleteElements(plan, [wallRef(leftWalls[0])]);
+    const next = deleteSelection(plan, [wallRef(leftWalls[0])]);
     expect(Object.keys(next.roomLabels)).toEqual([rightLabel]);
   });
 
   it('keeps only the oldest label when deleting the divider merges the rooms', () => {
     const { plan, divider, leftLabel } = twoLabeledRooms();
-    const next = deleteElements(plan, [wallRef(divider)]);
+    const next = deleteSelection(plan, [wallRef(divider)]);
     expect(Object.keys(next.roomLabels)).toEqual([leftLabel]);
   });
 
   it('deletes every label when the whole plan is deleted', () => {
     const { plan } = twoLabeledRooms();
     const refs = Object.keys(plan.walls).map(wallRef);
-    expect(deleteElements(plan, refs).roomLabels).toEqual({});
+    expect(deleteSelection(plan, refs).roomLabels).toEqual({});
   });
 });
 
@@ -744,30 +742,25 @@ function gridCenterPlan() {
 
 // Deleting a room keeps every wall that is another room's outline, so no
 // neighbour is broken (ADR 0015).
-describe('roomDeletion', () => {
+// ADR 0015. A Selection that reads as a Room deletes its boundary minus every
+// wall another room's outline needs; any other Selection deletes what it holds.
+describe('deleteSelection — a Room reading', () => {
   it('takes the whole boundary of a standalone room', () => {
     const plan = squareRoomPlan();
-    const rooms = detectRooms(plan);
-    const del = new Set(roomDeletion(plan, rooms, rooms[0]).map((r) => r.id));
-    expect(del).toEqual(new Set(Object.keys(plan.walls)));
+    const room = detectRooms(plan)[0];
+    const next = deleteSelection(plan, roomSelection(plan, room)!);
+    expect(Object.keys(next.walls)).toHaveLength(0);
   });
 
-  it('keeps the party wall shared with a neighbour', () => {
+  it('keeps the party wall shared with a neighbour, and the neighbour standing', () => {
     const plan = twoRoomPlan();
     const rooms = detectRooms(plan);
     const left = roomAt(rooms, 200, 200)!;
     const right = roomAt(rooms, 600, 200)!;
     const shared = roomWallIds(plan, left)!.find((id) => roomWallIds(plan, right)!.includes(id))!;
-    const del = roomDeletion(plan, rooms, left).map((r) => r.id);
-    expect(del).not.toContain(shared);
-    expect(del).toHaveLength(3);
-  });
-
-  it('leaves the neighbour standing after the delete', () => {
-    const plan = twoRoomPlan();
-    const rooms = detectRooms(plan);
-    const left = roomAt(rooms, 200, 200)!;
-    const next = deleteElements(plan, roomDeletion(plan, rooms, left));
+    const next = deleteSelection(plan, roomSelection(plan, left)!);
+    expect(next.walls[shared]).toBeDefined();
+    expect(Object.keys(next.walls)).toHaveLength(Object.keys(plan.walls).length - 3);
     const after = detectRooms(next);
     expect(roomAt(after, 600, 200)).not.toBeNull();
     expect(roomAt(after, 200, 200)).toBeNull();
@@ -775,9 +768,8 @@ describe('roomDeletion', () => {
 
   it('keeps the island walls when the container is deleted', () => {
     const plan = nestedRoomPlan();
-    const rooms = detectRooms(plan);
-    const container = roomAt(rooms, 350, 350)!;
-    const next = deleteElements(plan, roomDeletion(plan, rooms, container));
+    const container = roomAt(detectRooms(plan), 350, 350)!;
+    const next = deleteSelection(plan, roomSelection(plan, container)!);
     const after = detectRooms(next);
     expect(roomAt(after, 175, 150)).not.toBeNull();
     expect(roomAt(after, 350, 350)).toBeNull();
@@ -788,7 +780,7 @@ describe('roomDeletion', () => {
     const rooms = detectRooms(plan);
     const island = roomAt(rooms, 175, 150)!;
     const before = roomAt(rooms, 350, 350)!;
-    const next = deleteElements(plan, roomDeletion(plan, rooms, island));
+    const next = deleteSelection(plan, roomSelection(plan, island)!);
     const after = detectRooms(next);
     expect(after).toHaveLength(1);
     expect(roomAt(after, 175, 150)!.areaCm2).toBeGreaterThan(before.areaCm2);
@@ -796,30 +788,18 @@ describe('roomDeletion', () => {
 
   it('deletes nothing from a room whose every wall is a neighbour outline', () => {
     const plan = gridCenterPlan();
-    const rooms = detectRooms(plan);
-    const center = roomAt(rooms, 600, 600)!;
-    expect(roomDeletion(plan, rooms, center)).toEqual([]);
-  });
-});
-
-describe('selectionDeletion', () => {
-  it('reduces a room selection to the walls the room may delete', () => {
-    const plan = twoRoomPlan();
-    const rooms = detectRooms(plan);
-    const left = roomAt(rooms, 200, 200)!;
-    const sel = roomSelection(plan, left)!;
-    expect(selectionDeletion(plan, rooms, sel)).toEqual(roomDeletion(plan, rooms, left));
+    const center = roomAt(detectRooms(plan), 600, 600)!;
+    expect(deleteSelection(plan, roomSelection(plan, center)!).walls).toEqual(plan.walls);
   });
 
   // Scope: only a room reading is narrowed — a lone party wall stays deletable.
-  it('deletes any other selection exactly as it holds', () => {
+  it('deletes a lone party wall, which no room reads as itself', () => {
     const plan = twoRoomPlan();
     const rooms = detectRooms(plan);
     const left = roomAt(rooms, 200, 200)!;
     const right = roomAt(rooms, 600, 200)!;
     const shared = roomWallIds(plan, left)!.find((id) => roomWallIds(plan, right)!.includes(id))!;
-    const sel = [wallRef(shared)];
-    expect(selectionDeletion(plan, rooms, sel)).toBe(sel);
+    expect(deleteSelection(plan, [wallRef(shared)]).walls[shared]).toBeUndefined();
   });
 
   // Openings need no rule of their own: they die with a removed wall and live
@@ -841,7 +821,7 @@ describe('selectionDeletion', () => {
       swing: 'in',
     };
     plan.openings.ow = { id: 'ow', wallId: own, type: 'window', offset: 200, width: 90 };
-    const next = deleteElements(plan, selectionDeletion(plan, detectRooms(plan), roomSelection(plan, left)!));
+    const next = deleteSelection(plan, roomSelection(plan, left)!);
     expect(next.openings.od).toBeDefined();
     expect(next.openings.ow).toBeUndefined();
   });

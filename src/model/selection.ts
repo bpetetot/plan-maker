@@ -160,7 +160,7 @@ export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Roo
 
 // Every edit settles in the same place (ADR 0022); a delete displaces no Point,
 // so only the label reconciliation can act.
-export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
+function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan;
   for (const ref of refs) {
     if (ref.type === 'wall') next = deleteWall(next, ref.id);
@@ -174,7 +174,7 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
 /** The walls Delete takes for a Room: its boundary minus every wall that is
  *  another room's outer-loop outline, so no neighbour is broken (ADR 0015).
  *  Openings ride along with their walls, so only walls are listed. */
-export function roomDeletion(plan: Plan, rooms: Room[], room: Room): ElementRef[] {
+function roomDeletion(plan: Plan, rooms: Room[], room: Room): ElementRef[] {
   const wallIds = roomWallIds(plan, room);
   if (!wallIds) return [];
   const key = roomKey(room);
@@ -188,9 +188,15 @@ export function roomDeletion(plan: Plan, rooms: Room[], room: Room): ElementRef[
 
 /** What Delete removes for a Selection: a Room keeps other rooms' walls
  *  (ADR 0015); any other Selection deletes exactly what it holds. */
-export function selectionDeletion(plan: Plan, rooms: Room[], refs: ElementRef[]): ElementRef[] {
+function selectionDeletion(plan: Plan, rooms: Room[], refs: ElementRef[]): ElementRef[] {
   const room = selectedRoom(plan, rooms, refs);
   return room ? roomDeletion(plan, rooms, room) : refs;
+}
+
+/** What Delete does to a Selection, settled (ADR 0022). The rooms are read
+ *  here, off the plan handed in — never off a caller's render-time closure. */
+export function deleteSelection(plan: Plan, refs: ElementRef[]): Plan {
+  return deleteElements(plan, selectionDeletion(plan, detectRooms(plan), refs));
 }
 
 // Ties break on endpoint `a` then lowest id: selection order is an
