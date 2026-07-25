@@ -22,7 +22,9 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `src/store/` — zustand plan store, zundo history (drag grouping helpers)
 - `src/persistence/` — schema version + migrations + validation, IndexedDB storage, autosave
 - `src/transfer/` — JSON export/import envelope, PNG export
-- `src/editor/` — the SVG editor (variant A UX), shared render pieces, viewBox hook
+- `src/sheet/` — the drawing itself, by family (walls, openings, rooms, texts,
+  measures) behind `PlanScene`; called by both the editor and the PNG export
+- `src/editor/` — the SVG editor (variant A UX), interaction chrome, viewBox hook
 - `src/pwa/` — service worker update prompt
 
 ## Conventions

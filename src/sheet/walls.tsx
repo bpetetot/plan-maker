@@ -1,6 +1,5 @@
 import { junctionPatches, wallOutline } from '../model/faces';
 import { openingPlacement } from '../model/openings';
-import type { ElementRef } from '../model/selection';
 import type { Plan, Wall } from '../model/types';
 import { WINDOW_JAMB } from './openings';
 import { COLORS, seamStroke } from './paint';
@@ -56,13 +55,11 @@ export function WallLine({ plan, wall, color }: { plan: Plan; wall: Wall; color?
 
 // Fills the central gaps outlines leave at crossings (CONTEXT.md: Face). Owned
 // by every wall at its Point: no hover tint, selected tint from two selected.
-export function JunctionPatches({ plan, selection }: { plan: Plan; selection?: ElementRef[] }) {
-  const selected = new Set((selection ?? []).filter((r) => r.type === 'wall').map((r) => r.id));
+export function JunctionPatches({ plan, selected }: { plan: Plan; selected?: (wallId: string) => boolean }) {
   return (
     <g pointerEvents="none">
       {junctionPatches(plan).map(({ pointId, wallIds, corners }) => {
-        const paint =
-          wallIds.filter((id) => selected.has(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall;
+        const paint = wallIds.filter((id) => selected?.(id)).length >= 2 ? COLORS.wallSelected : COLORS.wall;
         return (
           <polygon
             key={pointId}

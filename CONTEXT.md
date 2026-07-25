@@ -10,6 +10,26 @@ The single floor plan the user is editing — the whole document. Holds points,
 walls, openings, room labels, rulers, and texts.
 _Avoid_: Document, project, drawing
 
+**Sheet**:
+The drawing itself — every graphic that states something about the Plan: walls,
+junctions, openings, room names and areas, texts, dimensions, rulers. Defined by
+what leaves the app: the Sheet is exactly what the PNG export prints, which is
+why the screen and the export draw it from one place and cannot drift apart. The
+editor renders the same Sheet and dresses it — selection accents, hover tints,
+handlers — without adding to it.
+_Avoid_: Canvas, scene, page
+
+**Interaction chrome**:
+Everything the editor draws that the Sheet does not contain: the Grid, room
+tints, Grab zones, point handles, the snap marker, the rubber-band wall,
+Placement dimensions, the live length of a wall being drawn. It exists to serve
+the gesture, so it has no real-world size and obeys no drawing scale (ADR 0005),
+and it is absent from the export by the same rule. Chrome sits above the Sheet,
+save for the Grid and the room tints, which lie under it, and the Grab zones,
+which slip between the content and the measures so a Dimension keeps its
+hit-test.
+_Avoid_: Overlay, decoration, UI layer
+
 **Point**:
 A shared corner in the plan, at integer-centimeter coordinates. Walls reference
 points; moving a point moves every wall attached to it. Two Points never

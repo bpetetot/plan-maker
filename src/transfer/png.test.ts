@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPlan, namedRoomPlan } from '../model/testHelpers';
+import { ROOM_TEXT_HIT } from '../sheet/rooms';
 import { buildExportSvg, computeExportFrame } from './png';
 
 const squarePlan = () =>
@@ -27,6 +28,13 @@ const rulerPlan = () => {
 const textPlan = () => {
   const plan = squarePlan();
   plan.texts.t1 = { id: 't1', x: 100, y: 120, content: 'Salon\néclairé', size: 'M' };
+  return plan;
+};
+
+// Every family of the sheet at once: walls, a room, a Ruler, a Text.
+const fullPlan = () => {
+  const plan = rulerPlan();
+  plan.texts.t1 = { id: 't1', x: 100, y: 120, content: 'Salon', size: 'M' };
   return plan;
 };
 
@@ -143,6 +151,25 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('Salon');
     expect(svg).toContain('éclairé');
     expect(svg).not.toContain('4,10 m');
+  });
+
+  // ADR 0005: the export prints the drawing, never what the editor adds to
+  // manipulate it. Both sides now call one PlanScene, so the screen's chrome
+  // reaches the sheet through a slot the export leaves empty (ADR 0024).
+  it('leaves the editor chrome out of the export', () => {
+    const svg = buildExportSvg(fullPlan(), { measuresVisible: true })!;
+    expect(svg).toContain('1,37 m');
+    expect(svg).toContain('Salon');
+    // grab zones, of every family, and the Dimension's own drag rect
+    expect(svg).not.toContain('transparent');
+    expect(svg).not.toContain('cursor');
+    expect(svg).not.toContain('ruler-grab');
+    expect(svg).not.toContain('text-grab');
+    expect(svg).not.toContain(ROOM_TEXT_HIT);
+    // tints, chips and handles: chrome that never enters the sheet at all
+    expect(svg).not.toContain('room-fill');
+    expect(svg).not.toContain('placement-chip');
+    expect(svg).not.toContain('point-handle');
   });
 
   // A stored placement is a wish, the Rail is the law — and the Rail is shorter

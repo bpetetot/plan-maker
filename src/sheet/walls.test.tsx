@@ -47,10 +47,11 @@ describe('JunctionPatches', () => {
     return { plan, bar1, bar2, stem };
   }
 
-  async function renderPatch(plan: Plan, selection?: ElementRef[]) {
+  async function renderPatch(plan: Plan, selection: ElementRef[] = []) {
+    const selected = (id: string) => selection.some((r) => r.type === 'wall' && r.id === id);
     const { container } = await render(
       <svg>
-        <JunctionPatches plan={plan} selection={selection} />
+        <JunctionPatches plan={plan} selected={selected} />
       </svg>,
     );
     return container.querySelector('polygon')!;

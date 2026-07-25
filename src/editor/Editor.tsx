@@ -48,7 +48,7 @@ import {
 } from '../model/selection';
 import type { Snap } from '../model/snap';
 import { snapPoint } from '../model/snap';
-import type { Opening, Plan, RoomLabel, TextNote, TextSize } from '../model/types';
+import type { Opening, Plan, RoomLabel, TextNote, TextSize, Wall } from '../model/types';
 import { GRID, WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
@@ -68,18 +68,14 @@ import {
   SnapMarker,
   WallGrabZone,
 } from './chrome';
-import { DimLabel, RulerLabel } from '../sheet/measures';
+// A ghost preview is chrome drawn with the sheet's own pieces (ADR 0005).
+import { RulerLabel } from '../sheet/measures';
 import { OpeningGlyph } from '../sheet/openings';
 import { COLORS } from '../sheet/paint';
-import {
-  BLOCK_LINE_HEIGHT,
-  blockNameSlots,
-  RoomOverlay,
-  ROOM_TEXT_HIT,
-  roomTextBlocks,
-} from '../sheet/rooms';
-import { TEXT_SIZE_CM, textAtPoint, textEditBox, TextNoteView } from '../sheet/texts';
-import { JunctionPatches, WallLine } from '../sheet/walls';
+import { BLOCK_LINE_HEIGHT, blockNameSlots, ROOM_TEXT_HIT, roomTextBlocks } from '../sheet/rooms';
+import type { ElementDecor } from '../sheet/scene';
+import { PlanScene } from '../sheet/scene';
+import { TEXT_SIZE_CM, textAtPoint, textEditBox } from '../sheet/texts';
 import type { Tool, ToolDefaults } from './tools';
 import { initialToolDefaults } from './tools';
 import { keyHint } from './useAppHotkeys';
@@ -693,6 +689,46 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
   };
 
+  // How the screen dresses each element of the sheet (ADR 0024). A wall's only
+  // interactive part here is its Dimension plate: the body's grab zone is chrome.
+  const dressElement = (ref: ElementRef): ElementDecor => {
+    const selected = selKeys.has(refKey(ref));
+    const selectable = tool === 'select';
+    switch (ref.type) {
+      case 'wall':
+        return {
+          selected,
+          hovered: hoverWall === ref.id && selectable,
+          onPointerDown: selectable ? (e) => onDimPointerDown(plan.walls[ref.id], e) : undefined,
+        };
+      case 'opening':
+        return { selected };
+      case 'ruler':
+        return { selected, hovered: hoverRuler === ref.id && selectable };
+      case 'text':
+        return {
+          selected,
+          hidden: textEditing?.id === ref.id,
+          onPointerDown: selectable
+            ? (e) => onElementPointerDown(ref, e, (c) => soloGroup([ref], c))
+            : undefined,
+          onDoubleClick: selectable ? (e) => onTextDoubleClick(plan.texts[ref.id], e) : undefined,
+        };
+    }
+  };
+
+  const onDimPointerDown = (wall: Wall, e: React.PointerEvent) => {
+    if (e.button !== 0 || space) return;
+    const c = toPlan(e.clientX, e.clientY);
+    const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall);
+    startPlanDrag({
+      kind: 'dim',
+      id: wall.id,
+      start: c,
+      grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t,
+    });
+  };
+
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
     if (tool === 'wall') {
       // Only an active chain finishes; without it the anchors are stale from an
@@ -745,143 +781,75 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         {/* under the walls: a tint marks a floor, it never repaints geometry */}
         {hoveredRoom && hoveredRoom !== selRoom && <RoomFill room={hoveredRoom} variant="hover" />}
         {selRoom && <RoomFill room={selRoom} variant="selected" />}
-        {Object.values(plan.walls).map((wall) => (
-          <WallLine
-            key={wall.id}
-            plan={plan}
-            wall={wall}
-            color={
-              selKeys.has(refKey({ type: 'wall', id: wall.id }))
-                ? COLORS.wallSelected
-                : hoverWall === wall.id && tool === 'select'
-                  ? COLORS.wallHover
-                  : undefined
-            }
-          />
-        ))}
-        <JunctionPatches plan={plan} selection={sel} />
-        {Object.values(plan.openings).map((opening) => (
-          <OpeningGlyph
-            key={opening.id}
-            plan={plan}
-            opening={opening}
-            selected={selKeys.has(refKey({ type: 'opening', id: opening.id }))}
-          />
-        ))}
-        <RoomOverlay
+        <PlanScene
+          plan={plan}
           rooms={rooms}
-          labels={overlayLabels}
           measuresVisible={measuresVisible}
-          editingKey={editing?.key}
-          onLinePointerDown={onLinePointerDown}
-          onLineDoubleClick={onLineDoubleClick}
-        />
-        {/* Always visible content — never gated by measures (ticket 07's key
-            contrast with the Ruler). The node under edit is hidden so the
-            textarea replaces it. Selection / drag wiring is 08. */}
-        {Object.values(plan.texts)
-          .filter((text) => textEditing?.id !== text.id)
-          .map((text) => (
-            <TextNoteView
-              key={text.id}
-              text={text}
-              pxPerCm={zoomScale}
-              interactive={tool === 'select'}
-              selected={selKeys.has(refKey({ type: 'text', id: text.id }))}
-              onPointerDown={(e) =>
-                onElementPointerDown({ type: 'text', id: text.id }, e, (c) =>
-                  soloGroup([{ type: 'text', id: text.id }], c),
-                )
-              }
-              onDoubleClick={(e) => onTextDoubleClick(text, e)}
-            />
-          ))}
-        {tool === 'select' &&
-          Object.values(plan.walls).map((wall) => (
-            <WallGrabZone
-              key={wall.id}
-              plan={plan}
-              wall={wall}
-              pxPerCm={zoomScale}
-              cursor="move"
-              onPointerDown={(e) =>
-                onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) =>
-                  soloGroup([{ type: 'wall', id: wall.id }], c),
-                )
-              }
-              onPointerEnter={() => setHoverWall(wall.id)}
-              onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
-            />
-          ))}
-        {tool === 'select' &&
-          Object.values(plan.openings).map((opening) => (
-            <OpeningGrabZone
-              key={opening.id}
-              plan={plan}
-              opening={opening}
-              pxPerCm={zoomScale}
-              onPointerDown={(e) =>
-                onElementPointerDown({ type: 'opening', id: opening.id }, e, (c) => ({
-                  kind: 'opening',
-                  id: opening.id,
-                  start: c,
-                  grabDelta: opening.offset - projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
-                }))
-              }
-            />
-          ))}
-        {/* Only while drawn: measures hidden ⇒ a Ruler is inert (ticket 02). A
-            body drag translates the one Ruler rigidly (a single-ref group). */}
-        {tool === 'select' &&
-          measuresVisible &&
-          Object.values(plan.rulers).map((ruler) => (
-            <RulerGrabZone
-              key={ruler.id}
-              ruler={ruler}
-              onPointerDown={(e) =>
-                onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) =>
-                  soloGroup([{ type: 'ruler', id: ruler.id }], c),
-                )
-              }
-              onPointerEnter={() => setHoverRuler(ruler.id)}
-              onPointerLeave={() => setHoverRuler((h) => (h === ruler.id ? null : h))}
-            />
-          ))}
-        {/* After the grab zones so the label wins the hit-test. Hiding is
-            global: selecting a wall does not bring its dimension back. */}
-        {measuresVisible &&
-          Object.values(plan.walls).map((wall) => (
-            <DimLabel
-              key={wall.id}
-              plan={plan}
-              wall={wall}
-              selected={selKeys.has(refKey({ type: 'wall', id: wall.id }))}
-              onPointerDown={
-                tool === 'select'
-                  ? (e) => {
-                      if (e.button !== 0 || space) return;
-                      const c = toPlan(e.clientX, e.clientY);
-                      const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall);
-                      startPlanDrag({
-                        kind: 'dim',
-                        id: wall.id,
-                        start: c,
-                        grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t,
-                      });
+          decor={{
+            element: dressElement,
+            pxPerCm: zoomScale,
+            labels: overlayLabels,
+            editingKey: editing?.key,
+            onLinePointerDown,
+            onLineDoubleClick,
+          }}
+          chrome={
+            <>
+              {tool === 'select' &&
+                Object.values(plan.walls).map((wall) => (
+                  <WallGrabZone
+                    key={wall.id}
+                    plan={plan}
+                    wall={wall}
+                    pxPerCm={zoomScale}
+                    cursor="move"
+                    onPointerDown={(e) =>
+                      onElementPointerDown({ type: 'wall', id: wall.id }, e, (c) =>
+                        soloGroup([{ type: 'wall', id: wall.id }], c),
+                      )
                     }
-                  : undefined
-              }
-            />
-          ))}
-        {measuresVisible &&
-          Object.values(plan.rulers).map((ruler) => (
-            <RulerLabel
-              key={ruler.id}
-              ruler={ruler}
-              selected={selKeys.has(refKey({ type: 'ruler', id: ruler.id }))}
-              hovered={hoverRuler === ruler.id && tool === 'select'}
-            />
-          ))}
+                    onPointerEnter={() => setHoverWall(wall.id)}
+                    onPointerLeave={() => setHoverWall((h) => (h === wall.id ? null : h))}
+                  />
+                ))}
+              {tool === 'select' &&
+                Object.values(plan.openings).map((opening) => (
+                  <OpeningGrabZone
+                    key={opening.id}
+                    plan={plan}
+                    opening={opening}
+                    pxPerCm={zoomScale}
+                    onPointerDown={(e) =>
+                      onElementPointerDown({ type: 'opening', id: opening.id }, e, (c) => ({
+                        kind: 'opening',
+                        id: opening.id,
+                        start: c,
+                        grabDelta:
+                          opening.offset - projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
+                      }))
+                    }
+                  />
+                ))}
+              {/* Only while drawn: measures hidden ⇒ a Ruler is inert (ticket 02).
+                  A body drag translates the one Ruler rigidly (a single-ref group). */}
+              {tool === 'select' &&
+                measuresVisible &&
+                Object.values(plan.rulers).map((ruler) => (
+                  <RulerGrabZone
+                    key={ruler.id}
+                    ruler={ruler}
+                    onPointerDown={(e) =>
+                      onElementPointerDown({ type: 'ruler', id: ruler.id }, e, (c) =>
+                        soloGroup([{ type: 'ruler', id: ruler.id }], c),
+                      )
+                    }
+                    onPointerEnter={() => setHoverRuler(ruler.id)}
+                    onPointerLeave={() => setHoverRuler((h) => (h === ruler.id ? null : h))}
+                  />
+                ))}
+            </>
+          }
+        />
         {dimmedOpenings.map((opening) => (
           <PlacementDims key={opening.id} plan={plan} opening={opening} pxPerCm={zoomScale} />
         ))}
