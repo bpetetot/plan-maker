@@ -1,5 +1,6 @@
 import type { Plan } from '../model/types';
 import { replacePlan, usePlanStore } from '../store/planStore';
+import type { ImportIssue } from './json';
 import { parsePlanFile, serializePlanFile, transferFileName } from './json';
 
 export function downloadBlob(blob: Blob, fileName: string) {
@@ -15,7 +16,7 @@ export function exportPlanJson(plan: Plan) {
   downloadBlob(new Blob([serializePlanFile(plan)], { type: 'application/json' }), transferFileName('json'));
 }
 
-const IMPORT_ERRORS: Record<string, string> = {
+const IMPORT_ERRORS: Record<ImportIssue, string> = {
   'invalid-json': 'This file is not valid JSON.',
   'wrong-format': 'This file is not a Plan Maker export.',
   'unsupported-version': 'This file comes from a newer version of Plan Maker.',

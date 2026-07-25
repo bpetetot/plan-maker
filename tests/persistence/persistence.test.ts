@@ -7,7 +7,7 @@ import { buildPlan } from '../helpers';
 import { emptyPlan } from '../../src/model/types';
 import { beginEdit, editPlan, usePlanStore } from '../../src/store/planStore';
 import { startAutosave } from '../../src/persistence/autosave';
-import { runMigrations, SCHEMA_VERSION, validatePlan, type StoredRecord } from '../../src/persistence/schema';
+import { decodePlanPayload, SCHEMA_VERSION, type StoredRecord } from '../../src/persistence/schema';
 import { BACKUP_KEY, CURRENT_KEY, loadPlan, savePlan } from '../../src/persistence/storage';
 
 const squarePlan = () =>
@@ -22,45 +22,57 @@ const squarePlan = () =>
     b.wall(e, a);
   });
 
+const decode = (payload: unknown) => decodePlanPayload(SCHEMA_VERSION, payload);
+
 beforeEach(async () => {
   await clear();
 });
 
-describe('validatePlan', () => {
+describe('decodePlanPayload', () => {
   it('accepts a valid plan', () => {
-    expect(validatePlan(squarePlan())).not.toBeNull();
-    expect(validatePlan(emptyPlan())).not.toBeNull();
+    expect(decode(squarePlan()).ok).toBe(true);
+    expect(decode(emptyPlan()).ok).toBe(true);
   });
 
   it('rejects non-objects and missing collections', () => {
-    expect(validatePlan(null)).toBeNull();
-    expect(validatePlan('nope')).toBeNull();
-    expect(validatePlan({ points: {}, walls: {} })).toBeNull();
+    expect(decode(null)).toEqual({ ok: false, reason: 'invalid-plan' });
+    expect(decode('nope')).toEqual({ ok: false, reason: 'invalid-plan' });
+    expect(decode({ points: {}, walls: {} })).toEqual({ ok: false, reason: 'invalid-plan' });
+  });
+
+  it('rejects a version it cannot reach, in either direction', () => {
+    expect(decodePlanPayload(SCHEMA_VERSION + 1, squarePlan())).toEqual({
+      ok: false,
+      reason: 'unsupported-version',
+    });
+    expect(decodePlanPayload('2', squarePlan())).toEqual({ ok: false, reason: 'unsupported-version' });
+    // older than the oldest migration: unreadable, not "newer"
+    expect(decodePlanPayload(0, squarePlan())).toEqual({ ok: false, reason: 'invalid-plan' });
   });
 
   it('rejects walls referencing missing points', () => {
     const plan = squarePlan();
     const broken = structuredClone(plan) as { walls: Record<string, { startPointId: string }> };
     Object.values(broken.walls)[0].startPointId = 'missing';
-    expect(validatePlan(broken)).toBeNull();
+    expect(decode(broken).ok).toBe(false);
   });
 
   it('rejects openings referencing missing walls or with bad door fields', () => {
     const plan = structuredClone(squarePlan());
     plan.openings['o1'] = { id: 'o1', wallId: 'missing', type: 'window', offset: 100, width: 90 };
-    expect(validatePlan(plan)).toBeNull();
+    expect(decode(plan).ok).toBe(false);
 
     const plan2 = structuredClone(squarePlan());
     const wallId = Object.keys(plan2.walls)[0];
     // @ts-expect-error deliberately malformed door
     plan2.openings['o1'] = { id: 'o1', wallId, type: 'door', offset: 100, width: 90, hingeSide: 'left' };
-    expect(validatePlan(plan2)).toBeNull();
+    expect(decode(plan2).ok).toBe(false);
   });
 
   it('accepts a wall with a valid dimension placement', () => {
     const plan = structuredClone(squarePlan());
     Object.values(plan.walls)[0].dimPlacement = { t: 0.75, side: -1 };
-    expect(validatePlan(plan)).not.toBeNull();
+    expect(decode(plan).ok).toBe(true);
   });
 
   it('rejects malformed dimension placements', () => {
@@ -68,14 +80,14 @@ describe('validatePlan', () => {
       const plan = structuredClone(squarePlan());
       // @ts-expect-error deliberately malformed placement
       Object.values(plan.walls)[0].dimPlacement = dimPlacement;
-      expect(validatePlan(plan)).toBeNull();
+      expect(decode(plan).ok).toBe(false);
     }
   });
 
   it('accepts a plan carrying a valid ruler', () => {
     const plan = structuredClone(squarePlan());
     plan.rulers['r1'] = { id: 'r1', a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, t: 0.5 };
-    expect(validatePlan(plan)).not.toBeNull();
+    expect(decode(plan).ok).toBe(true);
   });
 
   it('rejects malformed rulers', () => {
@@ -90,22 +102,22 @@ describe('validatePlan', () => {
     for (const ruler of rulers) {
       const plan = structuredClone(squarePlan()) as { rulers: Record<string, unknown> };
       plan.rulers['r1'] = ruler;
-      expect(validatePlan(plan)).toBeNull();
+      expect(decode(plan).ok).toBe(false);
     }
   });
 
   it('tolerates a plan missing the rulers field, defaulting it to empty', () => {
     const plan = structuredClone(squarePlan()) as Partial<ReturnType<typeof squarePlan>>;
     delete plan.rulers;
-    const validated = validatePlan(plan);
-    expect(validated).not.toBeNull();
-    expect(validated?.rulers).toEqual({});
+    const result = decode(plan);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.plan.rulers).toEqual({});
   });
 
   it('accepts a plan carrying a valid text note', () => {
     const plan = structuredClone(squarePlan());
     plan.texts['t1'] = { id: 't1', x: 100, y: 50, content: 'Garage', size: 'M' };
-    expect(validatePlan(plan)).not.toBeNull();
+    expect(decode(plan).ok).toBe(true);
   });
 
   it('rejects malformed text notes', () => {
@@ -120,31 +132,16 @@ describe('validatePlan', () => {
     for (const text of texts) {
       const plan = structuredClone(squarePlan()) as { texts: Record<string, unknown> };
       plan.texts['t1'] = text;
-      expect(validatePlan(plan)).toBeNull();
+      expect(decode(plan).ok).toBe(false);
     }
   });
 
   it('tolerates a plan missing the texts field, defaulting it to empty', () => {
     const plan = structuredClone(squarePlan()) as Partial<ReturnType<typeof squarePlan>>;
     delete plan.texts;
-    const validated = validatePlan(plan);
-    expect(validated).not.toBeNull();
-    expect(validated?.texts).toEqual({});
-  });
-});
-
-describe('runMigrations', () => {
-  it('applies ordered migrations from the record version', () => {
-    const table = {
-      0: (plan: unknown) => ({ ...(plan as object), first: true }),
-      1: (plan: unknown) => ({ ...(plan as object), second: true }),
-    };
-    expect(runMigrations(0, {}, table)).toEqual({ first: true, second: true });
-    expect(runMigrations(SCHEMA_VERSION, { untouched: 1 }, table)).toEqual({ untouched: 1 });
-  });
-
-  it('throws on a missing migration step', () => {
-    expect(() => runMigrations(-1, {}, {})).toThrow();
+    const result = decode(plan);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.plan.texts).toEqual({});
   });
 });
 
@@ -281,7 +278,7 @@ describe('loadPlan — coincident points', () => {
   });
 });
 
-describe('validatePlan — label placement state', () => {
+describe('decodePlanPayload — label placement state', () => {
   it('accepts placed: true and rejects other values', () => {
     const base = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -294,9 +291,9 @@ describe('validatePlan — label placement state', () => {
       b.wall(e, a);
       b.label('Kitchen', 200, 150, true);
     });
-    expect(validatePlan(base)).not.toBeNull();
+    expect(decode(base).ok).toBe(true);
     const label = Object.values(base.roomLabels)[0];
     const bad = { ...base, roomLabels: { [label.id]: { ...label, placed: 'yes' } } };
-    expect(validatePlan(bad)).toBeNull();
+    expect(decode(bad).ok).toBe(false);
   });
 });

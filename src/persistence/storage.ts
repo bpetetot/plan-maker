@@ -6,15 +6,13 @@ import { decodePlanPayload, SCHEMA_VERSION } from './schema';
 export const CURRENT_KEY = 'plan:current';
 export const BACKUP_KEY = 'plan:backup';
 
+// Failure policy of this adapter: any unreadable record is a miss, and loadPlan
+// falls back to the backup — the reason it failed changes nothing.
 function decodeRecord(value: unknown): Plan | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Partial<StoredRecord>;
-  if (typeof record.schemaVersion !== 'number' || record.schemaVersion > SCHEMA_VERSION) return null;
-  try {
-    return decodePlanPayload(record.schemaVersion, record.plan);
-  } catch {
-    return null;
-  }
+  const result = decodePlanPayload(record.schemaVersion, record.plan);
+  return result.ok ? result.plan : null;
 }
 
 function makeRecord(plan: Plan): StoredRecord {

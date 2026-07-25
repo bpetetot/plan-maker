@@ -10,6 +10,10 @@ export interface StoredRecord {
   plan: Plan;
 }
 
+export type DecodeIssue = 'unsupported-version' | 'invalid-plan';
+
+type DecodeResult = { ok: true; plan: Plan } | { ok: false; reason: DecodeIssue };
+
 // Keyed by the version they migrate FROM.
 type Migration = (plan: unknown) => unknown;
 const migrations: Record<number, Migration> = {
@@ -17,23 +21,31 @@ const migrations: Record<number, Migration> = {
   1: (plan) => plan,
 };
 
-export function runMigrations(
-  fromVersion: number,
-  plan: unknown,
-  table: Record<number, Migration> = migrations,
-): unknown {
+function runMigrations(fromVersion: number, plan: unknown): unknown {
   let current = plan;
   for (let version = fromVersion; version < SCHEMA_VERSION; version++) {
-    const migrate = table[version];
+    const migrate = migrations[version];
     if (!migrate) throw new Error(`No migration from schema version ${version}`);
     current = migrate(current);
   }
   return current;
 }
 
-export function decodePlanPayload(fromVersion: number, plan: unknown): Plan | null {
-  const validated = validatePlan(runMigrations(fromVersion, plan));
-  return validated && settlePlan(validated);
+/** The one reading of a versioned plan: the file and the stored record hand it
+ *  their version and payload, and add nothing but their own failure policy. */
+export function decodePlanPayload(version: unknown, payload: unknown): DecodeResult {
+  if (typeof version !== 'number' || version > SCHEMA_VERSION) {
+    return { ok: false, reason: 'unsupported-version' };
+  }
+  let migrated: unknown;
+  try {
+    migrated = runMigrations(version, payload);
+  } catch {
+    // an old version with no migration path: unreadable, not "newer"
+    return { ok: false, reason: 'invalid-plan' };
+  }
+  const validated = validatePlan(migrated);
+  return validated ? { ok: true, plan: settlePlan(validated) } : { ok: false, reason: 'invalid-plan' };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -75,7 +87,7 @@ function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening 
 }
 
 // Assumes the plan is already migrated to SCHEMA_VERSION.
-export function validatePlan(value: unknown): Plan | null {
+function validatePlan(value: unknown): Plan | null {
   if (!isRecord(value)) return null;
   const { points, walls, openings, roomLabels } = value;
   if (!isRecord(points) || !isRecord(walls) || !isRecord(openings) || !isRecord(roomLabels)) return null;
