@@ -23,7 +23,8 @@ _Avoid_: Canvas, page, drawing surface
 **Interaction chrome**:
 Everything the editor draws that the Sheet does not contain: the Grid, room
 tints, Grab zones, point handles, the snap marker, the rubber-band wall,
-Placement dimensions, the live length of a wall being drawn. It exists to serve
+Placement dimensions, the live length of a wall being drawn, and the box opened
+on the sheet to type a Room label or a Text. It exists to serve
 the gesture, so it has no real-world size and obeys no drawing scale (ADR 0005),
 and it is absent from the export by the same rule. Chrome sits above the Sheet,
 save for the Grid and the room tints, which lie under it, and the Grab zones,
@@ -238,6 +239,30 @@ chain or Ruler point but keeps the tool, an empty Text commits nothing and keeps
 it, and a finish that placed nothing keeps it too (ADR 0018). Pure editor state:
 never part of the plan.
 _Avoid_: Mode
+
+**Placement**:
+What a drawing tool has under way: the element it is posing, aimed and advanced
+click by click until it completes or is abandoned. Five of them exist, one per
+drawing tool — a wall chain, a Door, a Window, a Ruler, a Text — and exactly
+one can be under way at a time, since exactly one Tool is active. Select has
+none: it poses nothing.
+A placement spans several clicks and therefore several undo entries, which is
+what tells it apart from a Plan drag: a chain writes one entry per wall it
+draws, and between two of them the plan can move under it — an undo, a
+thickness retyped, a plan reopened. What it holds pending is therefore never
+the plan itself, only what the next click needs: the chain's anchor Points, the
+Ruler's first end, the wall an Opening would pierce (ADR 0025).
+It ends three ways. It **completes** — the chain closes on its start or stops
+on a double-click, the Opening lands, the Ruler takes its second click, the
+Text is committed non-empty — and the Tool hands back to Select with the result
+selected. It is **abandoned** — Escape or right-click — and the Tool stays,
+holding nothing. Or the click is a **no-op**: a finish that drew no wall, an
+offset the Rail refuses, a Ruler's second click landing on its own first. A
+no-op is not a completion, so the Tool stays there too (ADR 0018).
+Pure editor state: never part of the plan.
+_Avoid_: Draw, drawing gesture, mode — and not to be confused with Placement
+dimension or a Dimension's stored placement, which are about where a measure
+sits, not about posing an element
 
 **Selection**:
 The set of elements — walls, openings, rulers, texts — the user is currently

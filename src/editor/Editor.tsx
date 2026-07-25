@@ -18,20 +18,8 @@ import {
 } from 'lucide-react';
 import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
-import { nearestWall, projectOnWall, wallLength, wallPoints } from '../model/geometry';
-import {
-  addRoomLabel,
-  addRuler,
-  addText,
-  clampOpeningOffset,
-  commitPoint,
-  commitWall,
-  deleteText,
-  editTextContent,
-  placeOpening,
-  renameRoomLabel,
-  wallsAlongPath,
-} from '../model/operations';
+import { projectOnWall, wallLength, wallPoints } from '../model/geometry';
+import { addRoomLabel, addText, deleteText, editTextContent, renameRoomLabel } from '../model/operations';
 import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
@@ -46,16 +34,23 @@ import {
   selectionForRoom,
   toggleRef,
 } from '../model/selection';
-import type { Snap } from '../model/snap';
-import { snapPoint } from '../model/snap';
-import type { Opening, Plan, RoomLabel, TextNote, TextSize, Wall } from '../model/types';
-import { GRID, WALL_THICKNESS } from '../model/types';
+import type { Opening, RoomLabel, TextNote, TextSize, Wall } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
 import { InlineEditor } from './inlineEditor';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
-import { CLICK_PX, snapTolerance } from './gesture';
+import { CLICK_PX } from './gesture';
+import type { Placement, PlacementResult, PlacementStage } from './placement';
+import {
+  aimPlacement,
+  beginPlacement,
+  cancelPlacement,
+  clickPlacement,
+  finishPlacement,
+  placementChrome,
+  placementStage,
+} from './placement';
 import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
 import type { RoomTextBlock } from '../sheet/rooms';
@@ -92,16 +87,17 @@ type Drag =
   // settle, selection — lives in planDrag.ts (ADR 0023).
   | { kind: 'plan'; g: PlanDrag };
 
-// Screen px, and not the click threshold: two aimed positions this close are
-// the same point, so a Ruler's B on its own A is a mis-click, not a Ruler.
-const SAME_POINT_PX = 1;
-
-const pointSnap = (p: Plan, id: string): Snap => ({
-  x: p.points[id].x,
-  y: p.points[id].y,
-  kind: 'point',
-  pointId: id,
-});
+// One line per Placement stage; a missing one is a type error, not a blank hint.
+const placementHint = (stage: PlacementStage): string =>
+  ({
+    wall: `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    chaining: `Click to add a wall · click the start point to close the room · ${keyHint('cancel')} / double-click to stop`,
+    opening: 'Hover a wall, click to place',
+    ruler: `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    measuring: `Click to set the end point · ${keyHint('cancel')} / right-click cancels`,
+    text: `Click to place text · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    typing: `Type freely · ${keyHint('cancel')} cancels · Ctrl+Enter or click away commits`,
+  })[stage];
 
 /** Registry lives in App (ADR 0012); lifting this state there instead would
  *  move the editor's insides into its parent. Read through a ref, never stale. */
@@ -151,17 +147,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [hoverRuler, setHoverRuler] = useState<string | null>(null);
   // The room's loop, not the object: a Room is rebuilt on every plan change.
   const [hoverRoom, setHoverRoom] = useState<string | null>(null);
-  // First click held as a pending snap, not committed: aborting the chain
-  // (Esc, tool switch, double-click) must not mutate the plan.
-  const [chain, setChain] = useState<{ start: string; last: string } | { pending: Snap } | null>(null);
-  // The chain's anchor Points in draw order — a ref so id churn across commits
-  // never restages, read once at finish to select only the walls it drew.
-  const chainAnchors = useRef<string[]>([]);
-  // The Ruler's first click, held as a snap until B commits it: aborting (Esc,
-  // right-click, tool switch) must not touch the plan.
-  const [rulerA, setRulerA] = useState<Snap | null>(null);
-  const [snap, setSnap] = useState<Snap | null>(null);
-  const [openPreview, setOpenPreview] = useState<{ wallId: string; offset: number } | null>(null);
+  // CONTEXT.md: Placement. What the active drawing tool has pending — the
+  // chain, the Ruler's A, the aimed Opening — is one value (ADR 0025); null
+  // under Select, which poses nothing.
+  const [placement, setPlacement] = useState<Placement | null>(null);
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
     null,
   );
@@ -194,13 +183,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // Alt inverts the current snap state for the gesture (ADR 0007).
   const isFree = (alt: boolean) => !snapEnabled !== alt;
   const free = isFree(altHeld);
-
-  // A Text attaches to nothing, so its placement runs the grid rung only —
-  // never Points or wall body (ticket 02). Alt / Snap-off give free 1cm coords.
-  const snapText = (x: number, y: number, freeNow: boolean): Snap =>
-    freeNow
-      ? { x: Math.round(x), y: Math.round(y), kind: 'free' }
-      : { x: Math.round(x / GRID) * GRID, y: Math.round(y / GRID) * GRID, kind: 'grid' };
+  const placementEnv = (freeNow: boolean) => ({ pxPerCm: pxPerCm(), free: freeNow, defaults });
 
   // Fit on any plan replacement (open, restore, reset); mount included, which
   // frames a plan restored before the editor mounted.
@@ -235,33 +218,29 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       : null;
   const hoveredRoom = hovered && roomWallIds(plan, hovered) ? hovered : null;
 
-  // The tools aim through the same ladder at the same reach as a Plan drag.
-  const tolerance = () => snapTolerance(pxPerCm());
-
   const switchTool = (next: Tool) => {
     setTool(next);
-    setChain(null);
-    chainAnchors.current = [];
-    setRulerA(null);
-    setSnap(null);
-    setOpenPreview(null);
+    setPlacement(next === 'select' ? null : beginPlacement(next));
     setTextEditing(null);
     if (next !== 'select') setSel([]);
     // A Ruler is measured, so drawing one reveals the measures (ticket 03).
     if (next === 'ruler') setMeasures(true);
   };
 
-  // A completed chain returns to Select with the walls it drew selected; a
-  // path with no wall is not a completion, so the tool simply stays (Q5).
-  const finishChain = (finalPlan: Plan, path: string[]) => {
-    const drawn = wallsAlongPath(finalPlan, path);
-    if (drawn.length === 0) {
-      setChain(null);
-      setSnap(null);
-      return;
+  // Everything a placement can ask of the editor, in one place. A completion
+  // names the Tool it hands back to, which reseeds the placement itself.
+  const applyPlacement = (r: PlacementResult) => {
+    const next = r.plan;
+    if (next) setPlan(() => next);
+    if (r.tool) switchTool(r.tool);
+    else setPlacement(r.placement);
+    if (r.selection) setSel(r.selection);
+    if (r.editor) {
+      // The paired mousedown (next event) must skip its focus fixup so the
+      // editor's autoFocus survives — see onMouseDown below.
+      placingText.current = true;
+      setTextEditing({ id: null, ...r.editor, initial: '' });
     }
-    switchTool('select');
-    setSel(drawn.map((id) => ({ type: 'wall', id })));
   };
 
   const deleteSelection = useCallback(
@@ -280,14 +259,14 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     saveSnapEnabled(!snapEnabled);
   }, [snapEnabled]);
 
-  // No dependency list: a list naming chain, sel, tool, snapEnabled and the
-  // camera goes stale the first time someone forgets to extend it.
+  // No dependency list: a list naming the placement, sel, tool, snapEnabled and
+  // the camera goes stale the first time someone forgets to extend it.
   useImperativeHandle(commands, () => ({
+    // The cancel ladder: the placement drops what it has pending, then the
+    // Selection empties, then the tool falls back to Select (ADR 0018).
     cancel: () => {
-      if (chain) {
-        setChain(null);
-        chainAnchors.current = [];
-      } else if (rulerA) setRulerA(null);
+      const dropped = placement && cancelPlacement(placement);
+      if (dropped) setPlacement(dropped);
       else if (sel.length > 0) setSel([]);
       else switchTool('select');
     },
@@ -323,7 +302,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const showPlanDrag = (d: PlanDrag, live: boolean) => {
     const spec = d.spec;
     setPlan(() => d.plan);
-    setSnap(d.snap);
     setMovingOpeningId(live && spec.kind === 'opening' && d.moved ? spec.id : null);
   };
 
@@ -343,81 +321,18 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // must not place a second Text or start a marquee underneath it.
     if (textEditing) return;
     const c = toPlan(e.clientX, e.clientY);
-    if (tool === 'wall') {
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free });
-      if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
-        const closed = commitWall(
-          plan,
-          pointSnap(plan, chain.last),
-          pointSnap(plan, chain.start),
-          defaults.wallThickness,
-        )[0];
-        setPlan(() => closed);
-        // The closing segment runs last→start, so the path loops back to start.
-        finishChain(closed, [...chainAnchors.current, chain.start]);
-        return;
-      }
-      if (chain) {
-        // One setPlan per drawn wall: pending start and wall land in a single
-        // history entry (ADR 0002).
-        const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last);
-        const [withStart, startId] = commitPoint(plan, startSnap);
-        const [next, pointId] = commitWall(
-          withStart,
-          pointSnap(withStart, startId),
-          s,
-          defaults.wallThickness,
-        );
-        setPlan(() => next);
-        setChain({ start: 'pending' in chain ? startId : chain.start, last: pointId });
-        if ('pending' in chain) chainAnchors.current = [startId, pointId];
-        else chainAnchors.current.push(pointId);
-      } else {
-        setChain({ pending: s });
-      }
-    } else if ((tool === 'door' || tool === 'window') && openPreview) {
-      const [next, id] = placeOpening(plan, openPreview.wallId, tool, openPreview.offset, {
-        width: tool === 'door' ? defaults.doorWidth : defaults.windowWidth,
-        hingeSide: defaults.doorHinge,
-        swing: defaults.doorSwing,
-      });
-      // A placed opening returns to Select, selected (Q5: a refused placement
-      // is not a completion, so the tool stays put).
-      if (!id) return;
-      setPlan(() => next);
-      switchTool('select');
-      setSel([{ type: 'opening', id }]);
-    } else if (tool === 'ruler') {
-      const s = snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free });
-      if (!rulerA) {
-        setRulerA(s);
-        setSnap(s);
-        return;
-      }
-      // B on A is a mis-click: ignore it, the pending A keeps rubber-banding.
-      if (Math.hypot(s.x - rulerA.x, s.y - rulerA.y) * pxPerCm() < SAME_POINT_PX) return;
-      const [next, id] = addRuler(plan, { x: rulerA.x, y: rulerA.y }, { x: s.x, y: s.y });
-      setPlan(() => next);
-      // Auto-return to Select with the placed Ruler selected (tickets 03, 06).
-      switchTool('select');
-      setSel([{ type: 'ruler', id }]);
-    } else if (tool === 'text') {
-      // Place at the snapped position and open the inline editor there; the node
-      // is not born until a non-empty commit (ticket 02).
-      const s = snapText(c.x, c.y, isFree(e.altKey));
-      setSnap(null);
-      // The paired mousedown (next event) must skip its focus fixup so the
-      // editor's autoFocus survives — see onMouseDown below.
-      placingText.current = true;
-      setTextEditing({ id: null, x: s.x, y: s.y, size: defaults.textSize, initial: '' });
-    } else if (tool === 'select') {
-      drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
-      setHoverRoom(null);
-      setMarquee({ a: c, b: c });
-      svg.setPointerCapture(e.pointerId);
-    } else {
-      setSel([]);
+    if (placement) {
+      // Alt off the event for a Text and off the tracked state for the others:
+      // an inconsistency this move preserves rather than settles.
+      applyPlacement(
+        clickPlacement(placement, plan, c, placementEnv(placement.tool === 'text' ? isFree(e.altKey) : free)),
+      );
+      return;
     }
+    drag.current = { kind: 'marquee', additive: e.shiftKey, prev: sel, a: c, b: c };
+    setHoverRoom(null);
+    setMarquee({ a: c, b: c });
+    svg.setPointerCapture(e.pointerId);
   };
 
   const onElementPointerDown = (
@@ -475,45 +390,25 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       }
       return;
     }
-    if (tool === 'wall') {
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
-    } else if (tool === 'ruler') {
-      setSnap(snapPoint(plan, c.x, c.y, { tolerance: tolerance(), walls: true, free }));
-    } else if (tool === 'text') {
-      // The aimed placement shows the constant on-screen SnapMarker (ticket 02),
-      // until the editor opens and takes over the spot.
-      if (!textEditing) setSnap(snapText(c.x, c.y, free));
-    } else if (tool === 'select') {
-      // The browser's hit test decides what a click takes: anything above the
-      // sheet outranks the room, except the block the room is clicked by.
-      const target = e.target as Element;
-      const onSheet = target === svgRef.current || target.classList?.contains(ROOM_TEXT_HIT);
-      const room = onSheet ? roomAt(rooms, c.x, c.y) : null;
-      // Same value bails React out: tracking costs a render only on a change.
-      setHoverRoom(room ? roomKey(room) : null);
-    } else if (tool === 'door' || tool === 'window') {
-      const near = nearestWall(plan, c.x, c.y, 40 / pxPerCm() + WALL_THICKNESS);
-      if (near) {
-        const width = tool === 'door' ? defaults.doorWidth : defaults.windowWidth;
-        const offset = clampOpeningOffset(plan, near.wall, near.t, width);
-        setOpenPreview(offset === null ? null : { wallId: near.wall.id, offset });
-      } else setOpenPreview(null);
+    if (placement) {
+      setPlacement(aimPlacement(placement, plan, c, placementEnv(free)));
+      return;
     }
+    // The browser's hit test decides what a click takes: anything above the
+    // sheet outranks the room, except the block the room is clicked by.
+    const target = e.target as Element;
+    const onSheet = target === svgRef.current || target.classList?.contains(ROOM_TEXT_HIT);
+    const room = onSheet ? roomAt(rooms, c.x, c.y) : null;
+    // Same value bails React out: tracking costs a render only on a change.
+    setHoverRoom(room ? roomKey(room) : null);
   };
 
   const onSvgContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (drag.current) return;
-    if (chain) {
-      setChain(null);
-      chainAnchors.current = [];
-      setSnap(null);
-    } else if (rulerA) {
-      setRulerA(null);
-      setSnap(null);
-    } else if (tool !== 'select') {
-      switchTool('select');
-    }
+    const dropped = placement && cancelPlacement(placement);
+    if (dropped) setPlacement(dropped);
+    else if (tool !== 'select') switchTool('select');
   };
 
   const onSvgPointerUp = () => {
@@ -546,29 +441,12 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const selRuler = only?.type === 'ruler' ? plan.rulers[only.id] : null;
 
   const cursor = space ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
-  const ghostOpening: Opening | null =
-    openPreview && (tool === 'door' || tool === 'window')
-      ? tool === 'door'
-        ? {
-            id: '__ghost',
-            wallId: openPreview.wallId,
-            type: 'door',
-            offset: openPreview.offset,
-            width: defaults.doorWidth,
-            hingeSide: defaults.doorHinge,
-            swing: defaults.doorSwing,
-          }
-        : {
-            id: '__ghost',
-            wallId: openPreview.wallId,
-            type: 'window',
-            offset: openPreview.offset,
-            width: defaults.windowWidth,
-          }
-      : null;
+  // What the placement puts on screen: four fields, each folded below into its
+  // own piece of chrome. No field names a Tool.
+  const chrome = placement ? placementChrome(placement, plan, defaults) : null;
 
   const placementOpening =
-    ghostOpening ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null);
+    chrome?.ghost ?? (movingOpeningId ? (plan.openings[movingOpeningId] ?? null) : null);
 
   // Gesture plus selection, no cardinality threshold; a selected wall stays
   // silent for the openings it carries.
@@ -652,7 +530,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const onTextDoubleClick = (text: TextNote, e: React.MouseEvent) => {
     if (tool !== 'select') return;
     e.stopPropagation();
-    setSnap(null);
     setTextEditing({ id: text.id, x: text.x, y: text.y, size: text.size, initial: text.content });
   };
 
@@ -717,11 +594,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   };
 
   const onCanvasDoubleClick = (e: React.MouseEvent) => {
-    if (tool === 'wall') {
-      // Only an active chain finishes; without it the anchors are stale from an
-      // aborted chain. Latest plan, not the render closure: the double-click's
-      // own clicks just committed through setPlan and the closure reads stale.
-      if (chain) finishChain(usePlanStore.getState().plan, chainAnchors.current);
+    if (placement) {
+      // Latest plan, not the render closure: the double-click's own clicks just
+      // committed through setPlan and the closure reads stale.
+      applyPlacement(finishPlacement(placement, usePlanStore.getState().plan));
       return;
     }
     if (tool !== 'select') return;
@@ -899,24 +775,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             pointerEvents="none"
           />
         )}
-        {chain && snap && (
-          <RubberWall
-            from={'pending' in chain ? chain.pending : plan.points[chain.last]}
-            to={snap}
-            thickness={defaults.wallThickness}
-          />
-        )}
-        {ghostOpening && <OpeningGlyph plan={plan} opening={ghostOpening} ghost />}
-        {/* Full live preview: the A→cursor segment already reads as the Ruler
-            (ISO arrows + live length), plus the SnapMarker at the aimed point. */}
-        {tool === 'ruler' && rulerA && snap && (
-          <RulerLabel
-            ruler={{ id: '__ghost', a: { x: rulerA.x, y: rulerA.y }, b: { x: snap.x, y: snap.y }, t: 0.5 }}
-          />
-        )}
-        {(tool === 'wall' || tool === 'ruler' || (tool === 'text' && !textEditing)) && (
-          <SnapMarker snap={snap} pxPerCm={zoomScale} />
-        )}
+        {chrome?.rubber && <RubberWall {...chrome.rubber} />}
+        {chrome?.ghost && <OpeningGlyph plan={plan} opening={chrome.ghost} ghost />}
+        {chrome?.rulerGhost && <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} />}
+        <SnapMarker snap={chrome?.snap ?? null} pxPerCm={zoomScale} />
         {editing && (
           <InlineEditor
             className="room-name-input"
@@ -974,21 +836,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         className="hint"
         style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}
       >
-        {tool === 'wall'
-          ? chain
-            ? `Click to add a wall · click the start point to close the room · ${keyHint('cancel')} / double-click to stop`
-            : `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
-          : tool === 'door' || tool === 'window'
-            ? 'Hover a wall, click to place'
-            : tool === 'ruler'
-              ? rulerA
-                ? `Click to set the end point · ${keyHint('cancel')} / right-click cancels`
-                : `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
-              : tool === 'text'
-                ? textEditing
-                  ? `Type freely · ${keyHint('cancel')} cancels · Ctrl+Enter or click away commits`
-                  : `Click to place text · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`
-                : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
+        {placement
+          ? placementHint(placementStage(placement))
+          : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
