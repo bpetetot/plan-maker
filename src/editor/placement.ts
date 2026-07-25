@@ -1,6 +1,5 @@
-// CONTEXT.md: Placement — what a drawing tool poses, as a value (ADR 0025).
-// Pure: no React, no store. Unlike a Plan drag it carries no plan of its own,
-// because it spans several commits: the plan is an argument on every call.
+// CONTEXT.md: Placement, as a value (ADR 0025). Pure — no React, no store —
+// and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
 import { nearestWall } from '../model/geometry';
 import {
@@ -19,8 +18,8 @@ import { GRID, WALL_THICKNESS } from '../model/types';
 import { snapTolerance } from './gesture';
 import type { Tool, ToolDefaults } from './tools';
 
-/** Every Tool but Select, which poses nothing. */
-export type PlacementTool = Exclude<Tool, 'select'>;
+// Every Tool but Select, which poses nothing.
+type PlacementTool = Exclude<Tool, 'select'>;
 
 // The first click is held as a pending Snap, not committed: aborting the chain
 // must not touch the plan. Past it the chain names Points, which commits churn.
@@ -39,9 +38,9 @@ export type Placement =
 /** The machine's state, flat: one word the screen can index a hint by. */
 export type PlacementStage = 'wall' | 'chaining' | 'opening' | 'ruler' | 'measuring' | 'text' | 'typing';
 
-export interface PlacementEnv {
+interface PlacementEnv {
   pxPerCm: number;
-  /** Alt inverts the snap state for the gesture (ADR 0007). */
+  // Alt inverts the snap state for the gesture (ADR 0007).
   free: boolean;
   defaults: ToolDefaults;
 }
@@ -57,8 +56,8 @@ export interface PlacementResult {
   editor?: { x: number; y: number; size: TextSize };
 }
 
-/** Everything the placement puts on screen, folded by the caller into chrome. */
-export interface PlacementChrome {
+// Everything the placement puts on screen, folded by the caller into chrome.
+interface PlacementChrome {
   snap: Snap | null;
   rubber: { from: Vec; to: Vec; thickness: Cm } | null;
   ghost: Opening | null;
@@ -119,7 +118,6 @@ export function placementStage(p: Placement): PlacementStage {
 export function aimPlacement(p: Placement, plan: Plan, at: Vec, env: PlacementEnv): Placement {
   switch (p.tool) {
     case 'wall':
-      return { ...p, snap: aimPoint(plan, at, env) };
     case 'ruler':
       return { ...p, snap: aimPoint(plan, at, env) };
     // The open editor holds the spot: nothing chases the pointer under it.
@@ -128,7 +126,9 @@ export function aimPlacement(p: Placement, plan: Plan, at: Vec, env: PlacementEn
     case 'door':
     case 'window': {
       const near = nearestWall(plan, at.x, at.y, OPENING_REACH_PX / env.pxPerCm + WALL_THICKNESS);
-      if (!near) return { ...p, preview: null };
+      // The same value back, not a fresh one: aiming at no wall must not cost a
+      // render on every pointermove.
+      if (!near) return p.preview ? { ...p, preview: null } : p;
       const width = p.tool === 'door' ? env.defaults.doorWidth : env.defaults.windowWidth;
       const offset = clampOpeningOffset(plan, near.wall, near.t, width);
       return { ...p, preview: offset === null ? null : { wallId: near.wall.id, offset } };

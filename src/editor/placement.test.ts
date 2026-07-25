@@ -125,6 +125,8 @@ describe('an opening', () => {
     expect(clicked.plan).toBeUndefined();
     // A refused placement is not a completion: the tool stays (ADR 0018).
     expect(clicked.tool).toBeUndefined();
+    // Same value back, so aiming at nothing costs the screen no render.
+    expect(aimPlacement(aimed, plan, at(300, 900), ENV)).toBe(aimed);
   });
 
   it('refuses a wall whose Rail is narrower than the opening', () => {

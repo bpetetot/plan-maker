@@ -147,9 +147,8 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const [hoverRuler, setHoverRuler] = useState<string | null>(null);
   // The room's loop, not the object: a Room is rebuilt on every plan change.
   const [hoverRoom, setHoverRoom] = useState<string | null>(null);
-  // CONTEXT.md: Placement. What the active drawing tool has pending — the
-  // chain, the Ruler's A, the aimed Opening — is one value (ADR 0025); null
-  // under Select, which poses nothing.
+  // CONTEXT.md: Placement — what the drawing tool has pending, as one value
+  // (ADR 0025). Null under Select, which poses nothing.
   const [placement, setPlacement] = useState<Placement | null>(null);
   const [marquee, setMarquee] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(
     null,
