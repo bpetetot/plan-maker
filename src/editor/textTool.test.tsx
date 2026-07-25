@@ -98,6 +98,9 @@ describe('placing a Text', () => {
     expect(isEditing()).toBe(false);
     expect(texts()).toHaveLength(0);
     expect(undoDepth()).toBe(0);
+    // The one shot was spent opening the box, so a cancel hands back too
+    // (CONTEXT.md: Tool).
+    expect(pressed('Select')).toBe('true');
   });
 
   it('a plain Enter inserts a newline instead of committing; the multi-line content is kept', async () => {

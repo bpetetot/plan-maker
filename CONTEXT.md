@@ -233,10 +233,13 @@ placement hands the tool back to Select and leaves the result as the Selection �
 the walls a chain drew (which read as a Room when they close one), the Opening
 just set, the Ruler just measured, the Text just written.
 Completion is a positive finish only — a chain closed onto its start or ended
-by a double-click, an Opening placed, a Ruler's second click, a Text committed
-with non-empty content — never an abort: Escape or right-click ends the pending
-chain or Ruler point but keeps the tool, an empty Text commits nothing and keeps
-it, and a finish that placed nothing keeps it too (ADR 0018). Pure editor state:
+by a double-click, an Opening placed, a Ruler's second click — never an abort:
+Escape or right-click ends the pending chain or Ruler point but keeps the tool,
+and a finish that placed nothing keeps it too (ADR 0018).
+The Text tool is the exception, and spends its one shot on opening the editing
+box rather than on what the box returns: it hands back to Select as soon as that
+box closes, whether the content was committed, left empty, or cancelled by
+Escape. Only whether a Text is born varies (ADR 0021). Pure editor state:
 never part of the plan.
 _Avoid_: Mode
 
@@ -253,12 +256,15 @@ thickness retyped, a plan reopened. What it holds pending is therefore never
 the plan itself, only what the next click needs: the chain's anchor Points, the
 Ruler's first end, the wall an Opening would pierce (ADR 0025).
 It ends three ways. It **completes** — the chain closes on its start or stops
-on a double-click, the Opening lands, the Ruler takes its second click, the
-Text is committed non-empty — and the Tool hands back to Select with the result
-selected. It is **abandoned** — Escape or right-click — and the Tool stays,
-holding nothing. Or the click is a **no-op**: a finish that drew no wall, an
-offset the Rail refuses, a Ruler's second click landing on its own first. A
-no-op is not a completion, so the Tool stays there too (ADR 0018).
+on a double-click, the Opening lands, the Ruler takes its second click — and the
+Tool hands back to Select with the result selected. It is **abandoned** — Escape
+or right-click drops what it holds pending — and the Tool stays, holding
+nothing. Or the click is a **no-op**: a finish that drew no wall, an offset the
+Rail refuses, a Ruler's second click landing on its own first. A no-op is not a
+completion, so the Tool stays there too (ADR 0018).
+A Text placement follows none of that past its click: it ends by handing an
+editing box its spot, and the Tool hands back when the box closes — committed,
+empty or cancelled alike (CONTEXT.md: Tool).
 Pure editor state: never part of the plan.
 _Avoid_: Draw, drawing gesture, mode — and not to be confused with Placement
 dimension or a Dimension's stored placement, which are about where a measure
