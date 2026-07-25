@@ -19,6 +19,7 @@ import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
 import type { Plan } from '../model/types';
 import { dimTravelBounds } from '../sheet/measures';
+import { CLICK_PX, snapTolerance } from './gesture';
 
 export type PlanDragSpec =
   // `grabDelta` fixes the grab point so the handle never recenters on the cursor.
@@ -71,14 +72,6 @@ export interface PlanDrag {
   /** What the drag leaves selected, or null to leave the Selection alone. */
   selection: ElementRef[] | null;
 }
-
-// Screen px; below this a drag is a plain click.
-const CLICK_PX = 4;
-// Screen px too: the snap ladder's reach, constant whatever the zoom.
-const SNAP_PX = 14;
-
-/** Shared with the tools, which aim through the same ladder at the same reach. */
-export const snapTolerance = (pxPerCm: number) => SNAP_PX / pxPerCm;
 
 export interface AimEnv {
   pxPerCm: number;

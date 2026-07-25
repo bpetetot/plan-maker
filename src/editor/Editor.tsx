@@ -53,7 +53,8 @@ import { GRID, WALL_THICKNESS } from '../model/types';
 import { beginHistoryGroup, endHistoryGroup, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
-import { aimPlanDrag, beginPlanDrag, commitPlanDrag, snapTolerance } from './planDrag';
+import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
+import { CLICK_PX, snapTolerance } from './gesture';
 import { setMeasures, toggleGrid, toggleMeasures, usePreferences } from './preferences';
 import { loadSnapEnabled, saveSnapEnabled } from './snapPref';
 import type { RoomTextBlock } from '../sheet/rooms';
@@ -90,9 +91,9 @@ type Drag =
   // settle, selection — lives in planDrag.ts (ADR 0023).
   | { kind: 'plan'; g: PlanDrag };
 
-// Screen px; below this a drag is a plain click. The Plan drags read it from
-// planDrag.ts; the marquee is the one drag left holding it here.
-const CLICK_PX = 4;
+// Screen px, and not the click threshold: two aimed positions this close are
+// the same point, so a Ruler's B on its own A is a mis-click, not a Ruler.
+const SAME_POINT_PX = 1;
 
 const pointSnap = (p: Plan, id: string): Snap => ({
   x: p.points[id].x,
@@ -398,7 +399,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         return;
       }
       // B on A is a mis-click: ignore it, the pending A keeps rubber-banding.
-      if (Math.hypot(s.x - rulerA.x, s.y - rulerA.y) * pxPerCm() < CLICK_PX / 4) return;
+      if (Math.hypot(s.x - rulerA.x, s.y - rulerA.y) * pxPerCm() < SAME_POINT_PX) return;
       const [next, id] = addRuler(plan, { x: rulerA.x, y: rulerA.y }, { x: s.x, y: s.y });
       setPlan(() => next);
       // Auto-return to Select with the placed Ruler selected (tickets 03, 06).
