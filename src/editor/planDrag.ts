@@ -115,7 +115,9 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
         return { ...drag, plan: moveRoomLabel(drag.plan, drag.labelId, t.x, t.y), moved };
       }
       if (!moved) return { ...drag, moved };
-      const [plan, labelId] = addRoomLabel(drag.plan, '', t.x, t.y);
+      // Born of a placement gesture, so born placed: nothing else would keep
+      // it alive (CONTEXT.md: Room label).
+      const [plan, labelId] = addRoomLabel(drag.plan, '', t.x, t.y, true);
       return { ...drag, plan, labelId, moved };
     }
     case 'opening': {

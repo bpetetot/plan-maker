@@ -249,6 +249,10 @@ const sameLoop = (a: Room, b: Room) => {
   return a.pointIds.every((id) => ids.has(id));
 };
 
+// A label carries a name, a custom placement, or both; one carrying neither
+// does not exist (CONTEXT.md: Room label).
+const carries = (label: RoomLabel): boolean => Boolean(label.name || label.placed);
+
 // A label belongs to its room, not a position (CONTEXT.md: Room label): home
 // room matched by loop, not containment, so a passing wall cannot steal it.
 export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
@@ -285,10 +289,11 @@ export function reconcileRoomLabels(before: Plan, after: Plan): Plan {
     }
   }
   // one label per room: labels iterate in creation order, the first claim wins
+  // — and a label that carries nothing claims none, or it would evict a name.
   const next: Plan['roomLabels'] = {};
   const claimed = new Set<Room>();
   for (const { label, room } of kept) {
-    if (claimed.has(room)) {
+    if (!carries(label) || claimed.has(room)) {
       changed = true;
       continue;
     }
@@ -343,15 +348,21 @@ export function wallMeasures(plan: Plan, rooms: Room[], wall: Wall): WallMeasure
   return { kind: 'plain', length, thickness: wall.thickness };
 }
 
-export function addRoomLabel(plan: Plan, name: string, x: number, y: number): [Plan, string] {
+export function addRoomLabel(plan: Plan, name: string, x: number, y: number, placed?: true): [Plan, string] {
   const id = newId();
-  const label = { id, name, x: Math.round(x), y: Math.round(y) };
+  const rounded = { id, name, x: Math.round(x), y: Math.round(y) };
+  const label: RoomLabel = placed ? { ...rounded, placed } : rounded;
   return [{ ...plan, roomLabels: { ...plan.roomLabels, [id]: label } }, id];
 }
 
 export function renameRoomLabel(plan: Plan, id: string, name: string): Plan {
   const label = plan.roomLabels[id];
   if (!label) return plan;
+  if (!carries({ ...label, name })) {
+    const roomLabels = { ...plan.roomLabels };
+    delete roomLabels[id];
+    return { ...plan, roomLabels };
+  }
   return { ...plan, roomLabels: { ...plan.roomLabels, [id]: { ...label, name } } };
 }
 

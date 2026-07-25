@@ -97,31 +97,35 @@ own to delete, so deleting it does nothing (ADR 0015).
 _Avoid_: Zone, area, space
 
 **Room label**:
-The name given to a room, shown with the room's area as one text block —
-label and area always share one position and one behavior. A label belongs
-to its room, not to a position: it follows the room through every wall
-change — resizing the room, or a wall sweeping past the block, never hands
-the label to a neighbouring room. Its placement has two states, like a
-Dimension's: by default the block sits at the room's anchor — the centroid
-of the room's surface, or, when a contained island pushes that centroid out
-of the room, the point of the room deepest inside it — continuously
-recomputed; a default placement's position is the anchor, nothing else;
-dragging the block gives the label a custom placement, which holds exactly
-as long as the room contains it — a change that leaves the block outside
-its room reverts it to default placement. It is always inside a detected
-room — an orphan label never exists: it cannot be created or dragged
-outside a room, and labels that would arrive orphaned (e.g. from an
-imported plan) are dropped. After every wall change, each label reconciles:
+What a room carries of its own text block: a name, a custom placement, or
+both — a label that carries neither does not exist, and is deleted the
+moment it loses the last one it had. The name shows with the room's area as
+one text block — label and area always share one position and one behavior,
+so an unnamed room whose area block was dragged carries a nameless label to
+hold that placement. A label belongs to its room, not to a position: it
+follows the room through every wall change — resizing the room, or a wall
+sweeping past the block, never hands the label to a neighbouring room. Its
+placement has two states, like a Dimension's: by default the block sits at
+the room's anchor — the centroid of the room's surface, or, when a contained
+island pushes that centroid out of the room, the point of the room deepest
+inside it — continuously recomputed; a default placement's position is the
+anchor, nothing else; dragging the block gives the label a custom placement,
+which holds exactly as long as the room contains it — a change that leaves
+the block outside its room reverts it to default placement. It is always
+inside a detected room — an orphan label never exists: it cannot be created
+or dragged outside a room, and labels that would arrive orphaned (e.g. from
+an imported plan) are dropped. After every wall change, each label reconciles:
 its room still detected — the label stays with it; its room no longer
 recognizable (its loop of Points changed — a split added a corner, a merge
 removed one) — the label falls back to whichever detected room contains its
 position; no room contains it — the label is deleted. When a move
 translates every wall of its room, a custom placement translates with the
 room, keeping its position relative to the room — a default placement
-simply follows the anchor. A room without a label shows its area at its
-anchor. A room never keeps more than one label: when a wall change leaves
-several labels in one room (e.g. deleting a dividing wall merges two named
-rooms), only the oldest survives — the others are deleted.
+simply follows the anchor. A room with no label, or one whose label carries
+no name, shows its area alone — at the anchor by default, at the label's
+position when it holds one. A room never keeps more than one label: when a
+wall change leaves several labels in one room (e.g. deleting a dividing wall
+merges two named rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room name, tag
 
 **Edit**:

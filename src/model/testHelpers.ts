@@ -111,15 +111,17 @@ export function twoRoomPlan(): Plan {
   });
 }
 
-// Two named rooms stacked in a 2 m column, sharing the wall at y=60: 1,50 m
-// tall on top, 2,40 m below. Dragging the shared wall inverts the two.
-export function stackedRoomsPlan(): {
+// Two labeled rooms stacked in a 2 m column, sharing the wall at y=60: 1,50 m
+// tall on top, 2,40 m below. Dragging the shared wall inverts the two, and
+// deleting it merges them.
+export function stackedRoomsPlan(topName = 'AAA'): {
   plan: Plan;
   shared: [string, string];
+  sharedWall: string;
   top: string;
   bottom: string;
 } {
-  let ids = { shared: ['', ''] as [string, string], top: '', bottom: '' };
+  let ids = { shared: ['', ''] as [string, string], sharedWall: '', top: '', bottom: '' };
   const plan = buildPlan((b) => {
     const tl = b.point(250, -90);
     const tr = b.point(450, -90);
@@ -130,13 +132,14 @@ export function stackedRoomsPlan(): {
     b.wall(tl, tr);
     b.wall(tl, ml);
     b.wall(tr, mr);
-    b.wall(ml, mr);
+    const shared = b.wall(ml, mr);
     b.wall(ml, bl);
     b.wall(mr, br);
     b.wall(bl, br);
     ids = {
       shared: [ml.id, mr.id],
-      top: b.label('AAA', 350, -15).id,
+      sharedWall: shared.id,
+      top: b.label(topName, 350, -15).id,
       bottom: b.label('BBB', 350, 180).id,
     };
   });

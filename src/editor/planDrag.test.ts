@@ -342,4 +342,13 @@ describe('a new-label drag', () => {
     expect(Object.values(drag.plan.roomLabels)).toEqual([expect.objectContaining({ x: 270, y: 280 })]);
     expect(drag.selection).toBeNull();
   });
+
+  it('is born already placed, on the aim that crosses the threshold', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const drag = commitPlanDrag(aimPlanDrag(newLabelDrag(plan, room), at(250, 260), AIM));
+    expect(Object.values(drag.plan.roomLabels)).toEqual([
+      expect.objectContaining({ name: '', x: 250, y: 260, placed: true }),
+    ]);
+  });
 });

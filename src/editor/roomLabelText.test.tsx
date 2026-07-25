@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 // A closed square room (100,100)-(500,500); centroid at (300,300).
-function emptySquare(label?: { name: string; x: number; y: number }): Plan {
+function emptySquare(label?: { name: string; x: number; y: number; placed?: true }): Plan {
   return {
     points: {
       a: { id: 'a', x: 100, y: 100 },
@@ -41,7 +41,7 @@ const undoDepth = () => usePlanStore.temporal.getState().pastStates.length;
 const nameInput = () => page.getByRole('textbox');
 const isEditing = () => nameInput().elements().length === 1;
 
-async function setup(label?: { name: string; x: number; y: number }) {
+async function setup(label?: { name: string; x: number; y: number; placed?: true }) {
   usePlanStore.setState({ plan: emptySquare(label), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
   const { container } = await render(<Editor />);
@@ -81,13 +81,23 @@ describe('inline room-name editing', () => {
     expect(undoDepth()).toBe(0);
   });
 
-  it('emptying the text clears the name but keeps the marker in place', async () => {
-    const { svg } = await setup({ name: 'Kitchen', x: 250, y: 260 });
+  it('emptying the text keeps a dragged block where it was dragged', async () => {
+    const { svg } = await setup({ name: 'Kitchen', x: 250, y: 260, placed: true });
+    await mouse(svg, 'dblclick', clientAt(svg, 250, 260));
+    await expect.element(nameInput()).toHaveValue('Kitchen');
+    await userEvent.clear(nameInput());
+    await userEvent.keyboard('{Enter}');
+    expect(labels()[0]).toMatchObject({ name: '', x: 250, y: 260, placed: true });
+    expect(undoDepth()).toBe(1);
+  });
+
+  it('emptying the text on an undragged block leaves the room unlabeled', async () => {
+    const { svg } = await setup({ name: 'Kitchen', x: 300, y: 300 });
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await expect.element(nameInput()).toHaveValue('Kitchen');
     await userEvent.clear(nameInput());
     await userEvent.keyboard('{Enter}');
-    expect(labels()[0]).toMatchObject({ name: '', x: 250, y: 260 });
+    expect(labels()).toHaveLength(0);
     expect(undoDepth()).toBe(1);
   });
 
