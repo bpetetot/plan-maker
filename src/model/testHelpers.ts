@@ -111,6 +111,38 @@ export function twoRoomPlan(): Plan {
   });
 }
 
+// Two named rooms stacked in a 2 m column, sharing the wall at y=60: 1,50 m
+// tall on top, 2,40 m below. Dragging the shared wall inverts the two.
+export function stackedRoomsPlan(): {
+  plan: Plan;
+  shared: [string, string];
+  top: string;
+  bottom: string;
+} {
+  let ids = { shared: ['', ''] as [string, string], top: '', bottom: '' };
+  const plan = buildPlan((b) => {
+    const tl = b.point(250, -90);
+    const tr = b.point(450, -90);
+    const ml = b.point(250, 60);
+    const mr = b.point(450, 60);
+    const bl = b.point(250, 300);
+    const br = b.point(450, 300);
+    b.wall(tl, tr);
+    b.wall(tl, ml);
+    b.wall(tr, mr);
+    b.wall(ml, mr);
+    b.wall(ml, bl);
+    b.wall(mr, br);
+    b.wall(bl, br);
+    ids = {
+      shared: [ml.id, mr.id],
+      top: b.label('AAA', 350, -15).id,
+      bottom: b.label('BBB', 350, 180).id,
+    };
+  });
+  return { plan, ...ids };
+}
+
 // 4×3 m named room: tells the area measure apart from the room name.
 export function namedRoomPlan(name = 'Kitchen'): Plan {
   return buildPlan((b) => {

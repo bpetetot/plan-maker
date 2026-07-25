@@ -40,4 +40,6 @@ importing a plan normalizes it, healing plans produced before this decision.
   exact pre-gesture plan, including the merged-away point.
 - Dragging a point onto a wall's *body* is ADR 0002's invariant, not this
   one: since issue 08, drag end also planarizes — coincident points merge
-  first, then walls split at the remaining junctions.
+  first, then walls split at the remaining junctions. ADR 0022 made that order
+  part of one named operation, the Settle, which every edit ends with; loading
+  a plan is not an edit and keeps calling this merge directly.

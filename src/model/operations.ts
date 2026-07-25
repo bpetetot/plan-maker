@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { clampCenter, openingPlacement, openingRail } from './openings';
+import { reconcileRoomLabels } from './rooms';
 import type { Snap } from './snap';
 import type { Opening, Plan, Ruler, TextNote, TextSize, Wall } from './types';
 import { defaultOpeningWidth, WALL_THICKNESS } from './types';
@@ -310,7 +311,7 @@ export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
 
 // Invariant "walls only meet at shared Points" (ADR 0002), drag-end
 // counterpart of commitWall's planar insertion. Runs to a fixpoint.
-export function planarize(plan: Plan): Plan {
+function planarize(plan: Plan): Plan {
   let next = plan;
   for (let changed = true; changed;) {
     changed = false;
@@ -346,6 +347,12 @@ export function planarize(plan: Plan): Plan {
     }
   }
   return next;
+}
+
+/** CONTEXT.md: Settle. `before` is the plan the edit started from — the caller
+ *  holds it; `moving` lists the Points it displaced (ADR 0022). */
+export function settleEdit(before: Plan, after: Plan, moving?: Set<string>): Plan {
+  return reconcileRoomLabels(before, planarize(mergeCoincidentPoints(after, moving)));
 }
 
 // Openings die with their wall (spec §2).

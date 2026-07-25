@@ -12,7 +12,7 @@ import {
   wallMeasures,
 } from './rooms';
 import type { Plan } from './types';
-import { buildPlan, squareRoomPlan } from './testHelpers';
+import { buildPlan, squareRoomPlan, stackedRoomsPlan } from './testHelpers';
 
 describe('detectRooms after planar insertion (ADR 0002)', () => {
   it('detects both rooms when a divider is drawn between two wall bodies', () => {
@@ -531,33 +531,8 @@ describe('reconcileRoomLabels', () => {
     expect(reconcileRoomLabels(plan, after).roomLabels).toEqual({});
   });
 
-  const stackedRooms = () => {
-    let ids = { shared: ['', ''], top: '', bottom: '' };
-    const plan = buildPlan((b) => {
-      const tl = b.point(250, -90);
-      const tr = b.point(450, -90);
-      const ml = b.point(250, 60);
-      const mr = b.point(450, 60);
-      const bl = b.point(250, 300);
-      const br = b.point(450, 300);
-      b.wall(tl, tr);
-      b.wall(tl, ml);
-      b.wall(tr, mr);
-      b.wall(ml, mr);
-      b.wall(ml, bl);
-      b.wall(mr, br);
-      b.wall(bl, br);
-      ids = {
-        shared: [ml.id, mr.id],
-        top: b.label('AAA', 350, -15).id,
-        bottom: b.label('BBB', 350, 180).id,
-      };
-    });
-    return { plan, ...ids };
-  };
-
   it('keeps each label with its room when a shared wall sweeps past a label', () => {
-    const { plan, shared, top, bottom } = stackedRooms();
+    const { plan, shared, top, bottom } = stackedRoomsPlan();
     // drag the shared wall down past BBB's position: the room sizes invert
     const after = setPoints(plan, { [shared[0]]: { x: 250, y: 250 }, [shared[1]]: { x: 450, y: 250 } });
     const next = reconcileRoomLabels(plan, after);

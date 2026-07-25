@@ -20,8 +20,8 @@ import {
   moveRulerEndpoint,
   moveOpening,
   placeOpening,
-  planarize,
   renameRoomLabel,
+  settleEdit,
   setDimPlacement,
   moveText,
   setOpeningWidth,
@@ -33,7 +33,7 @@ import {
   toggleSwing,
 } from './operations';
 import { openingRail } from './openings';
-import { buildPlan, squareRoomPlan } from './testHelpers';
+import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from './testHelpers';
 import { DOOR_WIDTH, emptyPlan, isPlanEmpty } from './types';
 
 const rectPlan = () =>
@@ -415,7 +415,59 @@ describe('mergeCoincidentPoints', () => {
   });
 });
 
-describe('planarize', () => {
+describe('settleEdit', () => {
+  it('restores both invariants in one pass: the twin merges, the crossing splits', () => {
+    // b and dragged coincide at (300,0); the dragged wall runs up to (300,-200)
+    // and crosses the bar at y=-100
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const still = b.point(300, 0);
+      const dragged = b.point(300, 0);
+      const top = b.point(300, -200);
+      const barLeft = b.point(250, -100);
+      const barRight = b.point(350, -100);
+      b.wall(a, still);
+      b.wall(dragged, top);
+      b.wall(barLeft, barRight);
+    });
+    const [, still, dragged] = Object.keys(plan.points);
+    const next = settleEdit(plan, plan, new Set([dragged]));
+    expect(next.points[dragged]).toBeUndefined();
+    expect(next.points[still]).toBeDefined();
+    // the vertical wall and the bar each split at the crossing
+    expect(Object.keys(next.walls)).toHaveLength(5);
+    expect(Object.values(next.points).find((p) => p.x === 300 && p.y === -100)).toBeDefined();
+  });
+
+  it('lets a stationary point outlive a moved one, whatever the creation order', () => {
+    const plan = buildPlan((b) => {
+      const dragged = b.point(400, 0);
+      const still = b.point(400, 0);
+      b.wall(b.point(0, 0), dragged);
+      b.wall(still, b.point(400, 300));
+    });
+    const [dragged, still] = Object.keys(plan.points);
+    const next = settleEdit(plan, plan, new Set([dragged]));
+    expect(next.points[still]).toBeDefined();
+    expect(next.points[dragged]).toBeUndefined();
+  });
+
+  it('reads each label home room from `before`, not from the settled plan', () => {
+    const { plan, shared, top, bottom } = stackedRoomsPlan();
+    // the shared wall sweeps down past BBB, which must stay with its own room
+    const moved = { [shared[0]]: { x: 250, y: 250 }, [shared[1]]: { x: 450, y: 250 } };
+    const next = settleEdit(plan, setPoints(plan, moved), new Set(shared));
+    expect(next.roomLabels[top]).toMatchObject({ name: 'AAA', x: 350, y: 80 });
+    expect(next.roomLabels[bottom]).toMatchObject({ name: 'BBB', x: 350, y: 275 });
+  });
+
+  it('returns the same plan when the edit settled nothing, labels included', () => {
+    const plan = namedRoomPlan();
+    expect(settleEdit(plan, plan)).toBe(plan);
+  });
+});
+
+describe('settleEdit — planar insertion', () => {
   it('splits a wall under a point lying on its body (T junction)', () => {
     // w1 spans (0,0)→(400,0); the free end of w2 sits on its body at (150,0)
     const plan = buildPlan((b) => {
@@ -428,7 +480,7 @@ describe('planarize', () => {
     });
     const [p1, p2, t] = Object.keys(plan.points);
     const w1 = Object.keys(plan.walls)[0];
-    const next = planarize(plan);
+    const next = settleEdit(plan, plan);
     expect(Object.keys(next.walls)).toHaveLength(3);
     expect(next.walls[w1]).toMatchObject({ startPointId: p1, endPointId: t });
     const endHalf = Object.values(next.walls).find((w) => w.startPointId === t && w.endPointId === p2);
@@ -444,7 +496,7 @@ describe('planarize', () => {
       b.wall(p1, p2);
       b.wall(p3, p4);
     });
-    const next = planarize(plan);
+    const next = settleEdit(plan, plan);
     expect(Object.keys(next.walls)).toHaveLength(4);
     const cross = Object.values(next.points).find((p) => p.x === 200 && p.y === 0)!;
     expect(cross).toBeDefined();
@@ -466,14 +518,14 @@ describe('planarize', () => {
       b.wall(p3, p4);
       b.wall(p5, p6);
     });
-    const next = planarize(plan);
+    const next = settleEdit(plan, plan);
     // each vertical wall splits in two, the long wall in three
     expect(Object.keys(next.walls)).toHaveLength(7);
   });
 
   it('returns the same plan when the invariant already holds', () => {
     const plan = squareRoomPlan();
-    expect(planarize(plan)).toBe(plan);
+    expect(settleEdit(plan, plan)).toBe(plan);
   });
 
   it('collapses a wall dropped along another into shared pieces, never twins', () => {
@@ -487,7 +539,7 @@ describe('planarize', () => {
       b.wall(p1, p2);
       b.wall(p3, p4);
     });
-    const next = planarize(plan);
+    const next = settleEdit(plan, plan);
     expect(Object.keys(next.walls)).toHaveLength(3);
     const pairs = Object.values(next.walls).map((w) => [w.startPointId, w.endPointId].sort().join('-'));
     expect(new Set(pairs).size).toBe(3);

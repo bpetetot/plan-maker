@@ -7,13 +7,13 @@ import {
   deleteText,
   deleteWall,
   setPoints,
+  settleEdit,
   translateRoomLabel,
 } from './operations';
 import type { Room } from './rooms';
 import {
   detectRooms,
   openingsOnWalls,
-  reconcileRoomLabels,
   roomAt,
   roomKey,
   roomOpenings,
@@ -149,6 +149,8 @@ export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Roo
   );
 }
 
+// Every edit settles in the same place (ADR 0022); a delete displaces no Point,
+// so only the label reconciliation can act.
 export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan;
   for (const ref of refs) {
@@ -157,7 +159,7 @@ export function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
     else if (ref.type === 'ruler') next = deleteRuler(next, ref.id);
     else next = deleteText(next, ref.id);
   }
-  return reconcileRoomLabels(plan, next);
+  return settleEdit(plan, next);
 }
 
 /** The walls Delete takes for a Room: its boundary minus every wall that is
@@ -204,18 +206,27 @@ export function referencePoint(plan: Plan, refs: ElementRef[], grab: Vec): Point
   return best?.point ?? null;
 }
 
+/** Feeds settleEdit's `moving`, which lets a stationary Point outlive a moved
+ *  one (ADR 0003). */
+export function movedPointIds(plan: Plan, refs: ElementRef[]): Set<string> {
+  const ids = new Set<string>();
+  for (const ref of refs) {
+    if (ref.type !== 'wall') continue;
+    const wall = plan.walls[ref.id];
+    if (!wall) continue;
+    for (const point of wallPoints(plan, wall)) ids.add(point.id);
+  }
+  return ids;
+}
+
 // CONTEXT.md: Room label. A room with every boundary wall selected translates
 // rigidly, label included.
 export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy: number): Plan {
   if (dx === 0 && dy === 0) return plan;
   const updates: Record<string, Vec> = {};
-  for (const ref of refs) {
-    if (ref.type !== 'wall') continue;
-    const wall = plan.walls[ref.id];
-    if (!wall) continue;
-    for (const point of wallPoints(plan, wall)) {
-      updates[point.id] = { x: point.x + dx, y: point.y + dy };
-    }
+  for (const id of movedPointIds(plan, refs)) {
+    const point = plan.points[id];
+    updates[id] = { x: point.x + dx, y: point.y + dy };
   }
   // Rulers ride along rigidly: free coordinates, so both endpoints just shift
   // and `t` (a ratio) is untouched; they never anchor grid realignment.

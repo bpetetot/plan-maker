@@ -28,15 +28,14 @@ import {
   commitWall,
   deleteText,
   editTextContent,
-  mergeCoincidentPoints,
   movePoint,
   moveOpening,
   moveRoomLabel,
   moveRulerEndpoint,
   placeOpening,
-  planarize,
   renameRoomLabel,
   setDimPlacement,
+  settleEdit,
   wallsAlongPath,
 } from '../model/operations';
 import type { Room } from '../model/rooms';
@@ -47,6 +46,7 @@ import {
   deleteElements,
   elementsInRect,
   isSelected,
+  movedPointIds,
   refKey,
   referencePoint,
   roomSelection,
@@ -648,22 +648,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     }
     if (d.kind === 'point' || d.kind === 'rulerEnd') setSnap(null);
     if (d.kind === 'opening') setMovingOpeningId(null);
-    // Merge (ADR 0003), split (ADR 0002) and reconcile (CONTEXT.md: Room
-    // label) once at gesture end, inside the same history group.
+    // CONTEXT.md: Settle. Once at gesture end, inside the same history group.
     if (d.kind === 'point' || d.kind === 'group') {
-      setPlan((p) => {
-        const moving = new Set<string>();
-        if (d.kind === 'point') moving.add(d.id);
-        else
-          for (const ref of d.refs) {
-            const wall = ref.type === 'wall' ? p.walls[ref.id] : undefined;
-            if (wall) {
-              moving.add(wall.startPointId);
-              moving.add(wall.endPointId);
-            }
-          }
-        return reconcileRoomLabels(d.orig, planarize(mergeCoincidentPoints(p, moving)));
-      });
+      setPlan((p) => settleEdit(d.orig, p, d.kind === 'point' ? new Set([d.id]) : movedPointIds(p, d.refs)));
     }
     if (d.kind !== 'pan') endHistoryGroup();
   };

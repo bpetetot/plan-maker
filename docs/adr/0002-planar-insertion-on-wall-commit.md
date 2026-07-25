@@ -45,7 +45,8 @@ topological.
 - The whole commit (splits + reassignments + new wall) is a single history
   entry: undo restores the exact pre-gesture plan.
 - Drag gestures initially bypassed the invariant (tracked as issue 08); the
-  end of a point or group drag now runs the same planar insertion
-  (`planarize`), so a point dropped on a wall body or a dragged wall crossing
-  another splits walls under the same rules, inside the gesture's history
-  entry.
+  end of a point or group drag now runs the same planar insertion, so a point
+  dropped on a wall body or a dragged wall crossing another splits walls under
+  the same rules, inside the gesture's history entry. Since ADR 0022 that pass
+  is reached only through the Settle, which every edit ends with — drawing a
+  wall excepted, since this ADR's own insertion already covers it.

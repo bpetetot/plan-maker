@@ -102,6 +102,14 @@ several labels in one room (e.g. deleting a dividing wall merges two named
 rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room name, tag
 
+**Settle**:
+What the plan does the moment an edit that moved a Point or a Wall lands:
+coincident Points merge into one, walls that touch or cross away from a shared
+Point split at the junction, and every Room label reconciles against the plan
+the edit started from. An edit is never observable half-settled — the whole
+settling belongs to the gesture that caused it, and one undo takes it back.
+_Avoid_: Normalize, cleanup, heal
+
 **Measure**:
 A number the plan states about itself: the Dimension of each wall, the Room
 area of each detected room. Computed from the plan, never stored. Measures
