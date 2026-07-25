@@ -3,7 +3,7 @@
 // the gesture grabs the same position.
 import { faceSpan, fullThicknessSpan } from './faces';
 import { formatLength } from './format';
-import { labelAngle, wallLength, wallPoints } from './geometry';
+import { wallAxis, wallLength } from './geometry';
 import type { Span } from './openings';
 import { clampCenter, openingPlacement } from './openings';
 import type { Opening, Plan, Wall } from './types';
@@ -36,11 +36,11 @@ export const arrowsFitInside = (span: number, plateWidth: number) =>
 // horizontal walls and left for vertical ones.
 export function dimSide(plan: Plan, wall: Wall): 1 | -1 {
   if (wall.dimPlacement) return wall.dimPlacement.side;
-  const [a, b] = wallPoints(plan, wall);
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const raw = (Math.atan2(dy, dx) * 180) / Math.PI;
-  return labelAngle(dx, dy) !== raw ? 1 : -1;
+  const axis = wallAxis(plan, wall);
+  if (!axis) return -1;
+  const raw = (Math.atan2(axis.b.y - axis.a.y, axis.b.x - axis.a.x) * 180) / Math.PI;
+  // The ISO flip is what tells the two defaults apart.
+  return axis.angle !== raw ? 1 : -1;
 }
 
 // The Dimension's Rail: a ratio of the wall's length keeping the plate clear

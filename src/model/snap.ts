@@ -1,5 +1,5 @@
 import type { Vec } from './geometry';
-import { distance, nearestWall, wallLength, wallPoints } from './geometry';
+import { distance, nearestWall, wallAxis } from './geometry';
 import type { Plan } from './types';
 import { GRID } from './types';
 
@@ -51,12 +51,11 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
   if (options.walls) {
     const near = nearestWall(plan, x, y, options.tolerance);
     if (near) {
-      const [a, b] = wallPoints(plan, near.wall);
-      const length = wallLength(plan, near.wall);
-      if (length >= 1) {
+      const axis = wallAxis(plan, near.wall);
+      if (axis && axis.length >= 1) {
         // Rounding may drift a fraction of a cm; the junction holds because the wall is split there.
-        const px = a.x + ((b.x - a.x) / length) * near.t;
-        const py = a.y + ((b.y - a.y) / length) * near.t;
+        const px = axis.a.x + axis.u.x * near.t;
+        const py = axis.a.y + axis.u.y * near.t;
         return { x: Math.round(px), y: Math.round(py), kind: 'wall', wallId: near.wall.id };
       }
     }

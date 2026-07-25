@@ -9,6 +9,7 @@ import {
   polygonCentroid,
   projectOnWall,
   segmentIntersection,
+  wallAxis,
   wallLength,
   wallSide,
 } from './geometry';
@@ -53,6 +54,25 @@ describe('distance and wall length', () => {
     });
     const wall = Object.values(plan.walls)[0];
     expect(wallLength(plan, wall)).toBe(500);
+  });
+});
+
+describe('wallAxis', () => {
+  const axisOf = (ax: number, ay: number, bx: number, by: number) => {
+    const plan = buildPlan((b) => b.wall(b.point(ax, ay), b.point(bx, by)));
+    return wallAxis(plan, Object.values(plan.walls)[0]);
+  };
+
+  it('reads the origin, direction, length and ISO angle', () => {
+    expect(axisOf(0, 0, 100, 0)).toMatchObject({ u: { x: 1, y: 0 }, length: 100, angle: 0 });
+    // ISO: a downward wall reads from the right, never +90
+    expect(axisOf(0, 0, 0, 200)).toMatchObject({ u: { x: 0, y: 1 }, length: 200, angle: -90 });
+  });
+
+  it('refuses only what has no direction, not what is merely short', () => {
+    expect(axisOf(0, 0, 0, 0)).toBeNull();
+    // half a centimetre still has a direction: the thresholds belong to callers
+    expect(axisOf(0, 0, 0.5, 0)?.length).toBe(0.5);
   });
 });
 

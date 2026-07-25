@@ -17,14 +17,35 @@ export const wallLength = (plan: Plan, wall: Wall): number => {
   return distance(a.x, a.y, b.x, b.y);
 };
 
-export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t: number; d: number } {
+export interface WallAxis {
+  a: Point;
+  b: Point;
+  u: Vec;
+  length: number;
+  angle: number;
+}
+
+// The frame every reading of a wall starts from. `null` says only that no
+// direction exists; "too short for this" is each caller's own threshold, and
+// stays where it means something.
+export function wallAxis(plan: Plan, wall: Wall): WallAxis | null {
   const [a, b] = wallPoints(plan, wall);
-  const length = distance(a.x, a.y, b.x, b.y);
-  if (length < 1) return { t: 0, d: distance(a.x, a.y, x, y) };
-  const ux = (b.x - a.x) / length;
-  const uy = (b.y - a.y) / length;
-  const t = Math.max(0, Math.min(length, (x - a.x) * ux + (y - a.y) * uy));
-  return { t, d: distance(a.x + ux * t, a.y + uy * t, x, y) };
+  if (!a || !b) return null;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-9) return null;
+  return { a, b, u: { x: dx / length, y: dy / length }, length, angle: labelAngle(dx, dy) };
+}
+
+export function projectOnWall(plan: Plan, wall: Wall, x: number, y: number): { t: number; d: number } {
+  const [a] = wallPoints(plan, wall);
+  const axis = wallAxis(plan, wall);
+  // A wall too short to project on answers from its start Point.
+  if (!axis || axis.length < 1) return { t: 0, d: distance(a.x, a.y, x, y) };
+  const { u, length } = axis;
+  const t = Math.max(0, Math.min(length, (x - a.x) * u.x + (y - a.y) * u.y));
+  return { t, d: distance(a.x + u.x * t, a.y + u.y * t, x, y) };
 }
 
 // +1 on the left normal of start→end, -1 opposite.

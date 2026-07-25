@@ -1,5 +1,5 @@
 import type { Vec } from './geometry';
-import { wallPoints } from './geometry';
+import { wallAxis } from './geometry';
 import type { Plan, Wall } from './types';
 import { oncePerPlan } from './types';
 
@@ -18,11 +18,9 @@ interface Frame {
 }
 
 function wallFrame(plan: Plan, wall: Wall): Frame | null {
-  const [a, b] = wallPoints(plan, wall);
-  if (!a || !b) return null;
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
-  if (length < 1e-9) return null;
-  const u = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+  const axis = wallAxis(plan, wall);
+  if (!axis) return null;
+  const { a, b, u, length } = axis;
   return { a, b, u, n: rot90(u), length, half: wall.thickness / 2 };
 }
 

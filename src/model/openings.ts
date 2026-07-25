@@ -1,5 +1,5 @@
 import { fullThicknessSpan } from './faces';
-import { distance, wallPoints } from './geometry';
+import { wallAxis } from './geometry';
 import type { Opening, Plan } from './types';
 
 export interface Span {
@@ -26,19 +26,17 @@ export interface OpeningPlacement {
 export function openingPlacement(plan: Plan, opening: Opening): OpeningPlacement | null {
   const wall = plan.walls[opening.wallId];
   if (!wall) return null;
-  const [a, b] = wallPoints(plan, wall);
-  const length = distance(a.x, a.y, b.x, b.y);
-  if (length < 1) return null;
+  const axis = wallAxis(plan, wall);
+  if (!axis || axis.length < 1) return null;
   // Face bounds only, never neighbours: each would bound the other.
   // Gestures keep openings apart; a shrunk wall may draw them overlapping.
   const span = fullThicknessSpan(plan, wall);
   const offset = clampCenter(span, opening.width, opening.offset);
-  const ux = (b.x - a.x) / length;
-  const uy = (b.y - a.y) / length;
+  const { a, u } = axis;
   return {
-    cx: a.x + ux * offset,
-    cy: a.y + uy * offset,
-    angleDeg: (Math.atan2(uy, ux) * 180) / Math.PI,
+    cx: a.x + u.x * offset,
+    cy: a.y + u.y * offset,
+    angleDeg: (Math.atan2(u.y, u.x) * 180) / Math.PI,
     offset,
   };
 }
