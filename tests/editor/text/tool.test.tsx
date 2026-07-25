@@ -27,7 +27,7 @@ const isEditing = () => editor() !== null;
 // fires on — the testKit `blur` helper is for window-level focus, not this.
 const clickAway = async () => {
   editor()?.blur();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await expect.poll(isEditing).toBe(false);
 };
 
 async function setup() {

@@ -30,15 +30,13 @@ describe('re-editing a placed Text with a real double-click', () => {
     const { container } = await render(<Editor />);
     const grab = container.querySelector('rect.text-grab')!;
     await userEvent.dblClick(grab);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(editor()).not.toBeNull();
-    expect(editor()!.value).toBe('Old');
+    await expect.poll(() => editor()?.value).toBe('Old');
     expect(document.activeElement).toBe(editor());
     // Same node re-edited, not a second one, and not moved by the two clicks.
     await userEvent.clear(editor()!);
     await userEvent.type(editor()!, 'New');
     editor()!.blur();
-    await new Promise((r) => setTimeout(r, 10));
+    await expect.poll(() => plan().texts.t1?.content).toBe('New');
     expect(Object.values(plan().texts)).toHaveLength(1);
     expect(plan().texts.t1).toMatchObject({ content: 'New', x: 200, y: 200 });
   });

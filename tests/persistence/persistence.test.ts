@@ -236,9 +236,7 @@ describe('autosave', () => {
     stop();
     await vi.advanceTimersByTimeAsync(0);
     vi.useRealTimers();
-    await new Promise((r) => setTimeout(r, 0));
-    const record = (await get(CURRENT_KEY)) as StoredRecord;
-    expect(record).toBeDefined();
+    await expect.poll(() => get(CURRENT_KEY)).toBeDefined();
   });
 });
 

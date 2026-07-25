@@ -21,6 +21,8 @@ const plan = () => usePlanStore.getState().plan;
 const texts = () => Object.values(plan().texts) as TextNote[];
 const editor = () => document.querySelector('textarea.text-note-input') as HTMLTextAreaElement | null;
 const pressed = (name: string) => page.getByLabelText(name).element().getAttribute('aria-pressed');
+// A yield, not a retrying assertion: what follows asserts the editor was *not*
+// blurred shut, and `expect.poll` would pass before the fixup had its chance.
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe('placing a Text with a real pointer', () => {
@@ -46,8 +48,7 @@ describe('placing a Text with a real pointer', () => {
     await userEvent.type(editor()!, 'Kitchen');
     // A second real click on the sheet must blur-commit, not be swallowed.
     await userEvent.click(svg, { position: { x: 40, y: 40 } } as never);
-    await settle();
-    expect(editor()).toBeNull();
+    await expect.poll(editor).toBeNull();
     expect(texts()).toHaveLength(1);
     expect(texts()[0]).toMatchObject({ content: 'Kitchen' });
     expect(pressed('Select')).toBe('true');
