@@ -16,7 +16,7 @@ function decodeRecord(value: unknown): Plan | null {
 }
 
 function makeRecord(plan: Plan): StoredRecord {
-  return { schemaVersion: SCHEMA_VERSION, savedAt: Date.now(), plan };
+  return { schemaVersion: SCHEMA_VERSION, plan };
 }
 
 export async function loadPlan(): Promise<Plan | null> {

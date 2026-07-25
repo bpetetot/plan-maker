@@ -159,8 +159,8 @@ describe('storage', () => {
 
   it('falls back to the backup when the current record is corrupt', async () => {
     const plan = squarePlan();
-    await set(BACKUP_KEY, { schemaVersion: SCHEMA_VERSION, savedAt: 1, plan });
-    await set(CURRENT_KEY, { schemaVersion: SCHEMA_VERSION, savedAt: 2, plan: { garbage: true } });
+    await set(BACKUP_KEY, { schemaVersion: SCHEMA_VERSION, plan });
+    await set(CURRENT_KEY, { schemaVersion: SCHEMA_VERSION, plan: { garbage: true } });
     const loaded = await loadPlan();
     expect(loaded).toEqual(plan);
   });
@@ -176,12 +176,12 @@ describe('storage', () => {
 
   it('loads a v1 record unchanged (dimension placement is optional)', async () => {
     const plan = squarePlan();
-    await set(CURRENT_KEY, { schemaVersion: 1, savedAt: 1, plan });
+    await set(CURRENT_KEY, { schemaVersion: 1, plan });
     expect(await loadPlan()).toEqual(plan);
   });
 
   it('rejects records from a future schema version', async () => {
-    await set(CURRENT_KEY, { schemaVersion: SCHEMA_VERSION + 1, savedAt: 1, plan: squarePlan() });
+    await set(CURRENT_KEY, { schemaVersion: SCHEMA_VERSION + 1, plan: squarePlan() });
     expect(await loadPlan()).toBeNull();
   });
 });

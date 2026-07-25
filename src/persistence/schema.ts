@@ -6,7 +6,6 @@ export const SCHEMA_VERSION = 2;
 
 export interface StoredRecord {
   schemaVersion: number;
-  savedAt: number;
   plan: Plan;
 }
 
