@@ -2,14 +2,8 @@
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
 import { nearestWall } from '../model/geometry';
-import {
-  addRuler,
-  clampOpeningOffset,
-  commitPoint,
-  commitWall,
-  placeOpening,
-  wallsAlongPath,
-} from '../model/operations';
+import { addRuler, commitPoint, commitWall, placeOpening, wallsAlongPath } from '../model/operations';
+import { railedOpeningOffset } from '../model/rail';
 import type { ElementRef } from '../model/selection';
 import type { Snap } from '../model/snap';
 import { snapPoint } from '../model/snap';
@@ -130,7 +124,7 @@ export function aimPlacement(p: Placement, plan: Plan, at: Vec, env: PlacementEn
       // render on every pointermove.
       if (!near) return p.preview ? { ...p, preview: null } : p;
       const width = p.tool === 'door' ? env.defaults.doorWidth : env.defaults.windowWidth;
-      const offset = clampOpeningOffset(plan, near.wall, near.t, width);
+      const offset = railedOpeningOffset(plan, near.wall, near.t, width);
       return { ...p, preview: offset === null ? null : { wallId: near.wall.id, offset } };
     }
   }

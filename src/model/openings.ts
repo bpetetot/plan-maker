@@ -1,6 +1,6 @@
 import { fullThicknessSpan } from './faces';
 import { distance, wallPoints } from './geometry';
-import type { Opening, Plan, Wall } from './types';
+import type { Opening, Plan } from './types';
 
 export interface Span {
   from: number;
@@ -41,21 +41,4 @@ export function openingPlacement(plan: Plan, opening: Opening): OpeningPlacement
     angleDeg: (Math.atan2(uy, ux) * 180) / Math.PI,
     offset,
   };
-}
-
-// CONTEXT.md: Rail. `referenceOffset`, not the gesture's own overshoot, decides
-// which end a neighbour bounds — so a rail never spans a neighbour.
-export function openingRail(plan: Plan, wall: Wall, referenceOffset: number, excludeId?: string): Span {
-  const { from: spanFrom, to: spanTo } = fullThicknessSpan(plan, wall);
-  let from = spanFrom;
-  let to = spanTo;
-  for (const other of Object.values(plan.openings)) {
-    if (other.wallId !== wall.id || other.id === excludeId) continue;
-    const placement = openingPlacement(plan, other);
-    if (!placement) continue;
-    const half = other.width / 2;
-    if (placement.offset <= referenceOffset) from = Math.max(from, placement.offset + half);
-    else to = Math.min(to, placement.offset - half);
-  }
-  return { from, to };
 }

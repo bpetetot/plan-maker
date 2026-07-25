@@ -19,7 +19,9 @@ import {
 import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallLength, wallPoints } from '../model/geometry';
+import { openingPlacement } from '../model/openings';
 import { addRoomLabel, addText, deleteText, editTextContent, renameRoomLabel } from '../model/operations';
+import { dimSide, railedDimT } from '../model/rail';
 import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
@@ -579,7 +581,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const onDimPointerDown = (wall: Wall, e: React.PointerEvent) => {
     if (e.button !== 0 || space) return;
     const c = toPlan(e.clientX, e.clientY);
-    const textT = (wall.dimPlacement?.t ?? 0.5) * wallLength(plan, wall);
+    // The drawn position, not the stored wish: a wall shortened since the last
+    // drag rails the plate elsewhere, and the grab must start from there.
+    const t = railedDimT(plan, wall, dimSide(plan, wall), wall.dimPlacement?.t ?? 0.5);
+    const textT = t * wallLength(plan, wall);
     startPlanDrag({
       kind: 'dim',
       id: wall.id,
@@ -682,8 +687,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                         kind: 'opening',
                         id: opening.id,
                         start: c,
+                        // Drawn, not stored: on a shrunk wall the glyph sits
+                        // on its Rail while the offset still holds the wish.
                         grabDelta:
-                          opening.offset - projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
+                          (openingPlacement(plan, opening)?.offset ?? opening.offset) -
+                          projectOnWall(plan, plan.walls[opening.wallId], c.x, c.y).t,
                       }))
                     }
                   />

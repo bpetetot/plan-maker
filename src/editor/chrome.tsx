@@ -1,11 +1,12 @@
 import type { Vec } from '../model/geometry';
-import { wallPoints } from '../model/geometry';
+import { labelAngle, wallPoints } from '../model/geometry';
 import { formatLength } from '../model/format';
-import { openingPlacement, openingRail } from '../model/openings';
+import { openingPlacement } from '../model/openings';
+import { openingRail } from '../model/rail';
 import type { Room } from '../model/rooms';
 import type { Snap } from '../model/snap';
 import type { Opening, Plan, Ruler, Wall } from '../model/types';
-import { DimText, dimLineFrame, labelAngle } from '../sheet/measures';
+import { DimText, dimLineFrame } from '../sheet/measures';
 import { doorArc, doorLeaf, doorMirror } from '../sheet/openings';
 import { COLORS } from '../sheet/paint';
 

@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
-import { clampCenter, openingPlacement, openingRail } from './openings';
+import { railedOpeningOffset } from './rail';
 import { reconcileRoomLabels } from './rooms';
 import type { Snap } from './snap';
 import type { Opening, Plan, Ruler, TextNote, TextSize, Wall } from './types';
@@ -89,7 +89,7 @@ export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
     const opening = rebased[id];
     // An opening the clamp would shift is deleted, never silently moved.
     const host = staged.walls[opening.wallId];
-    if (clampOpeningOffset(staged, host, opening.offset, opening.width, opening) !== opening.offset) {
+    if (railedOpeningOffset(staged, host, opening.offset, opening.width, opening) !== opening.offset) {
       delete openings[id];
     }
   }
@@ -380,20 +380,12 @@ export function deleteWall(plan: Plan, id: string): Plan {
   return { ...plan, points, walls, openings };
 }
 
-// `travel` bounds the text center on write only: a stored placement falling
-// outside it after a shorten renders as stored.
-export function setDimPlacement(
-  plan: Plan,
-  wallId: string,
-  t: number,
-  side: 1 | -1,
-  travel: { min: number; max: number } = { min: 0, max: 1 },
-): Plan {
+// A plain setter: `t` arrives railed (ADR 0027), and the Rail binds again at
+// every drawing — a stored placement is only ever a wish.
+export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 | -1): Plan {
   const wall = plan.walls[wallId];
   if (!wall) return plan;
-  const clamped =
-    travel.min > travel.max ? (travel.min + travel.max) / 2 : Math.max(travel.min, Math.min(travel.max, t));
-  const dimPlacement = { t: Math.round(clamped * 1000) / 1000, side };
+  const dimPlacement = { t: Math.round(t * 1000) / 1000, side };
   return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } };
 }
 
@@ -410,24 +402,6 @@ export function deleteOpening(plan: Plan, id: string): Plan {
   return { ...plan, openings };
 }
 
-// `opening` is the one being moved or widened: it bounds nothing itself. Omit
-// it when placing a new one, where the desired offset plays that part.
-export function clampOpeningOffset(
-  plan: Plan,
-  wall: Wall | undefined,
-  offset: number,
-  width: number,
-  opening?: Opening,
-): number | null {
-  if (!wall) return null;
-  const reference = (opening && openingPlacement(plan, opening)?.offset) ?? offset;
-  const rail = openingRail(plan, wall, reference, opening?.id);
-  if (rail.to - rail.from < width) return null;
-  // Mitered rail ends are not whole centimetres: round first, rail last, so a
-  // flush opening lands exactly on its bound.
-  return clampCenter(rail, width, Math.round(clampCenter(rail, width, offset)));
-}
-
 export function placeOpening(
   plan: Plan,
   wallId: string,
@@ -438,7 +412,7 @@ export function placeOpening(
   const wall = plan.walls[wallId];
   if (!wall) return [plan, null];
   const width = init?.width ?? defaultOpeningWidth(type);
-  const clamped = clampOpeningOffset(plan, wall, offset, width);
+  const clamped = railedOpeningOffset(plan, wall, offset, width);
   if (clamped === null) return [plan, null];
   const id = newId();
   const opening: Opening =
@@ -459,7 +433,7 @@ export function placeOpening(
 export function moveOpening(plan: Plan, id: string, offset: number): Plan {
   const opening = plan.openings[id];
   if (!opening) return plan;
-  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], offset, opening.width, opening);
+  const clamped = railedOpeningOffset(plan, plan.walls[opening.wallId], offset, opening.width, opening);
   if (clamped === null) return plan;
   return { ...plan, openings: { ...plan.openings, [id]: { ...opening, offset: clamped } } };
 }
@@ -467,7 +441,7 @@ export function moveOpening(plan: Plan, id: string, offset: number): Plan {
 export function setOpeningWidth(plan: Plan, id: string, width: number): Plan {
   const opening = plan.openings[id];
   if (!opening) return plan;
-  const clamped = clampOpeningOffset(plan, plan.walls[opening.wallId], opening.offset, width, opening);
+  const clamped = railedOpeningOffset(plan, plan.walls[opening.wallId], opening.offset, width, opening);
   if (clamped === null) return plan;
   return { ...plan, openings: { ...plan.openings, [id]: { ...opening, width, offset: clamped } } };
 }

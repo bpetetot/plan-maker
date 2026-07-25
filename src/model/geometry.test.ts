@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampToPolygon,
   distance,
+  labelAngle,
   planBBox,
   pointInPolygon,
   polygonArea,
@@ -172,5 +173,25 @@ describe('clampToPolygon', () => {
     expect(p.x).toBeLessThanOrEqual(100);
     expect(p.y).toBeGreaterThanOrEqual(0);
     expect(pointInPolygon(p, square)).toBe(true);
+  });
+});
+
+describe('labelAngle', () => {
+  it('reads horizontal walls left-to-right regardless of draw direction', () => {
+    expect(labelAngle(100, 0)).toBe(0);
+    expect(labelAngle(-100, 0)).toBe(0);
+  });
+
+  it('reads vertical walls bottom-to-top (ISO), regardless of draw direction', () => {
+    expect(labelAngle(0, 100)).toBe(-90);
+    expect(labelAngle(0, -100)).toBe(-90);
+  });
+
+  it('normalizes every angle into [-90, 90)', () => {
+    expect(labelAngle(100, 1)).toBeCloseTo(0.57, 1);
+    expect(labelAngle(-100, 1)).toBeCloseTo(-0.57, 1);
+    expect(labelAngle(-100, -1)).toBeCloseTo(0.57, 1);
+    expect(labelAngle(1, 100)).toBeCloseTo(89.43, 1);
+    expect(labelAngle(-1, 100)).toBeCloseTo(-89.43, 1);
   });
 });

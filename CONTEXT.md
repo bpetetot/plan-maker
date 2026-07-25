@@ -464,7 +464,9 @@ chip, the concept is not
 
 **Rail**:
 An invisible bounded travel line. Nothing is drawn: a Rail is a constraint,
-not a graphic. Two things have one.
+not a graphic. Two things have one. A Rail bounds what is grabbed exactly as it
+bounds what is drawn: a gesture takes hold of the position on the Rail, never
+of the wish stored behind it.
 A Dimension's text slides along the dimension line of the side the pointer is
 on, bounded by the arrowheads: the text can at most touch a head, never cover
 it, and a span too narrow for the text pins it to the middle. The Rail is never

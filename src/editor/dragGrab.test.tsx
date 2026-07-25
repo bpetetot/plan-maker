@@ -60,6 +60,21 @@ describe('dragging an opening keeps the grab point under the cursor', () => {
     expect(usePlanStore.getState().plan.openings.o1.offset).toBe(300);
   });
 
+  // A wall shortened after the placement leaves the offset off its Rail: the
+  // glyph is drawn back on it, so the grab must start from there (ADR 0027).
+  it('grabs a shrunk wall’s opening where it is drawn, not where it is stored', async () => {
+    const plan = openingPlan();
+    // rail −5..405, width 120 → drawn centre clamped to 345, stored 380
+    plan.openings.o1.offset = 380;
+    const { container, svg } = await renderEditor(plan);
+    const grab = openingGrab(container);
+    // 460: plan x for wall offset 360, 15 cm right of the drawn centre
+    await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 460, 100) });
+    await pointer(svg, 'pointermove', clientAt(svg, 360, 100));
+    // cursor −100 from the drawn 345; reading the stored 380 would land on 280
+    expect(usePlanStore.getState().plan.openings.o1.offset).toBe(245);
+  });
+
   it('leaves the plan intact below the click threshold — a click is a click', async () => {
     const { container, svg } = await renderEditor(openingPlan());
     const grab = openingGrab(container);
@@ -130,6 +145,22 @@ describe('dragging a dimension text keeps the grab point under the cursor', () =
     await pointer(svg, 'pointermove', clientAt(svg, 420, 80));
     // cursor +100: 200 → 300 cm, t=0.75; the raw projection would read 0.8
     expect(usePlanStore.getState().plan.walls.w1.dimPlacement?.t).toBe(0.75);
+  });
+
+  // Same law as the opening above: the plate a shortened wall pushed off its
+  // Rail is drawn back on it, and that is where the gesture takes hold.
+  it('grabs a shrunk wall’s plate where it is drawn, not where it is stored', async () => {
+    const plan = openingPlan();
+    plan.openings = {};
+    // rail max (405 − 23.4)/400 = 0.954 → drawn at 381.6, stored at 0.99
+    plan.walls.w1.dimPlacement = { t: 0.99, side: -1 };
+    const { container, svg } = await renderEditor(plan);
+    const hit = dimTextGrab(container);
+    // 470: plan x for wall offset 370, inside the plate drawn at 481.6
+    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 470, 85) });
+    await pointer(svg, 'pointermove', clientAt(svg, 370, 85));
+    // cursor −100 from the drawn 381.6; reading the stored 396 would land on 0.74
+    expect(usePlanStore.getState().plan.walls.w1.dimPlacement?.t).toBe(0.704);
   });
 
   it('decides the side from the actual cursor, not the offset grab point', async () => {

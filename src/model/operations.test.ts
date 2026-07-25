@@ -4,7 +4,6 @@ import {
   addRuler,
   addText,
   addWall,
-  clampOpeningOffset,
   commitPoint,
   commitWall,
   deleteOpening,
@@ -32,7 +31,6 @@ import {
   toggleHingeSide,
   toggleSwing,
 } from './operations';
-import { openingRail } from './openings';
 import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from './testHelpers';
 import { DOOR_WIDTH, emptyPlan, isPlanEmpty } from './types';
 
@@ -616,30 +614,6 @@ describe('openings', () => {
     expect(plan.openings[id!]).toMatchObject({ type: 'window', width: 60, offset: 375 });
   });
 
-  it('clamps the offset to the rail, flush against each end', () => {
-    const plan = rectPlan();
-    const wall = Object.values(plan.walls)[0];
-    // rail -5 → 405: a 90 opening centres between 40 and 360
-    expect(clampOpeningOffset(plan, wall, 10, 90)).toBe(40);
-    expect(clampOpeningOffset(plan, wall, 395, 90)).toBe(360);
-    expect(clampOpeningOffset(plan, wall, 200, 90)).toBe(200);
-  });
-
-  it('lands exactly on a rail end that is not a whole centimetre', () => {
-    // a 45° corner miters the rail end to an irrational offset: rounding to
-    // whole centimetres must not push the opening off its bound
-    const plan = buildPlan((b) => {
-      const a = b.point(0, 0);
-      const corner = b.point(400, 0);
-      b.wall(a, corner);
-      b.wall(corner, b.point(700, 300));
-    });
-    const wall = Object.values(plan.walls)[0];
-    const rail = openingRail(plan, wall, 200);
-    expect(Number.isInteger(rail.to)).toBe(false);
-    expect(clampOpeningOffset(plan, wall, 400, 90)).toBe(rail.to - 45);
-  });
-
   it('refuses to place an opening on a wall narrower than it', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0);
@@ -752,32 +726,13 @@ describe('setDimPlacement', () => {
     });
   });
 
-  it('clamps the placement to the travel the caller passes', () => {
+  // Bounding is the Rail's business, upstream (ADR 0027): this stores what the
+  // gesture already railed.
+  it('stores the ratio it is handed, without a bound of its own', () => {
     const plan = rectPlan();
     const wallId = Object.keys(plan.walls)[0];
-    const travel = { min: 0.12, max: 0.88 };
-    expect(setDimPlacement(plan, wallId, 1.4, 1, travel).walls[wallId].dimPlacement).toEqual({
+    expect(setDimPlacement(plan, wallId, 0.88, 1).walls[wallId].dimPlacement).toEqual({
       t: 0.88,
-      side: 1,
-    });
-    expect(setDimPlacement(plan, wallId, -0.2, 1, travel).walls[wallId].dimPlacement).toEqual({
-      t: 0.12,
-      side: 1,
-    });
-  });
-
-  it('clamps to [0, 1] when no travel is passed', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    expect(setDimPlacement(plan, wallId, 1.4, 1).walls[wallId].dimPlacement).toEqual({ t: 1, side: 1 });
-  });
-
-  it('pins the placement to the middle of an empty travel', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    const travel = { min: 0.6, max: 0.4 };
-    expect(setDimPlacement(plan, wallId, 0.9, 1, travel).walls[wallId].dimPlacement).toEqual({
-      t: 0.5,
       side: 1,
     });
   });

@@ -35,6 +35,14 @@ export function wallSide(plan: Plan, wall: Wall, x: number, y: number): 1 | -1 {
   return cross >= 0 ? 1 : -1;
 }
 
+// ISO: text reads from the bottom or the right, so vertical is -90, never +90.
+export const labelAngle = (dx: number, dy: number) => {
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  if (angle >= 90) angle -= 180;
+  else if (angle < -90) angle += 180;
+  return angle;
+};
+
 export function nearestWall(
   plan: Plan,
   x: number,

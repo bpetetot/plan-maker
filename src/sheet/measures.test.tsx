@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-react';
 import { buildPlan, oneWallPlan, squareRoomPlan } from '../model/testHelpers';
 import type { Plan, Ruler, Wall } from '../model/types';
-import { DimLabel, dimTravelBounds, labelAngle, RulerLabel } from './measures';
+import { railedDimT } from '../model/rail';
+import { DimLabel, RulerLabel } from './measures';
 import { COLORS } from './paint';
 
 async function renderDim(plan: Plan, wall: Wall) {
@@ -15,26 +16,6 @@ async function renderDim(plan: Plan, wall: Wall) {
   const group = text.closest('g')!;
   return { text, group };
 }
-
-describe('labelAngle', () => {
-  it('reads horizontal walls left-to-right regardless of draw direction', () => {
-    expect(labelAngle(100, 0)).toBe(0);
-    expect(labelAngle(-100, 0)).toBe(0);
-  });
-
-  it('reads vertical walls bottom-to-top (ISO), regardless of draw direction', () => {
-    expect(labelAngle(0, 100)).toBe(-90);
-    expect(labelAngle(0, -100)).toBe(-90);
-  });
-
-  it('normalizes every angle into [-90, 90)', () => {
-    expect(labelAngle(100, 1)).toBeCloseTo(0.57, 1);
-    expect(labelAngle(-100, 1)).toBeCloseTo(-0.57, 1);
-    expect(labelAngle(-100, -1)).toBeCloseTo(0.57, 1);
-    expect(labelAngle(1, 100)).toBeCloseTo(89.43, 1);
-    expect(labelAngle(-1, 100)).toBeCloseTo(-89.43, 1);
-  });
-});
 
 describe('DimLabel value', () => {
   it('shows the hors-tout extent on a free-standing wall', async () => {
@@ -107,43 +88,17 @@ describe('DimLabel value', () => {
   });
 });
 
-describe('dimTravelBounds', () => {
-  it('stops the plate at the base of inside heads', () => {
-    // 400 cm wall, thickness 10: silhouette -5..405, plate half-width 16.4
-    // heads inside → margin 7 + 16.4 = 23.4
-    const { plan, wall } = oneWallPlan(0, 0, 400, 0);
-    const { min, max } = dimTravelBounds(plan, wall, -1);
-    expect(min).toBeCloseTo((-5 + 23.4) / 400, 5);
-    expect(max).toBeCloseTo((405 - 23.4) / 400, 5);
-  });
-
-  it('lets the plate reach the extent bounds when the heads sit outside', () => {
-    // 30 cm wall, thickness 10: silhouette -5..35, plate 28 wide
-    // heads outside → margin is the plate half-width only
-    const { plan, wall } = oneWallPlan(0, 0, 30, 0);
-    const { min, max } = dimTravelBounds(plan, wall, -1);
-    expect(min).toBeCloseTo((-5 + 14) / 30, 5);
-    expect(max).toBeCloseTo((35 - 14) / 30, 5);
-  });
-
-  it('collapses the travel to its middle when the plate overflows the span', () => {
-    // 20 cm wall, thickness 5: silhouette -2.5..22.5 (25 cm) < 28 cm plate
-    const { plan, wall } = oneWallPlan(0, 0, 20, 0, 5);
-    const { min, max } = dimTravelBounds(plan, wall, -1);
-    expect(min).toBe(max);
-    expect(min).toBeCloseTo(0.5, 5);
-  });
-
-  // The Rail binds at every drawing, not only at the gesture (CONTEXT.md: Rail):
-  // a placement its own wall outgrew is drawn back on the Rail, not where stored.
+// The Rail binds at every drawing, not only at the gesture (CONTEXT.md: Rail):
+// a placement its own wall outgrew is drawn back on the Rail, not where stored.
+describe('DimLabel on the Rail', () => {
   it('draws a stored placement its wall no longer allows back on the rail', async () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     wall.dimPlacement = { t: 0.99, side: -1 };
-    const { max } = dimTravelBounds(plan, wall, -1);
+    const railed = railedDimT(plan, wall, -1, 0.99);
     const { group } = await renderDim(plan, wall);
     const x = Number(/translate\(([-\d.]+),/.exec(group.getAttribute('transform')!)![1]);
-    expect(0.99).toBeGreaterThan(max);
-    expect(x).toBeCloseTo(max * 400, 3);
+    expect(railed).toBeLessThan(0.99);
+    expect(x).toBeCloseTo(railed * 400, 3);
   });
 });
 
