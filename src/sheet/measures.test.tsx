@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { cleanup, render } from 'vitest-browser-react';
 import { buildPlan, oneWallPlan, squareRoomPlan } from '../model/testHelpers';
 import type { Plan, Ruler, Wall } from '../model/types';
-import { railedDimT } from '../model/rail';
+import { DIM_FONT_PX, railedDimT } from '../model/rail';
 import { DimLabel, RulerLabel } from './measures';
 import { COLORS } from './paint';
 
 async function renderDim(plan: Plan, wall: Wall) {
   const { container } = await render(
     <svg>
-      <DimLabel plan={plan} wall={wall} />
+      <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} />
     </svg>,
   );
   const text = container.querySelector('text')!;
@@ -39,7 +39,7 @@ describe('DimLabel value', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     const { container } = await render(
       <svg>
-        <DimLabel plan={plan} wall={wall} />
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} />
       </svg>,
     );
     expect(container.querySelectorAll('line')).toHaveLength(2);
@@ -55,7 +55,7 @@ describe('DimLabel value', () => {
     const { plan, wall } = oneWallPlan(0, 0, 25, 0);
     const { container } = await render(
       <svg>
-        <DimLabel plan={plan} wall={wall} />
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} />
       </svg>,
     );
     expect(container.querySelector('text')!.textContent).toBe('35 cm');
@@ -79,7 +79,7 @@ describe('DimLabel value', () => {
     });
     const { container } = await render(
       <svg>
-        <DimLabel plan={plan} wall={plan.walls[wallId]} />
+        <DimLabel plan={plan} wall={plan.walls[wallId]} fontPx={DIM_FONT_PX} />
       </svg>,
     );
     const heads = Array.from(container.querySelectorAll('polygon'));
@@ -94,7 +94,7 @@ describe('DimLabel on the Rail', () => {
   it('draws a stored placement its wall no longer allows back on the rail', async () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     wall.dimPlacement = { t: 0.99, side: -1 };
-    const railed = railedDimT(plan, wall, -1, 0.99);
+    const railed = railedDimT(plan, wall, -1, 0.99, DIM_FONT_PX);
     const { group } = await renderDim(plan, wall);
     const x = Number(/translate\(([-\d.]+),/.exec(group.getAttribute('transform')!)![1]);
     expect(railed).toBeLessThan(0.99);
@@ -107,7 +107,7 @@ describe('DimLabel selection', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     const { container } = await render(
       <svg>
-        <DimLabel plan={plan} wall={wall} selected />
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} selected />
       </svg>,
     );
     expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(true);
@@ -123,7 +123,7 @@ describe('DimLabel selection', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
     const { container } = await render(
       <svg>
-        <DimLabel plan={plan} wall={wall} />
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} />
       </svg>,
     );
     expect(container.querySelector('text')!.classList.contains('dim-selected')).toBe(false);
@@ -133,6 +133,44 @@ describe('DimLabel selection', () => {
     for (const head of Array.from(container.querySelectorAll('polygon'))) {
       expect(head.getAttribute('fill')).toBe('var(--dim-line)');
     }
+  });
+});
+
+// CONTEXT.md: Grab zone. The plate is drawing and keeps the plan's scale; only
+// the margin around it is pinned to the screen (ADR 0005).
+describe('the plate’s grab zone', () => {
+  const grabOf = (container: HTMLElement) => container.querySelector('rect.dim-grab')!;
+
+  async function renderGrabbable(pxPerCm?: number) {
+    const { plan, wall } = oneWallPlan(0, 0, 400, 0);
+    const { container } = await render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} pxPerCm={pxPerCm} onPointerDown={() => {}} />
+      </svg>,
+    );
+    return container;
+  }
+
+  it('tracks the plate instead of a fixed box, plus a screen margin', async () => {
+    // '4,10 m' at 8 px: half-width 16.4, half-height 5 — plus 3 px of margin
+    const grab = grabOf(await renderGrabbable(1));
+    expect(Number(grab.getAttribute('width'))).toBeCloseTo(2 * (16.4 + 3), 5);
+    expect(Number(grab.getAttribute('height'))).toBeCloseTo(2 * (5 + 3), 5);
+  });
+
+  it('holds that margin at a constant on-screen size, so it halves at 2× zoom', async () => {
+    const grab = grabOf(await renderGrabbable(2));
+    expect(Number(grab.getAttribute('width'))).toBeCloseTo(2 * (16.4 + 1.5), 5);
+  });
+
+  it('is absent from an undressed sheet — the export prints no chrome', async () => {
+    const { plan, wall } = oneWallPlan(0, 0, 400, 0);
+    const { container } = await render(
+      <svg>
+        <DimLabel plan={plan} wall={wall} fontPx={DIM_FONT_PX} />
+      </svg>,
+    );
+    expect(container.querySelector('rect.dim-grab')).toBeNull();
   });
 });
 
@@ -147,7 +185,7 @@ describe('RulerLabel', () => {
   async function renderRuler(r: Ruler, selected?: boolean) {
     const { container } = await render(
       <svg>
-        <RulerLabel ruler={r} selected={selected} />
+        <RulerLabel ruler={r} fontPx={DIM_FONT_PX} selected={selected} />
       </svg>,
     );
     return container;

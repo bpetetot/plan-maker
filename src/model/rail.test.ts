@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dimSide, openingRail, railedDimT, railedOpeningOffset } from './rail';
+import { DIM_FONT_PX, dimSide, openingRail, railedDimT, railedOpeningOffset } from './rail';
 import { buildPlan, oneWallPlan, squareRoomPlan } from './testHelpers';
 
 const horizontal = (x1: number, y1: number, x2: number, y2: number) => {
@@ -29,46 +29,48 @@ describe('railedDimT', () => {
     // 400 cm wall, thickness 10: silhouette -5..405, plate half-width 16.4
     // heads inside → margin 7 + 16.4 = 23.4
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
-    expect(railedDimT(plan, wall, -1, 0)).toBeCloseTo((-5 + 23.4) / 400, 5);
-    expect(railedDimT(plan, wall, -1, 1)).toBeCloseTo((405 - 23.4) / 400, 5);
+    expect(railedDimT(plan, wall, -1, 0, DIM_FONT_PX)).toBeCloseTo((-5 + 23.4) / 400, 5);
+    expect(railedDimT(plan, wall, -1, 1, DIM_FONT_PX)).toBeCloseTo((405 - 23.4) / 400, 5);
   });
 
   it('leaves a wish that already sits on the rail alone', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
-    expect(railedDimT(plan, wall, -1, 0.42)).toBe(0.42);
+    expect(railedDimT(plan, wall, -1, 0.42, DIM_FONT_PX)).toBe(0.42);
   });
 
   it('lets the plate reach the extent bounds when the heads sit outside', () => {
     // 30 cm wall, thickness 10: silhouette -5..35, plate 28 wide
     // heads outside → margin is the plate half-width only
     const { plan, wall } = oneWallPlan(0, 0, 30, 0);
-    expect(railedDimT(plan, wall, -1, 0)).toBeCloseTo((-5 + 14) / 30, 5);
-    expect(railedDimT(plan, wall, -1, 1)).toBeCloseTo((35 - 14) / 30, 5);
+    expect(railedDimT(plan, wall, -1, 0, DIM_FONT_PX)).toBeCloseTo((-5 + 14) / 30, 5);
+    expect(railedDimT(plan, wall, -1, 1, DIM_FONT_PX)).toBeCloseTo((35 - 14) / 30, 5);
   });
 
   it('pins the plate to the middle when it overflows the span', () => {
     // 20 cm wall, thickness 5: silhouette -2.5..22.5 (25 cm) < 28 cm plate
     const { plan, wall } = oneWallPlan(0, 0, 20, 0, 5);
-    expect(railedDimT(plan, wall, -1, 0.9)).toBeCloseTo(0.5, 5);
-    expect(railedDimT(plan, wall, -1, 0.1)).toBeCloseTo(0.5, 5);
+    expect(railedDimT(plan, wall, -1, 0.9, DIM_FONT_PX)).toBeCloseTo(0.5, 5);
+    expect(railedDimT(plan, wall, -1, 0.1, DIM_FONT_PX)).toBeCloseTo(0.5, 5);
   });
 
   // What keeps the export honest: its measure font is larger than the editor's.
   it('shortens the rail as the font widens', () => {
     const { plan, wall } = oneWallPlan(0, 0, 400, 0);
-    expect(railedDimT(plan, wall, -1, 1, 10)).toBeLessThan(railedDimT(plan, wall, -1, 1));
+    expect(railedDimT(plan, wall, -1, 1, 10)).toBeLessThan(railedDimT(plan, wall, -1, 1, DIM_FONT_PX));
   });
 
   it('rails against the side asked for, the two faces being unequal', () => {
     const plan = squareRoomPlan();
     const bottom = Object.values(plan.walls)[0];
     // interior face 5..395, exterior -5..405: the interior rail starts later
-    expect(railedDimT(plan, bottom, 1, 0)).toBeGreaterThan(railedDimT(plan, bottom, -1, 0));
+    expect(railedDimT(plan, bottom, 1, 0, DIM_FONT_PX)).toBeGreaterThan(
+      railedDimT(plan, bottom, -1, 0, DIM_FONT_PX),
+    );
   });
 
   it('centres the placement on a wall too short to measure', () => {
     const { plan, wall } = oneWallPlan(0, 0, 0, 0);
-    expect(railedDimT(plan, wall, -1, 0.9)).toBe(0.5);
+    expect(railedDimT(plan, wall, -1, 0.9, DIM_FONT_PX)).toBe(0.5);
   });
 });
 

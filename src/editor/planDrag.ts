@@ -17,7 +17,7 @@ import type { Snap } from '../model/snap';
 import { realignDelta, snapPoint } from '../model/snap';
 import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
-import { railedDimT } from '../model/rail';
+import { DIM_FONT_PX, railedDimT } from '../model/rail';
 import type { Plan } from '../model/types';
 import { snapTolerance } from './gesture';
 
@@ -139,7 +139,8 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       const { t } = projectOnWall(drag.plan, wall, at.x, at.y);
       const side = wallSide(drag.plan, wall, at.x, at.y);
       const ratio = length < 1 ? 0.5 : (t + spec.grabDelta) / length;
-      const railed = railedDimT(drag.plan, wall, side, ratio);
+      // The editor's size: the Rail the gesture rides is the one it is drawn on.
+      const railed = railedDimT(drag.plan, wall, side, ratio, DIM_FONT_PX);
       return { ...drag, plan: setDimPlacement(drag.plan, spec.id, railed, side), moved };
     }
     case 'rulerEnd': {

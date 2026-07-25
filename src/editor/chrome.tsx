@@ -1,12 +1,12 @@
 import type { Vec } from '../model/geometry';
-import { labelAngle, wallPoints } from '../model/geometry';
+import { labelAngle, wallAxis, wallPoints } from '../model/geometry';
 import { formatLength } from '../model/format';
 import { openingPlacement } from '../model/openings';
-import { openingRail } from '../model/rail';
+import { DIM_FONT_PX, openingRail } from '../model/rail';
 import type { Room } from '../model/rooms';
 import type { Snap } from '../model/snap';
 import type { Opening, Plan, Ruler, Wall } from '../model/types';
-import { DimText, dimLineFrame } from '../sheet/measures';
+import { DimText } from '../sheet/measures';
 import { doorArc, doorLeaf, doorMirror } from '../sheet/openings';
 import { COLORS } from '../sheet/paint';
 
@@ -147,9 +147,10 @@ const chipWidth = (label: string) => label.length * CHIP_CHAR_PX + 10;
 export function PlacementDims({ plan, opening, pxPerCm }: { plan: Plan; opening: Opening; pxPerCm: number }) {
   const wall = plan.walls[opening.wallId];
   const placement = openingPlacement(plan, opening);
-  if (!wall || !placement) return null;
-  const { a, ux, uy, angle } = dimLineFrame(plan, wall);
-  const at = (t: number) => ({ x: a.x + ux * t, y: a.y + uy * t });
+  const axis = wall && wallAxis(plan, wall);
+  if (!wall || !placement || !axis) return null;
+  const { a, u, angle } = axis;
+  const at = (t: number) => ({ x: a.x + u.x * t, y: a.y + u.y * t });
   // a screen pixel in plan units: constant chip size, centre still where it
   // measures
   const k = 1 / Math.max(pxPerCm, 0.0001);
@@ -333,7 +334,12 @@ export function RubberWall({
       />
       {length > 20 && (
         <g transform={`translate(${(from.x + to.x) / 2},${(from.y + to.y) / 2}) rotate(${angle})`}>
-          <DimText label={formatLength(length + thickness)} className="dim dim-live" y={-thickness - 7} />
+          <DimText
+            label={formatLength(length + thickness)}
+            className="dim dim-live"
+            fontPx={DIM_FONT_PX}
+            y={-thickness - 7}
+          />
         </g>
       )}
     </g>

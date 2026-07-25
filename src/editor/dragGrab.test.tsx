@@ -31,11 +31,11 @@ const renderEditor = async (plan: Plan) => {
   return { container, svg };
 };
 
-// Grab zones: the opening rect spans its width (120), the dim text a fixed 60×16.
+// Grab zones: the opening rect spans its width (120), the dim plate its own
+// box plus an on-screen margin.
 const openingGrab = (container: HTMLElement) =>
   container.querySelector('rect[width="120"][fill="transparent"]')!;
-const dimTextGrab = (container: HTMLElement) =>
-  container.querySelector('rect[width="60"][fill="transparent"]')!;
+const dimTextGrab = (container: HTMLElement) => container.querySelector('rect.dim-grab')!;
 
 describe('dragging an opening keeps the grab point under the cursor', () => {
   it('moves by the cursor travel, not to the cursor — no jump on an off-center grab', async () => {
@@ -139,10 +139,10 @@ describe('dragging a dimension text keeps the grab point under the cursor', () =
     const plan = openingPlan();
     plan.openings = {};
     const { container, svg } = await renderEditor(plan);
-    // default placement t=0.5 (200 cm, plan x=300); 320 grabs it 20 cm right
+    // default placement t=0.5 (200 cm, plan x=300); 315 grabs it 15 cm right
     const hit = dimTextGrab(container);
-    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 80) });
-    await pointer(svg, 'pointermove', clientAt(svg, 420, 80));
+    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 315, 80) });
+    await pointer(svg, 'pointermove', clientAt(svg, 415, 80));
     // cursor +100: 200 → 300 cm, t=0.75; the raw projection would read 0.8
     expect(usePlanStore.getState().plan.walls.w1.dimPlacement?.t).toBe(0.75);
   });
@@ -168,9 +168,9 @@ describe('dragging a dimension text keeps the grab point under the cursor', () =
     plan.openings = {};
     const { container, svg } = await renderEditor(plan);
     const hit = dimTextGrab(container);
-    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 80) });
+    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 315, 80) });
     // y 130 crosses under the wall (y=100) → side flips
-    await pointer(svg, 'pointermove', clientAt(svg, 420, 130));
+    await pointer(svg, 'pointermove', clientAt(svg, 415, 130));
     expect(usePlanStore.getState().plan.walls.w1.dimPlacement).toMatchObject({ t: 0.75, side: 1 });
   });
 });

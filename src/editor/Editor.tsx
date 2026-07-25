@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
-import { projectOnWall, wallLength, wallPoints } from '../model/geometry';
+import { projectOnWall, wallPoints } from '../model/geometry';
 import { openingPlacement } from '../model/openings';
 import { addRoomLabel, addText, deleteText, editTextContent, renameRoomLabel } from '../model/operations';
-import { dimSide, railedDimT } from '../model/rail';
+import { wallDimension } from '../model/dimension';
+import { DIM_FONT_PX } from '../model/rail';
 import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
@@ -378,9 +379,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         if (!wall) return null;
         // The drawn position, not the stored wish: a wall shortened since the
         // last drag rails the plate elsewhere, and the grab must start there.
-        const t = railedDimT(plan, wall, dimSide(plan, wall), wall.dimPlacement?.t ?? 0.5);
-        const textT = t * wallLength(plan, wall);
-        return { kind: 'dim', id: wall.id, grabDelta: textT - projectOnWall(plan, wall, c.x, c.y).t };
+        const dim = wallDimension(plan, wall, DIM_FONT_PX);
+        if (!dim) return null;
+        return { kind: 'dim', id: wall.id, grabDelta: dim.t - projectOnWall(plan, wall, c.x, c.y).t };
       }
       case 'label': {
         const { block, label } = target;
@@ -713,6 +714,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         <PlanScene
           plan={plan}
           measuresVisible={measuresVisible}
+          dimFontPx={DIM_FONT_PX}
           decor={{
             element: dressElement,
             pxPerCm: zoomScale,
@@ -808,7 +810,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         )}
         {chrome?.rubber && <RubberWall {...chrome.rubber} />}
         {chrome?.ghost && <OpeningGlyph plan={plan} opening={chrome.ghost} ghost />}
-        {chrome?.rulerGhost && <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} />}
+        {chrome?.rulerGhost && (
+          <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} fontPx={DIM_FONT_PX} />
+        )}
         <SnapMarker snap={chrome?.snap ?? null} pxPerCm={zoomScale} />
         {editing && (
           <InlineEditor

@@ -183,6 +183,17 @@ bottom or the right of the sheet (ISO convention) — the reading direction
 never depends on which side of the wall it sits.
 _Avoid_: Measurement, cote
 
+**DimensionLine**:
+The ISO figure a Dimension and a Ruler are both drawn as: a line marking the
+measured extent, an arrowhead at each end pointing outward from inside — or
+flipped outside pointing in, when the span has no room for them — and the value
+on a sheet-colored plate sitting on its Rail. It is read from the plan and never
+stored: the value, its label, the frame the line runs on, where the plate rails
+and which way the heads point are all decided at once, in the model, at the font
+size the figure is being drawn at. The screen and the export are two readings of
+the one rule at two sizes, not two drawings (ADR 0031).
+_Avoid_: Dimension (that is the Measure, not the figure), cote, witness line
+
 **Room area**:
 A Measure: the surface of a detected room in square meters, bounded by the
 interior Faces of its walls — the real floor surface, not the wall-axis loop. The
@@ -191,11 +202,12 @@ floor: it is excluded.
 _Avoid_: Surface, square footage
 
 **Ruler**:
-A measurement the user hand-places between two points, rendered like a wall
-Dimension — ISO arrowheads at both ends, a line, a plated value reading its
-length — but laid directly on the segment from A to B, with no Face to offset
-from. Unlike a Measure it is part of the plan: its two endpoints, and the
-value's position along the segment, are stored and persist. Its endpoints are
+A measurement the user hand-places between two points, drawn as the same
+DimensionLine as a wall Dimension but laid directly on the segment from A to B,
+with no Face to offset from. Unlike a Measure it is part of the plan: its two
+endpoints, and the value's position along the segment, are stored and persist —
+that position rails like a Dimension's, though no gesture moves it today: it
+only ever comes from the plan. Its endpoints are
 free integer-centimeter coordinates that reference no shared Point, so a Ruler
 never merges, splits, or couples to a wall — it measures the space it is drawn
 across, not any element. It follows the Measures toggle all the same: hidden
@@ -488,8 +500,8 @@ chip, the concept is not
 
 **Rail**:
 An invisible bounded travel line. Nothing is drawn: a Rail is a constraint,
-not a graphic. Two things have one. A Rail bounds what is grabbed exactly as it
-bounds what is drawn: a gesture takes hold of the position on the Rail, never
+not a graphic. Three things have one. A Rail bounds what is grabbed exactly as
+it bounds what is drawn: a gesture takes hold of the position on the Rail, never
 of the wish stored behind it.
 A Dimension's text slides along the dimension line of the side the pointer is
 on, bounded by the arrowheads: the text can at most touch a head, never cover
@@ -498,6 +510,9 @@ drawn and never stored, and it binds at every drawing, not only at the gesture:
 the placement kept in the plan is a wish, and a plate too wide for the Rail of
 the size it is being drawn at slides back onto it. That is what keeps the
 export honest, its measure font being larger than the editor's.
+A Ruler's plate rides the same Rail on its own segment, being drawn as the same
+DimensionLine — even though nothing in the editor moves it. What the plan
+carries is still a wish, and an imported one is bound like any other.
 An Opening slides along the stretch of its wall that is at full thickness —
 bounded at each end by the shorter of the two Faces, since the opening pierces
 the whole thickness, and cut back to the near edge of the closest neighbouring

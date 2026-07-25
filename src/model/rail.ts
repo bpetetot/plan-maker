@@ -8,7 +8,8 @@ import type { Span } from './openings';
 import { clampCenter, openingPlacement } from './openings';
 import type { Opening, Plan, Wall } from './types';
 
-// Editor size; the PNG export passes its own via PlanScene. Advance width is
+// The editor's measure size, in plan centimetres — a Dimension is drawing, so
+// it zooms with the sheet. The PNG export names its own. Advance width is
 // JetBrains Mono's 0.6 em.
 export const DIM_FONT_PX = 8;
 const PLATE_PAD_X = 2;
@@ -43,15 +44,11 @@ export function dimSide(plan: Plan, wall: Wall): 1 | -1 {
   return axis.angle !== raw ? 1 : -1;
 }
 
-// The Dimension's Rail: a ratio of the wall's length keeping the plate clear
-// of the arrowheads. It binds the drawing, not the plan — a wider font
-// shortens it, so the same stored wish rails differently at export size.
-export function railedDimT(plan: Plan, wall: Wall, side: 1 | -1, t: number, fontPx = DIM_FONT_PX): number {
-  const length = wallLength(plan, wall);
-  if (length < 1) return 0.5;
-  const span = faceSpan(plan, wall, side);
-  const half = plateBox(formatLength(Math.max(0, span.to - span.from)), fontPx).halfW;
-  const margin = arrowsFitInside(span.to - span.from, 2 * half) ? ARROW_LEN + half : half;
+// The Rail a plated value slides on: a ratio of the run's length keeping the
+// plate clear of the arrowheads. A Dimension and a Ruler share it — both are
+// drawn as a DimensionLine, whatever the run underneath is.
+export function railedRatio(span: Span, length: number, halfW: number, t: number): number {
+  const margin = arrowsFitInside(span.to - span.from, 2 * halfW) ? ARROW_LEN + halfW : halfW;
   let min = (span.from + margin) / length;
   let max = (span.to - margin) / length;
   // A span too narrow for the plate pins it to the middle. Clamped last: the
@@ -59,6 +56,16 @@ export function railedDimT(plan: Plan, wall: Wall, side: 1 | -1, t: number, font
   if (min > max) min = max = (min + max) / 2;
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
   return Math.min(clamp01(max), Math.max(clamp01(min), t));
+}
+
+// The Dimension's Rail. It binds the drawing, not the plan — a wider font
+// shortens it, so the same stored wish rails differently at export size.
+export function railedDimT(plan: Plan, wall: Wall, side: 1 | -1, t: number, fontPx: number): number {
+  const length = wallLength(plan, wall);
+  if (length < 1) return 0.5;
+  const span = faceSpan(plan, wall, side);
+  const half = plateBox(formatLength(Math.max(0, span.to - span.from)), fontPx).halfW;
+  return railedRatio(span, length, half, t);
 }
 
 // The Opening's Rail. `referenceOffset`, not the gesture's own overshoot,

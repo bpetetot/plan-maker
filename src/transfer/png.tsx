@@ -54,6 +54,10 @@ const EXPORT_STYLE = `/* <![CDATA[ */
   ${SHEET_STYLE}
 /* ]]> */`;
 
+// Not the editor's 8: the export rasterizes small, so its Dimensions are drawn
+// larger — and rail against that size, not the editor's (ADR 0024).
+const EXPORT_DIM_FONT_PX = 10;
+
 // Measures mirror the editor (ADR 0008).
 export interface ExportOptions {
   measuresVisible: boolean;
@@ -71,8 +75,7 @@ export function buildExportSvg(plan: Plan, { measuresVisible }: ExportOptions): 
     >
       <style>{EXPORT_STYLE}</style>
       <rect x={frame.x} y={frame.y} width={frame.widthCm} height={frame.heightCm} fill="#ffffff" />
-      {/* 10px, not the editor's 8px: the export rasterizes small */}
-      <PlanScene plan={plan} measuresVisible={measuresVisible} dimFontPx={10} />
+      <PlanScene plan={plan} measuresVisible={measuresVisible} dimFontPx={EXPORT_DIM_FONT_PX} />
     </svg>,
   );
 }

@@ -1,42 +1,21 @@
-import { faceSpan } from '../model/faces';
-import { formatLength } from '../model/format';
-import { labelAngle, wallLength, wallPoints } from '../model/geometry';
-import { ARROW_LEN, arrowsFitInside, DIM_FONT_PX, dimSide, plateBox, railedDimT } from '../model/rail';
+import type { DimensionLine } from '../model/dimension';
+import { rulerDimension, wallDimension } from '../model/dimension';
+import { ARROW_LEN, plateBox } from '../model/rail';
 import type { Plan, Ruler, Wall } from '../model/types';
 import { COLORS, seamStroke } from './paint';
-
-const dimLineOffset = (wall: Wall) => wall.thickness / 2 + 10;
-
-// Where the dimension line runs: its origin, its unit vector, the reading
-// angle, the side it sits on and its distance from the wall axis.
-export function dimLineFrame(plan: Plan, wall: Wall) {
-  const [a, b] = wallPoints(plan, wall);
-  const length = wallLength(plan, wall);
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  return {
-    a,
-    length,
-    ux: dx / length,
-    uy: dy / length,
-    angle: labelAngle(dx, dy),
-    side: dimSide(plan, wall),
-    off: dimLineOffset(wall),
-  };
-}
 
 const PLATE_RX = 2;
 
 export function DimText({
   label,
   className,
-  fontPx = DIM_FONT_PX,
+  fontPx,
   x = 0,
   y = 0,
 }: {
   label: string;
   className: string;
-  fontPx?: number;
+  fontPx: number;
   x?: number;
   y?: number;
 }) {
@@ -68,31 +47,15 @@ export function DimText({
 const EXTENT_STROKE = 1;
 const ARROW_HALF_WIDTH = 2.2;
 
-function ExtentLine({
-  at,
-  ux,
-  uy,
-  from,
-  to,
-  gapFrom,
-  gapTo,
-  stroke = 'var(--dim-line)',
-}: {
-  at: (t: number) => { x: number; y: number };
-  ux: number;
-  uy: number;
-  from: number;
-  to: number;
-  gapFrom: number;
-  gapTo: number;
-  stroke?: string;
-}) {
-  const gapWidth = Math.max(0, Math.min(gapTo, to) - Math.max(gapFrom, from));
-  const inside = arrowsFitInside(to - from, gapWidth);
-  const start = inside ? from + ARROW_LEN : from;
-  const end = inside ? to - ARROW_LEN : to;
-  const g1 = Math.max(start, Math.min(gapFrom, end));
-  const g2 = Math.min(end, Math.max(gapTo, start));
+// ISO: the heads sit inside the extent pointing outward, and flip outside
+// pointing inward when the span runs out of room — which the reading decided.
+function ExtentLine({ dim, stroke }: { dim: DimensionLine; stroke: string }) {
+  const { origin, u, from, to, t, plate, arrowsInside } = dim;
+  const at = (s: number) => ({ x: origin.x + u.x * s, y: origin.y + u.y * s });
+  const start = arrowsInside ? from + ARROW_LEN : from;
+  const end = arrowsInside ? to - ARROW_LEN : to;
+  const g1 = Math.max(start, Math.min(t - plate.halfW, end));
+  const g2 = Math.min(end, Math.max(t + plate.halfW, start));
   const seg = (key: string, t1: number, t2: number) => {
     const p = at(t1);
     const q = at(t2);
@@ -103,16 +66,16 @@ function ExtentLine({
       {g1 - start > 2 && seg('a', start, g1)}
       {end - g2 > 2 && seg('b', g2, end)}
       {[
-        { t: from, dir: inside ? 1 : -1 },
-        { t: to, dir: inside ? -1 : 1 },
-      ].map(({ t, dir }, i) => {
-        const tip = at(t);
-        const bx = tip.x + ux * ARROW_LEN * dir;
-        const by = tip.y + uy * ARROW_LEN * dir;
+        { t: from, dir: arrowsInside ? 1 : -1 },
+        { t: to, dir: arrowsInside ? -1 : 1 },
+      ].map(({ t: tip0, dir }, i) => {
+        const tip = at(tip0);
+        const bx = tip.x + u.x * ARROW_LEN * dir;
+        const by = tip.y + u.y * ARROW_LEN * dir;
         const points = [
           `${tip.x},${tip.y}`,
-          `${bx + uy * ARROW_HALF_WIDTH},${by - ux * ARROW_HALF_WIDTH}`,
-          `${bx - uy * ARROW_HALF_WIDTH},${by + ux * ARROW_HALF_WIDTH}`,
+          `${bx + u.y * ARROW_HALF_WIDTH},${by - u.x * ARROW_HALF_WIDTH}`,
+          `${bx - u.y * ARROW_HALF_WIDTH},${by + u.x * ARROW_HALF_WIDTH}`,
         ].join(' ');
         return <polygon key={i} points={points} fill={stroke} {...seamStroke(stroke)} />;
       })}
@@ -120,110 +83,92 @@ function ExtentLine({
   );
 }
 
-// Automatic dimension on every wall (spec §4), measuring the rendered
-// silhouette on its side. Drag handle with onPointerDown; never selectable.
-export function DimLabel({
-  plan,
-  wall,
+// On-screen margin around the plate (CONTEXT.md: Grab zone). The plate itself
+// is drawing and keeps the plan's scale; only the margin is pinned (ADR 0005).
+const PLATE_GRAB_MARGIN_PX = 3;
+
+// Draws a DimensionLine and nothing else: every position, box and flip on it
+// was decided by the model.
+function DimensionLineView({
+  dim,
   selected,
-  fontPx = DIM_FONT_PX,
+  hovered,
+  pxPerCm,
   onPointerDown,
 }: {
-  plan: Plan;
-  wall: Wall;
+  dim: DimensionLine;
   selected?: boolean;
-  fontPx?: number;
+  hovered?: boolean;
+  pxPerCm?: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
-  const { a, length, ux, uy, angle, side, off } = dimLineFrame(plan, wall);
-  if (length < 20) return null;
-  const span = faceSpan(plan, wall, side);
-  const value = Math.max(0, span.to - span.from);
-  const label = formatLength(value);
-  const at = (t: number) => ({ x: a.x + ux * t - uy * side * off, y: a.y + uy * t + ux * side * off });
-  // The stored ratio was railed at the size the editor draws; a wider font
-  // shortens the Rail, so it binds again here (CONTEXT.md: Rail).
-  const tText = railedDimT(plan, wall, side, wall.dimPlacement?.t ?? 0.5, fontPx) * length;
-  const mid = at(tText);
-  const gapHalf = plateBox(label, fontPx).halfW;
+  // Line and arrows tint on hover like a wall body; the plate text stays plain.
+  const stroke = selected ? COLORS.wallSelected : hovered ? COLORS.wallHover : 'var(--dim-line)';
+  const mid = { x: dim.origin.x + dim.u.x * dim.t, y: dim.origin.y + dim.u.y * dim.t };
+  const margin = pxPerCm ? PLATE_GRAB_MARGIN_PX / pxPerCm : 0;
+  const halfW = dim.plate.halfW + margin;
+  const halfH = dim.plate.halfH + margin;
   return (
     <g>
-      {value >= 1 && (
-        <ExtentLine
-          at={at}
-          ux={ux}
-          uy={uy}
-          from={span.from}
-          to={span.to}
-          gapFrom={tText - gapHalf}
-          gapTo={tText + gapHalf}
-          stroke={selected ? COLORS.wallSelected : undefined}
-        />
-      )}
+      {dim.value >= 1 && <ExtentLine dim={dim} stroke={stroke} />}
       <g
-        transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
+        transform={`translate(${mid.x},${mid.y}) rotate(${dim.angle})`}
         pointerEvents={onPointerDown ? 'auto' : 'none'}
         style={onPointerDown ? { cursor: 'move' } : undefined}
         onPointerDown={onPointerDown}
       >
-        {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
-        <DimText label={label} fontPx={fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
+        {onPointerDown && (
+          <rect
+            className="dim-grab"
+            x={-halfW}
+            y={-halfH}
+            width={2 * halfW}
+            height={2 * halfH}
+            fill="transparent"
+          />
+        )}
+        <DimText label={dim.label} fontPx={dim.fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
       </g>
     </g>
   );
 }
 
-// A hand-placed Ruler (CONTEXT.md), drawn like a wall Dimension but laid
-// directly on its own A→B segment: no face offset, value is the raw distance.
-export function RulerLabel({
-  ruler,
+// Automatic dimension on every wall (spec §4). Drag handle with onPointerDown;
+// never selectable.
+export function DimLabel({
+  plan,
+  wall,
+  fontPx,
   selected,
-  hovered,
-  fontPx = DIM_FONT_PX,
+  pxPerCm,
   onPointerDown,
 }: {
-  ruler: Ruler;
+  plan: Plan;
+  wall: Wall;
+  fontPx: number;
   selected?: boolean;
-  hovered?: boolean;
-  fontPx?: number;
+  pxPerCm?: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
-  const { a, b, t } = ruler;
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const length = Math.hypot(dx, dy);
-  if (length < 1) return null;
-  const ux = dx / length;
-  const uy = dy / length;
-  const angle = labelAngle(dx, dy);
-  const label = formatLength(length);
-  const at = (s: number) => ({ x: a.x + ux * s, y: a.y + uy * s });
-  const tText = t * length;
-  const mid = at(tText);
-  const gapHalf = plateBox(label, fontPx).halfW;
-  // Line and arrows tint on hover like a wall body; the plate text stays plain.
-  const stroke = selected ? COLORS.wallSelected : hovered ? COLORS.wallHover : undefined;
-  return (
-    <g>
-      <ExtentLine
-        at={at}
-        ux={ux}
-        uy={uy}
-        from={0}
-        to={length}
-        gapFrom={tText - gapHalf}
-        gapTo={tText + gapHalf}
-        stroke={stroke}
-      />
-      <g
-        transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
-        pointerEvents={onPointerDown ? 'auto' : 'none'}
-        style={onPointerDown ? { cursor: 'move' } : undefined}
-        onPointerDown={onPointerDown}
-      >
-        {onPointerDown && <rect x={-30} y={-8} width={60} height={16} fill="transparent" />}
-        <DimText label={label} fontPx={fontPx} className={selected ? 'dim dim-selected' : 'dim'} />
-      </g>
-    </g>
-  );
+  const dim = wallDimension(plan, wall, fontPx);
+  return dim ? (
+    <DimensionLineView dim={dim} selected={selected} pxPerCm={pxPerCm} onPointerDown={onPointerDown} />
+  ) : null;
+}
+
+// A hand-placed Ruler (CONTEXT.md). Its body is grabbed by the chrome's zone on
+// the segment, so the plate answers to nothing here.
+export function RulerLabel({
+  ruler,
+  fontPx,
+  selected,
+  hovered,
+}: {
+  ruler: Ruler;
+  fontPx: number;
+  selected?: boolean;
+  hovered?: boolean;
+}) {
+  const dim = rulerDimension(ruler, fontPx);
+  return dim ? <DimensionLineView dim={dim} selected={selected} hovered={hovered} /> : null;
 }

@@ -43,7 +43,7 @@ export function PlanScene({
 }: {
   plan: Plan;
   measuresVisible: boolean;
-  dimFontPx?: number;
+  dimFontPx: number;
   decor?: SheetDecor;
   chrome?: ReactNode;
 }) {
@@ -109,6 +109,7 @@ export function PlanScene({
               plan={plan}
               wall={wall}
               fontPx={dimFontPx}
+              pxPerCm={decor?.pxPerCm}
               selected={d?.selected}
               onPointerDown={d?.onPointerDown}
             />
