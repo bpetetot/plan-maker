@@ -54,7 +54,7 @@ button is not a substitute for the entry; it is a second way in.
 have meant new required props on `Editor`, which every test rendering
 `<Editor />` would have had to feed." Moving the registry up incurs that cost
 anyway — a bare `<Editor />` no longer answers a keystroke. The answer is
-`testHarness.tsx`: `EditorWithHotkeys`, the smallest thing that is both an
+`tests/harness.tsx`: `EditorWithHotkeys`, the smallest thing that is both an
 editor and a place shortcuts are bound. It shares `editorCommands` with `App`
 rather than restating it.
 

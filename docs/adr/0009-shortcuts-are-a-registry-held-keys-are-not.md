@@ -70,7 +70,7 @@ Three things stayed behind, and none is an oversight:
 
 ## Consequences
 
-- **`testKit.key()` dispatches at `document.activeElement`, not `window`.** The
+- **`kit.key()` dispatches at `document.activeElement`, not `window`.** The
   library listens on `document`, and an event dispatched *on* `window` runs only
   `window`'s own listeners — it never travels down. Aligning the library to the
   helper would have frozen a test artifact into production config, so the helper

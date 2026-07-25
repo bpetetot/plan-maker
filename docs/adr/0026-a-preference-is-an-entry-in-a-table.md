@@ -67,7 +67,7 @@ two real mirrors instead: the key in `preferences.ts`, the colors in `theme.ts`.
   Everything else ADR 0008 decides is unchanged, the Theme included — it now
   shares the discipline it had only been compared to.
 - `reloadPreferences()` becomes the single test door, and covers Snap and the
-  Theme for the first time. `testSetup.browser.ts` already called it after every
+  Theme for the first time. `tests/setup.browser.ts` already called it after every
   test; the same line now re-seeds four values instead of two.
 - `grid.tsx` is rendering again, and `theme/` keeps only what the Theme *is*:
   `resolveTheme`, `toggledTheme`, `applyResolvedTheme`, the bar colors, and

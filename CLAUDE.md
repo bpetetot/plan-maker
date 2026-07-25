@@ -29,6 +29,21 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `src/editor/` — the SVG editor (variant A UX), interaction chrome, viewBox hook
 - `src/pwa/` — service worker update prompt
 
+`src/` holds only what ships. The suite lives in `tests/`, mirroring `src/`
+directory for directory, with the shared support at its root: `kit.ts` (event
+dispatch), `helpers.ts` (plan fixtures), `harness.tsx` (`EditorWithHotkeys`),
+`setup.browser.ts` (the browser project's `setupFiles`).
+
+`tests/editor/` is the one folder that does not mirror module for module: 34 of
+its 40 files drive `Editor.tsx` through its surface, so they are grouped by the
+noun they exercise — `view/`, `drag/`, `tools/`, `text/`, `toggles/`, `ruler/`,
+`room/`, `shortcuts/` — leaving `chrome` and `pointer` at the root as the module
+tests they are. A test named for a module keeps the module's name; a test named
+for a scenario drops the prefix its folder already carries.
+
+`vitest.config.ts` is the test config, `vite.config.ts` the build config. Vitest
+loads only the former, which is why it declares its own `react()` plugin.
+
 ## Conventions
 
 - Not in production yet: the stored plan model can change freely — no schema
@@ -67,7 +82,7 @@ idb-keyval (autosave), vite-plugin-pwa.
 - `EditorWithHotkeys` pins the hotkey platform to `linux`, so `Mod` resolves to
   `Ctrl` wherever the suite runs: for a `Mod` shortcut dispatch `{ ctrlKey: true }`,
   never `{ metaKey: true }`. Pass `platform="mac"` only to exercise Cmd on purpose.
-- Never construct an event object directly — always a `src/editor/testKit.ts`
+- Never construct an event object directly — always a `tests/kit.ts`
   helper (`pointer`, `mouse`, `key`, `keyUp`, `wheel`, `blur`). They carry the mandatory
   init (`pointerId: 1`, `bubbles`), and they `await` React's commit, which
   browser mode does not do on its own. **Every dispatch must be awaited**;
