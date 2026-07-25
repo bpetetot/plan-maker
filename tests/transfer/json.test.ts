@@ -134,6 +134,23 @@ describe('transferFileName', () => {
   });
 });
 
+describe('parsePlanFile — crossing walls', () => {
+  // CONTEXT.md, Wall: no wall ever crosses another away from a shared Point. A
+  // file written elsewhere settles on arrival like any other plan.
+  it('splits two crossing walls at their intersection', () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(200, -100), b.point(200, 100));
+    });
+    const result = parsePlanFile(serializePlanFile(plan));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(Object.keys(result.plan.walls)).toHaveLength(4);
+      expect(Object.values(result.plan.points)).toContainEqual(expect.objectContaining({ x: 200, y: 0 }));
+    }
+  });
+});
+
 describe('parsePlanFile — orphan room labels', () => {
   it('drops labels outside any room and keeps contained ones', () => {
     let inside = '';

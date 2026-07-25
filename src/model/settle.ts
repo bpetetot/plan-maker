@@ -3,7 +3,7 @@
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { railedOpeningOffset } from './openings';
-import { reconcileRoomLabels } from './rooms';
+import { dropOrphanRoomLabels, reconcileRoomLabels } from './rooms';
 import type { Snap } from './snap';
 import type { Opening, Plan, Wall } from './types';
 import { newId, WALL_THICKNESS } from './types';
@@ -249,7 +249,7 @@ function mergePoints(plan: Plan, survivorId: string, absorbedId: string): Plan {
 
 // Invariant "two Points never coincide" (ADR 0003). `moving` lists gesture-
 // displaced points: a stationary point survives over a moved one.
-export function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
+function mergeCoincidentPoints(plan: Plan, moving?: Set<string>): Plan {
   let next = plan;
   for (let merged = true; merged;) {
     merged = false;
@@ -314,4 +314,10 @@ function planarize(plan: Plan): Plan {
  *  holds it; `moving` lists the Points it displaced (ADR 0022). */
 export function settleEdit(before: Plan, after: Plan, moving?: Set<string>): Plan {
   return reconcileRoomLabels(before, planarize(mergeCoincidentPoints(after, moving)));
+}
+
+/** CONTEXT.md: Settle, the form with no `before`: nothing to reconcile labels
+ *  against. Orphans drop last — a split can close a loop and give one its room. */
+export function settlePlan(plan: Plan): Plan {
+  return dropOrphanRoomLabels(planarize(mergeCoincidentPoints(plan)));
 }

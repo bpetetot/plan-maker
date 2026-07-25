@@ -1,5 +1,4 @@
-import { mergeCoincidentPoints } from '../model/settle';
-import { dropOrphanRoomLabels } from '../model/rooms';
+import { settlePlan } from '../model/settle';
 import type { Opening, Plan, Ruler, TextNote } from '../model/types';
 
 // Spec §7: the IndexedDB record and the JSON export file share this version.
@@ -32,11 +31,9 @@ export function runMigrations(
   return current;
 }
 
-// Merge coincident points before dropping orphan labels (ADR 0003): closing a
-// loop can give an otherwise-orphan label its room back.
 export function decodePlanPayload(fromVersion: number, plan: unknown): Plan | null {
   const validated = validatePlan(runMigrations(fromVersion, plan));
-  return validated && dropOrphanRoomLabels(mergeCoincidentPoints(validated));
+  return validated && settlePlan(validated);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

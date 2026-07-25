@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commitPoint, commitWall, mergeCoincidentPoints, settleEdit } from '../../src/model/settle';
+import { commitPoint, commitWall, settleEdit, settlePlan } from '../../src/model/settle';
 import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from '../helpers';
 import { setDimPlacement, setPoints } from '../../src/model/walls';
 
@@ -218,7 +218,7 @@ describe('commitWall', () => {
   });
 });
 
-describe('mergeCoincidentPoints', () => {
+describe('merging coincident points', () => {
   it('merges coincident points, rewiring walls to the first-seen survivor', () => {
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0);
@@ -230,7 +230,7 @@ describe('mergeCoincidentPoints', () => {
     });
     const [p1, p2, twin, p4] = Object.keys(plan.points);
     const [w1, w2] = Object.keys(plan.walls);
-    const next = mergeCoincidentPoints(plan);
+    const next = settlePlan(plan);
     expect(Object.keys(next.points).sort()).toEqual([p1, p2, p4].sort());
     expect(next.points[twin]).toBeUndefined();
     expect(next.walls[w1]).toMatchObject({ startPointId: p1, endPointId: p2 });
@@ -245,7 +245,9 @@ describe('mergeCoincidentPoints', () => {
       b.wall(still, b.point(400, 300));
     });
     const [dragged, still] = Object.keys(plan.points);
-    const next = mergeCoincidentPoints(plan, new Set([dragged]));
+    // the drag landed `dragged` on `still`: the plan it started from had them apart
+    const points = { ...plan.points, [dragged]: { ...plan.points[dragged], x: 200 } };
+    const next = settleEdit({ ...plan, points }, plan, new Set([dragged]));
     expect(next.points[still]).toBeDefined();
     expect(next.points[dragged]).toBeUndefined();
   });
@@ -258,7 +260,7 @@ describe('mergeCoincidentPoints', () => {
       b.wall(p2, b.point(300, 0));
       b.opening(shrunk, 'door', 0);
     });
-    const next = mergeCoincidentPoints(plan);
+    const next = settlePlan(plan);
     expect(next.walls[Object.keys(plan.walls)[0]]).toBeUndefined();
     expect(Object.keys(next.openings)).toHaveLength(0);
   });
@@ -274,7 +276,7 @@ describe('mergeCoincidentPoints', () => {
     });
     const [w1, w2] = Object.keys(plan.walls);
     const doorId = Object.keys(plan.openings)[0];
-    const next = mergeCoincidentPoints(plan);
+    const next = settlePlan(plan);
     expect(next.walls[w2]).toBeUndefined();
     // 100 from the twin's start = 300 from the survivor's end; hinge and swing
     // are wall-relative, so the reversed frame flips both
@@ -286,9 +288,9 @@ describe('mergeCoincidentPoints', () => {
     });
   });
 
-  it('returns the same plan when no points coincide', () => {
+  it('returns the same plan when there is nothing to settle', () => {
     const plan = squareRoomPlan();
-    expect(mergeCoincidentPoints(plan)).toBe(plan);
+    expect(settlePlan(plan)).toBe(plan);
   });
 });
 

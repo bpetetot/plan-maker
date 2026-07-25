@@ -138,11 +138,15 @@ closed by the next one (ADR 0028).
 _Avoid_: History group, transaction, batch
 
 **Settle**:
-What the plan does the moment an Edit that moved or created a Point or a Wall
-lands: coincident Points merge into one, walls that touch or cross away from a
-shared Point split at the junction, and every Room label reconciles against the
-plan the edit started from. An edit is never observable half-settled — the whole
-settling belongs to the Edit that caused it, and one undo takes it back.
+Restoring the plan's own invariants: coincident Points merge into one, and walls
+that touch or cross away from a shared Point split at the junction. It happens on
+two occasions, which differ only in what becomes of the Room labels. When an Edit
+that moved or created a Point or a Wall lands, every label reconciles against the
+plan that edit started from; the settling belongs whole to that Edit — no edit is
+ever observable half-settled, and one undo takes it back. When a plan arrives
+from outside — opened from a file, restored at startup — there is no plan it
+started from and nothing to reconcile against: labels that arrive orphaned are
+dropped.
 _Avoid_: Normalize, cleanup, heal
 
 **Measure**:
