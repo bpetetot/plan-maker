@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import SHEET_STYLE from '../sheet/sheet.css?inline';
 import { PlanScene } from '../sheet/scene';
+import LIGHT_PALETTE from '../theme/light.css?inline';
 import { planBBox } from '../model/geometry';
 import { detectRooms } from '../model/rooms';
 import type { Plan } from '../model/types';
@@ -41,16 +43,20 @@ export function computeExportFrame(plan: Plan): ExportFrame | null {
   };
 }
 
-// Every var PlanScene consumes must be pinned here, or it falls back to black.
-// Font inlined: rasterization goes through an <img>, which loads no external resource.
-const EXPORT_STYLE = `
+// The sheet's own rules and the light palette, verbatim from the app — nothing
+// is restated here, or the export drifts from the screen (ADR 0024). `:root`
+// resolves to the exported <svg>, so the palette lands and the dark override
+// cannot. Only the font is the export's own: rasterization goes through an
+// <img>, which loads no external resource, so the subset is inlined.
+// CDATA because this document is XML, not HTML: React writes style children
+// raw, so a single "<" anywhere in the borrowed CSS — a comment naming a tag is
+// enough — would close the element and make the whole SVG unrasterizable. The
+// markers sit inside CSS comments, which the stylesheet then ignores.
+const EXPORT_STYLE = `/* <![CDATA[ */
   @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(${MEASURE_FONT_DATA_URI}) format('woff2'); }
-  svg { --wall: #1e293b; --sheet: #ffffff; --dim-line: #93c9c3; --text-note: #334155; }
-  text.dim { font-family: 'JetBrains Mono', ui-monospace, monospace; fill: #1d7d74; }
-  text.room-name { font: 600 11px system-ui, sans-serif; fill: #334155; }
-  text.room-area { font: 9px 'JetBrains Mono', ui-monospace, monospace; fill: #64748b; }
-  text.text-note { font-family: system-ui, sans-serif; font-weight: 400; fill: var(--text-note); stroke: var(--sheet); paint-order: stroke; stroke-linejoin: round; }
-`;
+  ${LIGHT_PALETTE}
+  ${SHEET_STYLE}
+/* ]]> */`;
 
 // Measures mirror the editor (ADR 0008).
 export interface ExportOptions {

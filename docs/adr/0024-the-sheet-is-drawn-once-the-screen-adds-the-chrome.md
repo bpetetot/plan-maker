@@ -61,6 +61,17 @@ structure: a layer is added in one place or it exists nowhere.
   imports `OpeningGlyph` and `RulerLabel` directly for the placement previews.
   That is not a leak: the preview is chrome (ADR 0005), it just happens to be
   drawn with a drawing component.
+- **The export borrows the stylesheet instead of restating it.**
+  `sheet/sheet.css` holds the drawing's rules and `theme/light.css` the light
+  palette; `styles.css` imports both, `png.tsx` inlines both. Nothing is written
+  twice — not a rule, not a hex value — and the export is light by construction,
+  `:root` resolving to the exported `<svg>` where the dark override cannot match.
+  Two costs came with it: vitest returns empty strings for CSS imports unless
+  `css: true`, and the borrowed text must be wrapped in CDATA — the export is
+  XML, so one `<` in a CSS comment closes the `<style>` element and the document
+  rasterizes to nothing. A browser test now parses the export for that, the only
+  export test outside node: 709 tests never caught it, because none of them
+  parsed what they built.
 - ADR 0021 is not amended. It was written ahead of the code; this makes it true.
 - The test count went up, not down: 708. The browser tests were kept as the
   iso-behaviour net, and two node tests were added — the Rail at export size,

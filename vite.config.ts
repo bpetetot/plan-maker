@@ -48,6 +48,9 @@ export default defineConfig(({ mode }) => ({
           name: 'node',
           include: ['src/**/*.test.ts'],
           environment: 'node',
+          // The PNG export inlines the sheet's stylesheet (ADR 0024); left at
+          // its default, vitest hands every CSS import back as an empty string.
+          css: true,
         },
       },
       {

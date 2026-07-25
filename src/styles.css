@@ -1,52 +1,13 @@
+/* The light palette and the Sheet's rules live in their own files because the
+   PNG export inlines them (ADR 0024); everything below is chrome, which the
+   export never draws. The import order matters: the dark override must come
+   after the light palette it overrides. */
+@import './theme/light.css';
+@import './sheet/sheet.css';
+
 /* Theme palette. Light is the reference; dark overrides under [data-theme].
    The resolved theme is always stamped on <html> by JS (inline script in
    index.html, then src/theme) — no prefers-color-scheme media query here. */
-:root {
-  color-scheme: light;
-
-  /* canvas — drawing greys all come from the slate ramp, matching the blue
-     accent's temperature; interaction colors (accent, snap) are functional
-     and stay put */
-  --sheet: #ffffff;
-  --wall: #1e293b;
-  --wall-hover: #7aa5f8;
-  --accent: #2563eb;
-  --accent-contrast: #fff;
-  --snap: #16a34a;
-  --label: #334155;
-  /* free-text ink: its own token, seeded to the label value (ticket 03) so a
-     future "notes are grey" tweak never has to touch room labels */
-  --text-note: var(--label);
-  /* the measure register reads in its own teal ink — a hue apart from the
-     slate greys of the grid and walls, and from the interaction blue */
-  --dim-line: #93c9c3;
-  --dim-text: #1d7d74;
-  --room-area-text: #64748b;
-  --marquee-fill: rgba(37, 99, 235, 0.08);
-  --room-hover-fill: rgba(37, 99, 235, 0.05);
-  --room-selected-fill: rgba(37, 99, 235, 0.12);
-  --grid-minor: rgba(100, 116, 139, 0.12);
-  --grid-major: rgba(100, 116, 139, 0.26);
-
-  /* chrome */
-  --text: #222;
-  --text-muted: #777;
-  --text-faint: #999;
-  --surface: #fff;
-  --surface-hover: #f3f4f6;
-  --border: #e2e2e2;
-  --separator: #e5e7eb;
-  --input-border: #ddd;
-  --key-hint-active: #cfdcff;
-  --danger-text: #b91c1c;
-  --danger-surface: #fee2e2;
-  --flip-surface: #eef2ff;
-  --flip-text: #3730a3;
-  --hint-surface: rgba(255, 255, 255, 0.9);
-  --banner-surface: #1f2937;
-  --banner-text: #f9fafb;
-}
-
 :root[data-theme='dark'] {
   color-scheme: dark;
 
@@ -122,22 +83,11 @@ button:disabled {
   opacity: 0.4;
 }
 
-/* Measures read in a mono font — the instrument register, apart from the
-   Room label titles; mono digits are tabular by construction. The size is set
-   by the component (editor and export differ), and the masking is done by the
-   rounded sheet plate DimText draws — the text carries no halo. */
-svg text.dim {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  fill: var(--dim-text);
-  user-select: none;
-}
+/* The live length of a wall being drawn: chrome wearing the measure register,
+   so it modifies .dim — which lives in sheet/sheet.css, being drawing. */
 svg text.dim-live {
   fill: var(--accent);
   font-weight: 600;
-}
-/* the dimension of a selected wall shares the wall's selection accent */
-svg text.dim-selected {
-  fill: var(--accent);
 }
 /* placement dimensions: the value sits on a filled accent chip, so it needs
    the contrasting fill and none of .dim's sheet-coloured halo */
@@ -159,15 +109,6 @@ svg path.room-fill-selected {
   fill: var(--room-selected-fill);
 }
 
-/* Semi-bold, as typed — the Room label's name is the sheet's one title
-   register, kept typographically apart from every number on the sheet */
-svg text.room-name {
-  font:
-    600 11px system-ui,
-    sans-serif;
-  fill: var(--label);
-  user-select: none;
-}
 /* Inline room-name editing, drawn in plan coordinates so it matches the
    rendered text at every zoom level */
 svg foreignObject input.room-name-input {
@@ -183,29 +124,7 @@ svg foreignObject input.room-name-input {
     sans-serif;
   color: var(--label);
 }
-svg text.room-area {
-  font:
-    9px 'JetBrains Mono',
-    ui-monospace,
-    monospace;
-  fill: var(--room-area-text);
-  user-select: none;
-}
 
-/* Free-text annotation (CONTEXT.md: Text): prose, not a title — plain 400
-   weight, left-aligned. font-size is set per node in plan cm. The soft halo
-   (ticket 03) is a sheet-coloured stroke painted under the glyphs; its width is
-   set per node in cm on the element. */
-svg text.text-note {
-  font-family: system-ui, sans-serif;
-  font-weight: 400;
-  fill: var(--text-note);
-  stroke: var(--sheet);
-  paint-order: stroke;
-  stroke-linejoin: round;
-  cursor: default;
-  user-select: none;
-}
 /* Inline text editing, drawn in plan coordinates so the textarea matches the
    rendered block at every zoom; font-size is set inline to the node's cm. */
 svg foreignObject textarea.text-note-input {

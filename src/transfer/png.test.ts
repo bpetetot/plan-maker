@@ -158,18 +158,21 @@ describe('buildExportSvg', () => {
   // reaches the sheet through a slot the export leaves empty (ADR 0024).
   it('leaves the editor chrome out of the export', () => {
     const svg = buildExportSvg(fullPlan(), { measuresVisible: true })!;
-    expect(svg).toContain('1,37 m');
-    expect(svg).toContain('Salon');
+    // The drawn elements only: the inlined stylesheet legitimately mentions a
+    // cursor and the chrome's own classes.
+    const drawn = svg.slice(svg.indexOf('</style>'));
+    expect(drawn).toContain('1,37 m');
+    expect(drawn).toContain('Salon');
     // grab zones, of every family, and the Dimension's own drag rect
-    expect(svg).not.toContain('transparent');
-    expect(svg).not.toContain('cursor');
-    expect(svg).not.toContain('ruler-grab');
-    expect(svg).not.toContain('text-grab');
-    expect(svg).not.toContain(ROOM_TEXT_HIT);
+    expect(drawn).not.toContain('transparent');
+    expect(drawn).not.toContain('cursor');
+    expect(drawn).not.toContain('ruler-grab');
+    expect(drawn).not.toContain('text-grab');
+    expect(drawn).not.toContain(ROOM_TEXT_HIT);
     // tints, chips and handles: chrome that never enters the sheet at all
-    expect(svg).not.toContain('room-fill');
-    expect(svg).not.toContain('placement-chip');
-    expect(svg).not.toContain('point-handle');
+    expect(drawn).not.toContain('room-fill');
+    expect(drawn).not.toContain('placement-chip');
+    expect(drawn).not.toContain('point-handle');
   });
 
   // A stored placement is a wish, the Rail is the law — and the Rail is shorter
@@ -188,10 +191,12 @@ describe('buildExportSvg', () => {
     expect(x).toBeCloseTo(98, 3);
   });
 
-  // Without the pinned ink the export <style> gives text.text-note no fill and
-  // it rasterizes black instead of the label slate.
-  it('pins the free-text ink so it does not fall back to black', () => {
+  // A var the export leaves undefined rasterizes black. The free-text ink is
+  // the one defined through another (CONTEXT.md: Text), so the whole chain has
+  // to arrive, not just its first link.
+  it('carries the free-text ink and what it resolves to', () => {
     const svg = buildExportSvg(textPlan(), { measuresVisible: true })!;
-    expect(svg).toContain('--text-note: #334155');
+    expect(svg).toContain('--text-note: var(--label)');
+    expect(svg).toContain('--label: #334155');
   });
 });

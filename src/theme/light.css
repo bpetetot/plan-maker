@@ -1,0 +1,48 @@
+/* The light palette — the reference theme, and the only one the PNG export
+   knows: it inlines this file, where `:root` resolves to the exported <svg>
+   itself, so the dark override in styles.css can never match (CONTEXT.md: Theme). */
+:root {
+  color-scheme: light;
+
+  /* canvas — drawing greys all come from the slate ramp, matching the blue
+     accent's temperature; interaction colors (accent, snap) are functional
+     and stay put */
+  --sheet: #ffffff;
+  --wall: #1e293b;
+  --wall-hover: #7aa5f8;
+  --accent: #2563eb;
+  --accent-contrast: #fff;
+  --snap: #16a34a;
+  --label: #334155;
+  /* free-text ink: its own token, seeded to the label value (ticket 03) so a
+     future "notes are grey" tweak never has to touch room labels */
+  --text-note: var(--label);
+  /* the measure register reads in its own teal ink — a hue apart from the
+     slate greys of the grid and walls, and from the interaction blue */
+  --dim-line: #93c9c3;
+  --dim-text: #1d7d74;
+  --room-area-text: #64748b;
+  --marquee-fill: rgba(37, 99, 235, 0.08);
+  --room-hover-fill: rgba(37, 99, 235, 0.05);
+  --room-selected-fill: rgba(37, 99, 235, 0.12);
+  --grid-minor: rgba(100, 116, 139, 0.12);
+  --grid-major: rgba(100, 116, 139, 0.26);
+
+  /* chrome */
+  --text: #222;
+  --text-muted: #777;
+  --text-faint: #999;
+  --surface: #fff;
+  --surface-hover: #f3f4f6;
+  --border: #e2e2e2;
+  --separator: #e5e7eb;
+  --input-border: #ddd;
+  --key-hint-active: #cfdcff;
+  --danger-text: #b91c1c;
+  --danger-surface: #fee2e2;
+  --flip-surface: #eef2ff;
+  --flip-text: #3730a3;
+  --hint-surface: rgba(255, 255, 255, 0.9);
+  --banner-surface: #1f2937;
+  --banner-text: #f9fafb;
+}
