@@ -3,13 +3,14 @@
 import type { Vec } from '../model/geometry';
 import { nearestWall } from '../model/geometry';
 import { placeOpening, railedOpeningOffset } from '../model/openings';
-import { commitPoint, commitWall, settleEdit, wallsAlongPath } from '../model/operations';
+import { commitPoint, commitWall, settleEdit } from '../model/settle';
 import { addRuler } from '../model/rulers';
 import type { ElementRef } from '../model/selection';
 import type { Snap } from '../model/snap';
 import { snapPoint } from '../model/snap';
 import type { Cm, Opening, Plan, TextSize } from '../model/types';
 import { GRID, WALL_THICKNESS } from '../model/types';
+import { wallsAlongPath } from '../model/walls';
 import { snapTolerance } from './gesture';
 import type { Tool, ToolDefaults } from './tools';
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { commitWall, deleteWall, setPoints } from './operations';
+import { commitWall } from './settle';
+import { deleteWall, setPoints } from './walls';
 import {
   addRoomLabel,
   clampToRoom,

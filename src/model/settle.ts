@@ -1,3 +1,5 @@
+// The graph surgery a Point or a Wall edit needs: planar insertion at commit
+// (ADR 0002) and the settle that follows a drag (ADR 0022).
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { railedOpeningOffset } from './openings';
@@ -6,14 +8,14 @@ import type { Snap } from './snap';
 import type { Opening, Plan, Wall } from './types';
 import { newId, WALL_THICKNESS } from './types';
 
-export function ensurePoint(plan: Plan, snap: Snap): [Plan, string] {
+function ensurePoint(plan: Plan, snap: Snap): [Plan, string] {
   if (snap.pointId) return [plan, snap.pointId];
   const id = newId();
   const point = { id, x: Math.round(snap.x), y: Math.round(snap.y) };
   return [{ ...plan, points: { ...plan.points, [id]: point } }, id];
 }
 
-export function addWall(
+function addWall(
   plan: Plan,
   startPointId: string,
   endPointId: string,
@@ -30,19 +32,9 @@ export function addWall(
   return { ...plan, walls: { ...plan.walls, [id]: wall } };
 }
 
-export function movePoint(plan: Plan, id: string, x: number, y: number): Plan {
-  return { ...plan, points: { ...plan.points, [id]: { id, x: Math.round(x), y: Math.round(y) } } };
-}
-
-export function setPoints(plan: Plan, updates: Record<string, { x: number; y: number }>): Plan {
-  const points = { ...plan.points };
-  for (const [id, p] of Object.entries(updates)) points[id] = { id, x: Math.round(p.x), y: Math.round(p.y) };
-  return { ...plan, points };
-}
-
 // ADR 0002. Start-side half keeps the wall's id, so its openings keep their
 // wallId and offset.
-export function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
+function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
   const wall = plan.walls[wallId];
   const point = plan.points[pointId];
   if (!wall || !point) return plan;
@@ -194,34 +186,6 @@ export function commitWall(
   return [next, endId];
 }
 
-// The walls a chain drew: those lying on the polyline through its anchor Points,
-// which excludes the halves a crossing split off a pre-existing wall (they sit
-// on the crossed wall's line, not the drawn path).
-export function wallsAlongPath(plan: Plan, anchorIds: string[]): string[] {
-  const onSegment = (p: Vec, s: Vec, e: Vec): boolean => {
-    const dx = e.x - s.x;
-    const dy = e.y - s.y;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) return false;
-    const t = ((p.x - s.x) * dx + (p.y - s.y) * dy) / len2;
-    if (t < -0.001 || t > 1.001) return false;
-    return Math.abs((p.x - s.x) * dy - (p.y - s.y) * dx) / Math.sqrt(len2) <= 1.5;
-  };
-  const ids: string[] = [];
-  for (const wall of Object.values(plan.walls)) {
-    const [a, b] = wallPoints(plan, wall);
-    for (let i = 0; i < anchorIds.length - 1; i++) {
-      const s = plan.points[anchorIds[i]];
-      const e = plan.points[anchorIds[i + 1]];
-      if (s && e && onSegment(a, s, e) && onSegment(b, s, e)) {
-        ids.push(wall.id);
-        break;
-      }
-    }
-  }
-  return ids;
-}
-
 // ADR 0003. Opposed twins mirror the offset and flip hinge/swing, so the door
 // stays physically identical.
 function dedupeTwinWalls(plan: Plan): Plan {
@@ -350,44 +314,4 @@ function planarize(plan: Plan): Plan {
  *  holds it; `moving` lists the Points it displaced (ADR 0022). */
 export function settleEdit(before: Plan, after: Plan, moving?: Set<string>): Plan {
   return reconcileRoomLabels(before, planarize(mergeCoincidentPoints(after, moving)));
-}
-
-// Openings die with their wall (spec §2).
-export function deleteWall(plan: Plan, id: string): Plan {
-  const wall = plan.walls[id];
-  if (!wall) return plan;
-  const walls = { ...plan.walls };
-  delete walls[id];
-
-  const openings: Record<string, Opening> = {};
-  for (const opening of Object.values(plan.openings)) {
-    if (opening.wallId !== id) openings[opening.id] = opening;
-  }
-
-  const usedPointIds = new Set<string>();
-  for (const w of Object.values(walls)) {
-    usedPointIds.add(w.startPointId);
-    usedPointIds.add(w.endPointId);
-  }
-  const points: Plan['points'] = {};
-  for (const point of Object.values(plan.points)) {
-    if (usedPointIds.has(point.id)) points[point.id] = point;
-  }
-
-  return { ...plan, points, walls, openings };
-}
-
-// A plain setter: `t` arrives railed (ADR 0027), and the Rail binds again at
-// every drawing — a stored placement is only ever a wish.
-export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 | -1): Plan {
-  const wall = plan.walls[wallId];
-  if (!wall) return plan;
-  const dimPlacement = { t: Math.round(t * 1000) / 1000, side };
-  return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } };
-}
-
-export function setWallThickness(plan: Plan, id: string, thickness: number): Plan {
-  const wall = plan.walls[id];
-  if (!wall || wall.thickness === thickness) return plan;
-  return { ...plan, walls: { ...plan.walls, [id]: { ...wall, thickness } } };
 }

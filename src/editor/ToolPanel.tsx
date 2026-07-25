@@ -17,7 +17,7 @@ import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
 import { setOpeningWidth, toggleHingeSide, toggleSwing } from '../model/openings';
-import { setWallThickness } from '../model/operations';
+import { setWallThickness } from '../model/walls';
 import { detectRooms, roomLabelAt, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';

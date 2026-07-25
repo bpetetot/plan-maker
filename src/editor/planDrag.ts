@@ -3,7 +3,7 @@
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallLength, wallSide } from '../model/geometry';
 import { moveOpening } from '../model/openings';
-import { movePoint, setDimPlacement, settleEdit } from '../model/operations';
+import { settleEdit } from '../model/settle';
 import type { Room } from '../model/rooms';
 import { addRoomLabel, clampToRoom, moveRoomLabel } from '../model/rooms';
 import { moveRulerEndpoint } from '../model/rulers';
@@ -13,6 +13,7 @@ import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
 import { DIM_FONT_PX, railedDimT } from '../model/rail';
 import type { Plan } from '../model/types';
+import { movePoint, setDimPlacement } from '../model/walls';
 import { snapTolerance } from './gesture';
 
 export type PlanDragSpec =

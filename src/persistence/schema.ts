@@ -1,4 +1,4 @@
-import { mergeCoincidentPoints } from '../model/operations';
+import { mergeCoincidentPoints } from '../model/settle';
 import { dropOrphanRoomLabels } from '../model/rooms';
 import type { Opening, Plan, Ruler, TextNote } from '../model/types';
 

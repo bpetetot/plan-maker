@@ -1,7 +1,7 @@
 import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { deleteOpening, openingPlacement } from './openings';
-import { deleteWall, setPoints, settleEdit } from './operations';
+import { settleEdit } from './settle';
 import type { Room } from './rooms';
 import {
   detectRooms,
@@ -15,6 +15,7 @@ import {
 } from './rooms';
 import { deleteRuler, translateRuler } from './rulers';
 import { deleteText, translateText } from './texts';
+import { deleteWall, setPoints } from './walls';
 import type { Opening, Plan, Point } from './types';
 
 // CONTEXT.md: Selection. Editor state, never the plan; room labels are never

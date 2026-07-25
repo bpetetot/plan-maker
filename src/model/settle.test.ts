@@ -1,20 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { placeOpening } from './openings';
-import {
-  addWall,
-  commitPoint,
-  commitWall,
-  deleteWall,
-  ensurePoint,
-  mergeCoincidentPoints,
-  movePoint,
-  setDimPlacement,
-  setPoints,
-  settleEdit,
-  setWallThickness,
-  splitWall,
-} from './operations';
+import { commitPoint, commitWall, mergeCoincidentPoints, settleEdit } from './settle';
 import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from './testHelpers';
+import { setDimPlacement, setPoints } from './walls';
 
 const rectPlan = () =>
   buildPlan((b) => {
@@ -23,61 +10,29 @@ const rectPlan = () =>
     b.wall(p1, p2);
   });
 
-describe('ensurePoint', () => {
-  it('reuses an existing point when the snap carries a pointId', () => {
+// ADR 0002. The split is reached through commitPoint, which looks the host up
+// itself: a point landing on a wall body is what cuts it.
+describe('splitting the host wall', () => {
+  it('splits into two halves, the start side keeping the wall id', () => {
     const plan = rectPlan();
-    const existingId = Object.keys(plan.points)[0];
-    const [next, id] = ensurePoint(plan, { x: 0, y: 0, kind: 'point', pointId: existingId });
-    expect(id).toBe(existingId);
-    expect(next).toBe(plan);
-  });
-
-  it('creates a new rounded integer point otherwise', () => {
-    const plan = rectPlan();
-    const [next, id] = ensurePoint(plan, { x: 10.4, y: 19.6, kind: 'free' });
-    expect(next.points[id]).toMatchObject({ x: 10, y: 20 });
-  });
-});
-
-describe('splitWall', () => {
-  it('splits a wall into two halves sharing the split point', () => {
-    const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const mid = b.point(150, 0);
-      b.wall(p1, p2);
-      void mid;
-    });
-    const [p1, p2, mid] = Object.keys(plan.points);
     const wallId = Object.keys(plan.walls)[0];
-    const next = splitWall(plan, wallId, mid);
+    const [p1, p2] = Object.keys(plan.points);
+    const [next, mid] = commitPoint(plan, { x: 150, y: 0, kind: 'wall', wallId });
     expect(Object.keys(next.walls)).toHaveLength(2);
     expect(next.walls[wallId]).toMatchObject({ startPointId: p1, endPointId: mid, thickness: 10 });
     const other = Object.values(next.walls).find((w) => w.id !== wallId)!;
     expect(other).toMatchObject({ startPointId: mid, endPointId: p2, thickness: 10 });
   });
 
-  it('is a no-op when the point is one of the wall ends', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    const endId = plan.walls[wallId].endPointId;
-    expect(splitWall(plan, wallId, endId)).toBe(plan);
-  });
-
   it('reassigns each opening to the half containing its center', () => {
     const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const mid = b.point(200, 0);
-      const wall = b.wall(p1, p2);
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
       b.opening(wall, 'door', 60); // center on the start side
       b.opening(wall, 'window', 320); // center on the end side
-      void mid;
     });
-    const mid = Object.keys(plan.points)[2];
     const wallId = Object.keys(plan.walls)[0];
     const [doorId, windowId] = Object.keys(plan.openings);
-    const next = splitWall(plan, wallId, mid);
+    const [next] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId });
     expect(next.openings[doorId]).toMatchObject({ wallId, offset: 60 });
     // end-side opening rebased on the new half: 320 − 200 = 120
     const endHalf = Object.values(next.walls).find((w) => w.id !== wallId)!;
@@ -86,80 +41,53 @@ describe('splitWall', () => {
 
   it('deletes an opening straddling the cut', () => {
     const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const cut = b.point(210, 0);
-      const wall = b.wall(p1, p2);
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
       b.opening(wall, 'door', 200); // interval 155..245 contains the cut
-      void cut;
     });
-    const cut = Object.keys(plan.points)[2];
     const wallId = Object.keys(plan.walls)[0];
-    const next = splitWall(plan, wallId, cut);
+    const [next] = commitPoint(plan, { x: 210, y: 0, kind: 'wall', wallId });
     expect(Object.keys(next.openings)).toHaveLength(0);
   });
 
   it('keeps an opening the cut barely clears, however tight the half', () => {
     const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const cut = b.point(96, 0);
-      const wall = b.wall(p1, p2);
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
       b.opening(wall, 'door', 50); // interval 5..95, one centimetre clear of the cut
-      void cut;
     });
-    const cut = Object.keys(plan.points)[2];
     const wallId = Object.keys(plan.walls)[0];
     const doorId = Object.keys(plan.openings)[0];
     // its rail on the 96 cm half runs -5..96, still wider than the door
-    expect(splitWall(plan, wallId, cut).openings[doorId]).toMatchObject({ offset: 50 });
+    const [next] = commitPoint(plan, { x: 96, y: 0, kind: 'wall', wallId });
+    expect(next.openings[doorId]).toMatchObject({ offset: 50 });
   });
 
   it('deletes an opening the cut would force to shift, instead of moving it', () => {
     const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const cut = b.point(100, 0);
-      const wall = b.wall(p1, p2);
       // interval -15..75: clear of the cut, but hanging past the start half's
       // overhang at -5 — clamping would silently move it to 40
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
       b.opening(wall, 'door', 30);
-      void cut;
     });
-    const cut = Object.keys(plan.points)[2];
     const wallId = Object.keys(plan.walls)[0];
-    const next = splitWall(plan, wallId, cut);
+    const [next] = commitPoint(plan, { x: 100, y: 0, kind: 'wall', wallId });
     expect(Object.keys(next.openings)).toHaveLength(0);
   });
 
   it('keeps an opening that exactly fits its half at its stored offset', () => {
     const plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const cut = b.point(100, 0);
-      const wall = b.wall(p1, p2);
+      const wall = b.wall(b.point(0, 0), b.point(400, 0));
       b.opening(wall, 'door', 50); // interval 5..95, inside the half's rail of -5..100
-      void cut;
     });
-    const cut = Object.keys(plan.points)[2];
     const wallId = Object.keys(plan.walls)[0];
     const doorId = Object.keys(plan.openings)[0];
-    const next = splitWall(plan, wallId, cut);
+    const [next] = commitPoint(plan, { x: 100, y: 0, kind: 'wall', wallId });
     expect(next.openings[doorId]).toMatchObject({ wallId, offset: 50 });
   });
 
   it('drops the dimension placement on both halves', () => {
-    let plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const mid = b.point(200, 0);
-      b.wall(p1, p2);
-      void mid;
-    });
-    const mid = Object.keys(plan.points)[2];
+    const plan = setDimPlacement(rectPlan(), Object.keys(rectPlan().walls)[0], 0.3, -1);
     const wallId = Object.keys(plan.walls)[0];
-    plan = setDimPlacement(plan, wallId, 0.3, -1);
-    const next = splitWall(plan, wallId, mid);
+    const [next] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId });
     for (const wall of Object.values(next.walls)) expect(wall.dimPlacement).toBeUndefined();
   });
 });
@@ -287,37 +215,6 @@ describe('commitWall', () => {
       (w) => w.startPointId === footId || w.endPointId === footId,
     );
     expect(touching).toHaveLength(3);
-  });
-});
-
-describe('addWall', () => {
-  it('adds a wall with default thickness', () => {
-    const plan = rectPlan();
-    const [p1, p2] = Object.keys(plan.points);
-    const withPoint = ensurePoint(plan, { x: 400, y: 300, kind: 'free' });
-    const next = addWall(withPoint[0], p2, withPoint[1]);
-    expect(Object.keys(next.walls)).toHaveLength(2);
-    const added = Object.values(next.walls).find((w) => w.startPointId === p2)!;
-    expect(added.thickness).toBe(10);
-    expect(added.endPointId).toBe(withPoint[1]);
-    expect(p1).toBeTruthy();
-  });
-
-  it('adds a wall with the requested thickness', () => {
-    const plan = rectPlan();
-    const [, p2] = Object.keys(plan.points);
-    const [withPoint, p3] = ensurePoint(plan, { x: 400, y: 300, kind: 'free' });
-    const next = addWall(withPoint, p2, p3, 25);
-    const added = Object.values(next.walls).find((w) => w.startPointId === p2)!;
-    expect(added.thickness).toBe(25);
-  });
-
-  it('rejects self-loops and duplicate walls (either direction)', () => {
-    const plan = rectPlan();
-    const [p1, p2] = Object.keys(plan.points);
-    expect(addWall(plan, p1, p1)).toBe(plan);
-    expect(addWall(plan, p1, p2)).toBe(plan);
-    expect(addWall(plan, p2, p1)).toBe(plan);
   });
 });
 
@@ -523,89 +420,5 @@ describe('settleEdit — planar insertion', () => {
     expect(Object.keys(next.walls)).toHaveLength(3);
     const pairs = Object.values(next.walls).map((w) => [w.startPointId, w.endPointId].sort().join('-'));
     expect(new Set(pairs).size).toBe(3);
-  });
-});
-
-describe('movePoint / setPoints', () => {
-  it('moves a shared point (all attached walls follow implicitly)', () => {
-    const plan = rectPlan();
-    const id = Object.keys(plan.points)[0];
-    const next = movePoint(plan, id, 50.4, 60.5);
-    expect(next.points[id]).toMatchObject({ x: 50, y: 61 });
-  });
-
-  it('setPoints updates several points at once', () => {
-    const plan = rectPlan();
-    const [a, b] = Object.keys(plan.points);
-    const next = setPoints(plan, { [a]: { x: 1, y: 2 }, [b]: { x: 3, y: 4 } });
-    expect(next.points[a]).toMatchObject({ x: 1, y: 2 });
-    expect(next.points[b]).toMatchObject({ x: 3, y: 4 });
-  });
-});
-
-describe('deleteWall', () => {
-  it('deletes the wall, its openings, and now-orphan points', () => {
-    let plan = buildPlan((b) => {
-      const p1 = b.point(0, 0);
-      const p2 = b.point(400, 0);
-      const p3 = b.point(400, 300);
-      b.wall(p1, p2);
-      b.wall(p2, p3);
-    });
-    const wall = Object.values(plan.walls).find((w) => {
-      return plan.points[w.startPointId].y === 0 && plan.points[w.endPointId].y === 0;
-    })!;
-    plan = placeOpening(plan, wall.id, 'door', 200)[0];
-    expect(Object.keys(plan.openings)).toHaveLength(1);
-
-    const next = deleteWall(plan, wall.id);
-    expect(next.walls[wall.id]).toBeUndefined();
-    expect(Object.keys(next.openings)).toHaveLength(0);
-    // p1 became orphan, p2 still used by the second wall
-    expect(Object.keys(next.points)).toHaveLength(2);
-  });
-});
-
-describe('setWallThickness', () => {
-  it('sets the thickness of a wall', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    expect(setWallThickness(plan, wallId, 20).walls[wallId].thickness).toBe(20);
-  });
-
-  it('is a no-op for an unknown wall', () => {
-    const plan = rectPlan();
-    expect(setWallThickness(plan, 'nope', 20)).toBe(plan);
-  });
-});
-
-describe('setDimPlacement', () => {
-  it('stores the placement on the wall, rounded to 3 decimals', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    expect(setDimPlacement(plan, wallId, 0.75, -1).walls[wallId].dimPlacement).toEqual({
-      t: 0.75,
-      side: -1,
-    });
-    expect(setDimPlacement(plan, wallId, 1 / 3, 1).walls[wallId].dimPlacement).toEqual({
-      t: 0.333,
-      side: 1,
-    });
-  });
-
-  // Bounding is the Rail's business, upstream (ADR 0027): this stores what the
-  // gesture already railed.
-  it('stores the ratio it is handed, without a bound of its own', () => {
-    const plan = rectPlan();
-    const wallId = Object.keys(plan.walls)[0];
-    expect(setDimPlacement(plan, wallId, 0.88, 1).walls[wallId].dimPlacement).toEqual({
-      t: 0.88,
-      side: 1,
-    });
-  });
-
-  it('is a no-op for an unknown wall', () => {
-    const plan = rectPlan();
-    expect(setDimPlacement(plan, 'missing', 0.5, 1)).toBe(plan);
   });
 });
