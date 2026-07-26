@@ -154,6 +154,17 @@ describe('re-editing a placed Text', () => {
     expect(texts()).toHaveLength(1);
   });
 
+  it('a re-edit that changes nothing writes no undo entry', async () => {
+    usePlanStore.setState({ plan: oneText('Old'), planEpoch: 0 });
+    usePlanStore.temporal.getState().clear();
+    const { container } = await render(<Editor />);
+    const note = container.querySelector('text.text-note')!;
+    await mouse(note, 'dblclick', clientAt(container.querySelector('svg')!, 200, 200));
+    await clickAway();
+    expect(plan().texts.t1.content).toBe('Old');
+    expect(undoDepth()).toBe(0);
+  });
+
   it('emptying an existing Text then committing deletes it', async () => {
     usePlanStore.setState({ plan: oneText('Old'), planEpoch: 0 });
     usePlanStore.temporal.getState().clear();

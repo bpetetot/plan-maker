@@ -20,8 +20,6 @@ import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallPoints } from '../model/geometry';
 import { openingPlacement } from '../model/openings';
-import { addRoomLabel, renameRoomLabel } from '../model/roomLabels';
-import { addText, deleteText, editTextContent } from '../model/texts';
 import { wallDimension } from '../model/dimension';
 import { DIM_FONT_PX } from '../model/rail';
 import { reconcileRoomLabels } from '../model/roomLabels';
@@ -38,10 +36,12 @@ import {
   selectionForRoom,
   toggleRef,
 } from '../model/selection';
-import type { Opening, RoomLabel, TextNote, TextSize } from '../model/types';
+import type { Opening, RoomLabel, TextNote } from '../model/types';
 import type { OpenEdit } from '../store/planStore';
 import { beginEdit, editPlan, redo, undo, usePlanStore } from '../store/planStore';
 import { GridLines } from './grid';
+import type { InlineEdit } from './inlineEdit';
+import { commitInlineEdit, editedSlot, openRoomLabel, openText, placeText } from './inlineEdit';
 import { InlineEditor } from './inlineEditor';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from './planDrag';
@@ -74,7 +74,7 @@ import {
 import { RulerLabel } from '../sheet/measures';
 import { OpeningGlyph } from '../sheet/openings';
 import { COLORS } from '../sheet/paint';
-import { BLOCK_LINE_HEIGHT, blockNameSlots, ROOM_TEXT_HIT, roomTextBlocks } from '../sheet/rooms';
+import { ROOM_TEXT_HIT, roomTextBlocks } from '../sheet/rooms';
 import type { ElementDecor } from '../sheet/scene';
 import { PlanScene } from '../sheet/scene';
 import { TEXT_SIZE_CM, textAtPoint, textEditBox } from '../sheet/texts';
@@ -162,26 +162,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   );
   const [movingOpeningId, setMovingOpeningId] = useState<string | null>(null);
   // Plan touched on commit only, not per keystroke: one undo entry.
-  // labelId null until the room has a label — created on non-empty commit.
-  const [editing, setEditing] = useState<{
-    key: string;
-    labelId: string | null;
-    x: number;
-    y: number;
-    initial: string;
-  } | null>(null);
-  // A Text under edit: `id` null while placing (the node is born only on a
-  // non-empty commit, so an aborted placement leaves no orphan).
-  const [textEditing, setTextEditing] = useState<{
-    id: string | null;
-    x: number;
-    y: number;
-    size: TextSize;
-    initial: string;
-  } | null>(null);
-  // A Text placement mousedown must not run its focus fixup, or it blurs the
-  // just-mounted editor and commits it empty before a key can land.
-  const placingText = useRef(false);
+  const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null);
   const space = useSpaceHeld();
   // Tracked only so the snap toggle re-renders on Alt transitions: every
   // gesture reads Alt off its own event (ADR 0007, ADR 0030).
@@ -227,7 +208,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const switchTool = (next: Tool) => {
     setTool(next);
     setPlacement(next === 'select' ? null : beginPlacement(next));
-    setTextEditing(null);
+    setInlineEdit((e) => (e?.kind === 'text' ? null : e));
     if (next !== 'select') setSel([]);
     // A Ruler is measured, so drawing one reveals the measures (ticket 03).
     if (next === 'ruler') setPreference('measures', true);
@@ -241,12 +222,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     if (r.tool) switchTool(r.tool);
     else setPlacement(r.placement);
     if (r.selection) setSel(r.selection);
-    if (r.editor) {
-      // The paired mousedown (next event) must skip its focus fixup so the
-      // editor's autoFocus survives — see onMouseDown below.
-      placingText.current = true;
-      setTextEditing({ id: null, ...r.editor, initial: '' });
-    }
+    if (r.editor) setInlineEdit(placeText(r.editor));
   };
 
   const deleteSelected = useCallback((selection: ElementRef[]) => {
@@ -327,7 +303,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     space,
     snapEnabled,
     placementOpen: placement !== null,
-    textEditing: textEditing !== null,
+    // Only a Text box swallows the click: a Room label box coexists with a
+    // marquee, which its own blur-commit does not disturb.
+    textEditing: inlineEdit?.kind === 'text',
   });
 
   // One capture protocol: whatever the source, a gesture holds the svg.
@@ -427,9 +405,15 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         capture(e);
         return;
       }
-      case 'placementClick':
-        if (placement) applyPlacement(clickPlacement(placement, plan, intent.at, placementEnv(intent.free)));
+      case 'placementClick': {
+        if (!placement) return;
+        const r = clickPlacement(placement, plan, intent.at, placementEnv(intent.free));
+        applyPlacement(r);
+        // Pointer Events: preventDefault on a pointerdown suppresses its
+        // compatibility mouse events — whose focus fixup would blur the box.
+        if (r.editor) e.preventDefault();
         return;
+      }
       case 'panBy':
         panByPx(intent.dxPx, intent.dyPx);
         return;
@@ -565,40 +549,10 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     onDown(e, { kind: 'label', block, label });
   };
 
-  const startEditing = (block: RoomTextBlock, label: RoomLabel | null) => {
-    // The input overlays the label's own slot in a stacked block; creation
-    // targets the top slot.
-    const named = blockNameSlots(block, label?.id);
-    const line = label
-      ? Math.max(
-          0,
-          named.findIndex((l) => l.id === label.id),
-        )
-      : 0;
-    setEditing({
-      key: label?.id ?? block.key,
-      labelId: label?.id ?? null,
-      x: block.x,
-      y: block.y + line * BLOCK_LINE_HEIGHT,
-      initial: label?.name ?? '',
-    });
-  };
-
-  // Null means Escape cancelled the box (CONTEXT.md: Interaction chrome).
-  const finishEditing = (value: string | null) => {
-    const ed = editing;
-    setEditing(null);
-    if (!ed || value === null) return;
-    const name = value.trim();
-    if (name === ed.initial) return;
-    if (ed.labelId) editPlan((p) => renameRoomLabel(p, ed.labelId!, name));
-    else if (name) editPlan((p) => addRoomLabel(p, name, ed.x, ed.y)[0]);
-  };
-
   const onLineDoubleClick = (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => {
     if (tool !== 'select') return;
     e.stopPropagation();
-    startEditing(block, label);
+    setInlineEdit(openRoomLabel(block, label));
   };
 
   // Double-click a placed Text to re-open its editor (ticket 02); stops the
@@ -606,27 +560,24 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const onTextDoubleClick = (text: TextNote, e: React.MouseEvent) => {
     if (tool !== 'select') return;
     e.stopPropagation();
-    setTextEditing({ id: text.id, x: text.x, y: text.y, size: text.size, initial: text.content });
+    setInlineEdit(openText(text));
   };
 
   // A just-placed node is born here; an emptied one is discarded. Null is
   // Escape: the box closes and the tool hands back, but nothing is written.
-  const finishTextEditing = (value: string | null) => {
-    const ed = textEditing;
-    setTextEditing(null);
-    // One-shot: placement hands back to Select; a re-edit is already there.
+  const finishInlineEdit = (value: string | null) => {
+    const ed = inlineEdit;
+    setInlineEdit(null);
+    // One-shot: a Text placement hands back to Select whatever the box returns
+    // (ADR 0021); a re-edit is already there, and a Room label never switches.
     if (tool === 'text') switchTool('select');
-    if (!ed || value === null) return;
-    const empty = value.trim() === '';
-    if (ed.id) {
-      editPlan((p) => (empty ? deleteText(p, ed.id!) : editTextContent(p, ed.id!, value)));
-    } else if (!empty) {
-      // A placed Text hands back to Select, selected (the 06 auto-select
-      // deferral) — mirroring a placed Ruler and Opening.
-      const [next, id] = addText(plan, ed.x, ed.y, value, ed.size);
-      editPlan(() => next);
-      setSel([{ type: 'text', id }]);
-    }
+    if (!ed) return;
+    // Latest plan, not the render closure: a placement click just committed
+    // through editPlan and the closure reads stale.
+    const done = commitInlineEdit(usePlanStore.getState().plan, ed, value);
+    if (!done) return;
+    editPlan(() => done.plan);
+    if (done.selection) setSel(done.selection);
   };
 
   // How the screen dresses each element of the sheet (ADR 0024). A wall's only
@@ -648,7 +599,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       case 'text':
         return {
           selected,
-          hidden: textEditing?.id === ref.id,
+          hidden: inlineEdit?.kind === 'text' && inlineEdit.id === ref.id,
           onPointerDown: selectable ? downFrom({ kind: 'element', ref }) : undefined,
           onDoubleClick: selectable ? (e) => onTextDoubleClick(plan.texts[ref.id], e) : undefined,
         };
@@ -678,7 +629,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // lands mid-drag, so there is nothing to reconcile here.
     const blocks = roomTextBlocks(rooms, Object.values(plan.roomLabels));
     const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
-    if (block) startEditing(block, block.labels[0] ?? null);
+    if (block) setInlineEdit(openRoomLabel(block, block.labels[0] ?? null));
   };
 
   return (
@@ -688,14 +639,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         style={{ width: '100%', height: '100%', background: 'var(--sheet)', display: 'block', cursor }}
         onPointerDown={(e) => onDown(e, { kind: 'sheet' })}
-        // Placing a Text just mounted and focused the editor; the paired
-        // mousedown's focus fixup would blur it. Cancel only that one.
-        onMouseDown={(e) => {
-          if (placingText.current) {
-            placingText.current = false;
-            e.preventDefault();
-          }
-        }}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onCancel}
@@ -718,7 +661,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             element: dressElement,
             pxPerCm: zoomScale,
             labels: overlayLabels,
-            editingKey: editing?.key,
+            editingKey: editedSlot(inlineEdit),
             onLinePointerDown,
             onLineDoubleClick,
           }}
@@ -813,26 +756,23 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} fontPx={DIM_FONT_PX} />
         )}
         <SnapMarker snap={chrome?.snap ?? null} pxPerCm={zoomScale} />
-        {editing && (
+        {/* One box, keyed by what is typed: without the key the component's
+            mirrored value would outlive a switch from one target to the other. */}
+        {inlineEdit && (
           <InlineEditor
-            className="room-name-input"
-            initial={editing.initial}
-            box={() => ({ x: editing.x - 100, y: editing.y - 13, width: 200, height: 17 })}
-            onClose={finishEditing}
-          />
-        )}
-        {textEditing && (
-          <InlineEditor
-            multiline
-            className="text-note-input"
-            initial={textEditing.initial}
-            style={{ fontSize: `${TEXT_SIZE_CM[textEditing.size]}px` }}
-            box={(value) => ({
-              x: textEditing.x,
-              y: textEditing.y,
-              ...textEditBox(value, textEditing.size),
-            })}
-            onClose={finishTextEditing}
+            key={`${inlineEdit.kind}:${inlineEdit.id ?? 'new'}`}
+            multiline={inlineEdit.kind === 'text'}
+            className={inlineEdit.kind === 'text' ? 'text-note-input' : 'room-name-input'}
+            initial={inlineEdit.initial}
+            style={
+              inlineEdit.kind === 'text' ? { fontSize: `${TEXT_SIZE_CM[inlineEdit.size]}px` } : undefined
+            }
+            box={(value) =>
+              inlineEdit.kind === 'text'
+                ? { x: inlineEdit.at.x, y: inlineEdit.at.y, ...textEditBox(value, inlineEdit.size) }
+                : { x: inlineEdit.at.x - 100, y: inlineEdit.at.y - 13, width: 200, height: 17 }
+            }
+            onClose={finishInlineEdit}
           />
         )}
       </svg>
