@@ -216,7 +216,7 @@ export function roomWallIds(plan: Plan, room: Room): string[] | null {
 // The walls on a room's outer loop only — the edges whose removal opens the
 // room. Hole-loop walls merely subtract area, so removing one never destroys
 // the room (ADR 0015); they are excluded.
-export function roomOutlineWallIds(plan: Plan, room: Room): string[] {
+function roomOutlineWallIds(plan: Plan, room: Room): string[] {
   const byPair = wallIdByPair(plan);
   const ids: string[] = [];
   for (let i = 0; i < room.pointIds.length; i++) {
@@ -236,6 +236,21 @@ export function openingsOnWalls(plan: Plan, wallIds: string[]): Opening[] {
 export function roomOpenings(plan: Plan, room: Room): Opening[] {
   const wallIds = roomWallIds(plan, room);
   return wallIds ? openingsOnWalls(plan, wallIds) : [];
+}
+
+/** The walls a Delete takes for a Room: its boundary minus every wall that is
+ *  another room's outer-loop outline, so no neighbour is broken (ADR 0015).
+ *  Openings ride along with their walls, so only walls are listed. */
+export function roomDeletionWallIds(plan: Plan, room: Room): string[] {
+  const wallIds = roomWallIds(plan, room);
+  if (!wallIds) return [];
+  const key = roomKey(room);
+  const foreignOutline = new Set<string>();
+  for (const other of detectRooms(plan)) {
+    if (roomKey(other) === key) continue;
+    for (const id of roomOutlineWallIds(plan, other)) foreignOutline.add(id);
+  }
+  return wallIds.filter((id) => !foreignOutline.has(id));
 }
 
 // Null unless exactly one side faces a room (standalone, party, dangling).
