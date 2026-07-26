@@ -1,7 +1,7 @@
 // CONTEXT.md: Plan drag. The interface is the surface: begin, aim, commit.
 import { describe, expect, it } from 'vitest';
 import type { Vec } from '../../../src/model/geometry';
-import { addRoomLabel } from '../../../src/model/rooms';
+import { addRoomLabel } from '../../../src/model/roomLabels';
 import { addRuler } from '../../../src/model/rulers';
 import type { Room } from '../../../src/model/rooms';
 import { detectRooms } from '../../../src/model/rooms';

@@ -3,7 +3,7 @@
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { railedOpeningOffset } from './openings';
-import { dropOrphanRoomLabels, reconcileRoomLabels } from './rooms';
+import { dropOrphanRoomLabels, reconcileRoomLabels } from './roomLabels';
 import type { Snap } from './snap';
 import type { Opening, Plan, Wall } from './types';
 import { newId, WALL_THICKNESS } from './types';

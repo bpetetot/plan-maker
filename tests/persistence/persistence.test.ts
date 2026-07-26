@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { clear, get, set } from 'idb-keyval';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addRoomLabel } from '../../src/model/rooms';
+import { addRoomLabel } from '../../src/model/roomLabels';
 import { detectRooms } from '../../src/model/rooms';
 import { buildPlan } from '../helpers';
 import { emptyPlan } from '../../src/model/types';

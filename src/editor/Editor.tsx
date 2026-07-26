@@ -20,11 +20,12 @@ import { useStore } from 'zustand';
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallPoints } from '../model/geometry';
 import { openingPlacement } from '../model/openings';
-import { addRoomLabel, renameRoomLabel } from '../model/rooms';
+import { addRoomLabel, renameRoomLabel } from '../model/roomLabels';
 import { addText, deleteText, editTextContent } from '../model/texts';
 import { wallDimension } from '../model/dimension';
 import { DIM_FONT_PX } from '../model/rail';
-import { detectRooms, reconcileRoomLabels, roomAt, roomKey, roomWallIds } from '../model/rooms';
+import { reconcileRoomLabels } from '../model/roomLabels';
+import { detectRooms, roomAt, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import {
   allElements,

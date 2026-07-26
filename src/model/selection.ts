@@ -2,16 +2,15 @@ import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { deleteOpening, openingPlacement } from './openings';
 import { settleEdit } from './settle';
+import { translateRoomLabelsWithRooms } from './roomLabels';
 import type { Room } from './rooms';
 import {
   detectRooms,
   openingsOnWalls,
-  roomAt,
   roomKey,
   roomOpenings,
   roomOutlineWallIds,
   roomWallIds,
-  translateRoomLabel,
 } from './rooms';
 import { deleteRuler, translateRuler } from './rulers';
 import { deleteText, translateText } from './texts';
@@ -234,8 +233,6 @@ export function movedPointIds(plan: Plan, refs: ElementRef[]): Set<string> {
   return ids;
 }
 
-// CONTEXT.md: Room label. A room with every boundary wall selected translates
-// rigidly, label included.
 export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy: number): Plan {
   if (dx === 0 && dy === 0) return plan;
   const updates: Record<string, Vec> = {};
@@ -256,18 +253,9 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
   for (const ref of rulerRefs) next = translateRuler(next, ref.id, dx, dy);
   for (const ref of textRefs) next = translateText(next, ref.id, dx, dy);
 
-  const labels = Object.values(plan.roomLabels);
-  if (movesWalls && labels.length > 0) {
-    const selected = new Set(refs.filter((r) => r.type === 'wall').map((r) => r.id));
-    const rigid = (room: Room) => {
-      const wallIds = roomWallIds(plan, room);
-      return wallIds !== null && wallIds.every((id) => selected.has(id));
-    };
-    const rooms = detectRooms(plan);
-    for (const label of labels) {
-      const room = roomAt(rooms, label.x, label.y);
-      if (room && rigid(room)) next = translateRoomLabel(next, label.id, dx, dy);
-    }
+  if (movesWalls) {
+    const movedWallIds = new Set(refs.filter((r) => r.type === 'wall').map((r) => r.id));
+    next = translateRoomLabelsWithRooms(plan, next, movedWallIds, dx, dy);
   }
   return next;
 }
