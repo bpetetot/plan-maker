@@ -4,6 +4,9 @@
 > suspends only the grid (the 45° axis lock no longer exists), and the rejected
 > "Free keeps the 45° axis lock" option is moot. The state/inversion mechanic
 > this ADR defines is unchanged.
+>
+> **Generalised by ADR 0034** — "read off the live event, never tracked, toggling
+> mid-gesture both ways" now governs any gesture modifier, Shift as well as Alt.
 
 Snap was a permanent behavior that one key escaped: Alt held meant a Free move,
 Alt released meant the full ladder, with no way to say "I am drawing this whole

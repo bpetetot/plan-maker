@@ -344,7 +344,12 @@ content (ADR 0021). Having one anchor rather than two endpoints, a marquee takes
 it when that anchor is enclosed, and it has no endpoint handles — the whole
 block drags as one. Like a Ruler it moves rigidly in a group, is never a
 realignment reference, and never reads as part of a Room nor counts among a
-Selection's contents. Never part of the plan.
+Selection's contents. Shift + press on an element is an *additive grab*: the
+element joins the Selection at the press — what moves is what is lit — and the
+gesture runs on that union, whatever it was grabbed by. The toggle waits for the
+levée: a press that never crossed the click threshold puts the element out of
+the Selection it was in, or leaves it in the one it just joined. Never part of
+the plan.
 _Avoid_: Highlight, marked elements
 
 **Tool panel**:
@@ -404,7 +409,8 @@ its intent outright; the pointer stream is the one source whose events have to
 be *interpreted* into one. There, the button and a held Space pick the gesture —
 panning, selecting, grabbing, placing — whatever sits under the pointer: Space +
 drag Pans from a Point handle exactly as from the sheet. Alt resolves whether
-the move is Free, read from the event itself. One click threshold tells a click
+the move is Free and Shift whether its axis is locked, both read from the event
+itself. One click threshold tells a click
 from a drag for every gesture alike — a distance travelled on screen, not a box,
 and a drag that returns to its start was still a drag. What was under the
 pointer names the subject; the Intent names the verb, and no gesture re-decides
@@ -442,7 +448,8 @@ move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
 chosen so the group's Reference point lands on a grid intersection, to the grid
 only and to nothing else. An off-grid element therefore realigns on its first
-non-Free move. Snap shows the aimed position with a marker of constant on-screen
+non-Free move — with one exception, the Axis lock, which preserves the alignment
+the element had on the coordinate it holds. Snap shows the aimed position with a marker of constant on-screen
 size (ADR 0019): an *attached* ring — the Point handle's shape in the snap ink
 (Grab zone) — when the click lands on an existing Point or wall, a small dot
 otherwise. Pure editor behavior: never part of the plan.
@@ -451,8 +458,9 @@ _Avoid_: Magnetism, snapping grid, attach
 **Drawing anchor**:
 The Point a new wall segment is being drawn from — the fixed end of the segment
 being rubber-banded, and the Point the closing segment of a chain loops back to.
-It constrains nothing about where the moving end lands: the placement ladder
-alone decides that. A group move has no Drawing anchor: it aims at no connection.
+It constrains one thing about where the moving end lands, and one only: it is
+the origin the Axis lock runs its axis through. Otherwise the placement ladder
+alone decides. A group move has no Drawing anchor: it aims at no connection.
 Pure editor state: never part of the plan.
 _Avoid_: Origin, start point, pivot
 
@@ -478,8 +486,38 @@ geometry, and only the second is what a Free move escapes: a wall drawn freely
 still joins the plan instead of landing beside it. A group move, which runs no
 ladder, keeps its own rule: a Free move suspends its realignment — so an
 off-grid group heals on its first snapped move, and never while Snap is off.
-Toggles immediately, both ways, including mid-gesture.
+Toggles immediately, both ways, including mid-gesture. Alt leaves the Axis lock
+alone: the two modifiers are independent, and all four of their combinations
+mean something.
 _Avoid_: Free mode, no-grid mode
+
+**Axis lock**:
+The world axis — horizontal or vertical, those two and no other — a gesture is
+confined to while Shift is held. It runs through where the gesture's aim began:
+the element's own position at the grab for a move, the Drawing anchor or a
+Ruler's A for a placement — fixed there for the whole gesture and never
+recomputed, so releasing Shift returns exactly the free result and pressing it
+again returns exactly the locked one. The active axis is the nearer of the two
+to the current aim, decided again at every aim, so it flips across the diagonal
+without the key ever being released. A gesture aiming at a position invented
+from nothing — a chain's first click, a Ruler's A — has no origin, so it has no
+lock. Momentary: no toggle, no preference, and nothing drawn on the sheet, the
+result on the axis being its own feedback.
+It is an alignment constraint of the gesture's own, and it has the last word
+over Snap's ladder: while Shift is held the result is on the axis, full stop. A
+connection target off the axis is skipped rather than honoured — only Points
+whose held coordinate is the origin's are considered, and a wall body's
+projection is vetoed if it leaves the axis rather than slid onto it — while the
+grid keeps the free coordinate and the lock holds the other at the origin's
+value. A group move has no position to hold, only a delta: the lock keeps it at
+zero on the held coordinate and the realignment moves the Reference point on the
+free one alone.
+What outranks the lock is the model's invariants, which do not propose a
+position but define which ones exist: a Room label pushed into a re-entrant
+notch leaves the axis rather than leaving its Room, and two Points landing
+within a centimeter of each other merge — making, off the axis, the very
+connection the lock had refused. Pure editor behavior: never part of the plan.
+_Avoid_: angle lock, 45° lock, ortho mode
 
 **Grid**:
 The sheet's visible ruling, materializing what Snap aligns to: minor grid

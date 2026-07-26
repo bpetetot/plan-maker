@@ -1,5 +1,12 @@
 # Axis snapping is removed — the grid is the only alignment target
 
+> **Amended by ADR 0034** — the deferred option below is taken: a held Shift now
+> locks the axis explicitly. The removal of the automatic rung stands entirely
+> and the ladder is still `point > wall body > grid`; only "`snapPoint` loses
+> its `anchor` option" is retracted, the argument coming back as an
+> already-resolved constraint the rungs respect rather than a rung that computes
+> a band. The dashed guide stays dead.
+
 The snap ladder locked a drawn segment to the nearest 45° / horizontal /
 vertical axis whenever the direction from the drawing anchor fell within a
 fixed **angular** tolerance (±8°) of an octant. An angular band projects a dead
