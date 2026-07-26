@@ -13,7 +13,7 @@ export interface AlignmentGuide {
   at: number;
 }
 
-export interface GuideSearch {
+interface GuideSearch {
   /** In plan centimeters, tighter than the ladder's: a guide is a band across
    *  the whole sheet, not a disc (ADR 0037). */
   tolerance: number;

@@ -257,12 +257,11 @@ export function SnapMarker({ snap, pxPerCm }: { snap: Snap | null; pxPerCm: numb
 
 // Screen px, settled on a bench at 1:1 (ADR 0037): a hairline segment, and a
 // square small enough to name a Point without covering it.
-const GUIDE_PX = 1.25;
+const GUIDE_STROKE_PX = 1.25;
 const SOURCE_PX = 3.4;
 
-/** CONTEXT.md: Alignment guide — a bounded segment from the source Point to
- *  the aim, plus a square naming the source. Draws the value, never re-derives
- *  it (ADR 0036); a crossing is two of them and nothing more. */
+/** CONTEXT.md: Alignment guide — a bounded segment from the source Point to the
+ *  aim, plus a square naming it. Draws the value, never re-derives it (ADR 0036). */
 export function AlignmentGuides({ snap, plan, pxPerCm }: { snap: Snap | null; plan: Plan; pxPerCm: number }) {
   if (!snap?.guides) return null;
   const r = SOURCE_PX / pxPerCm;
@@ -281,7 +280,7 @@ export function AlignmentGuides({ snap, plan, pxPerCm }: { snap: Snap | null; pl
               x2={snap.x}
               y2={snap.y}
               stroke={COLORS.snap}
-              strokeWidth={GUIDE_PX}
+              strokeWidth={GUIDE_STROKE_PX}
               vectorEffect="non-scaling-stroke"
             />
             <rect

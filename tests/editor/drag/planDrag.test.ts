@@ -12,9 +12,8 @@ import type { Plan } from '../../../src/model/types';
 import { WORLD_AXES } from '../../../src/model/axisLock';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from '../../../src/editor/planDrag';
 
-// pxPerCm 1 puts the snap tolerance at 14 cm and the guide reach at 4. The
-// click-vs-drag verdict comes with the env: the pointer router owns the
-// threshold (ADR 0030); the view holds every fixture below.
+// pxPerCm 1 puts the snap tolerance at 14 cm and the guide reach at 4; the
+// click-vs-drag verdict comes with the env (ADR 0030), the view holds it all.
 const WIDE = { x: -1000, y: -1000, w: 3000, h: 3000 };
 const AIM = { pxPerCm: 1, free: false, locked: false, moved: true, view: WIDE };
 const FREE = { pxPerCm: 1, free: true, locked: false, moved: true, view: WIDE };
@@ -454,5 +453,25 @@ describe('the guides a drag discovers', () => {
     expect(drag.plan.rulers[id].b).toMatchObject({ x: 600, y: 900 });
     // The far wall's own column, offered by whichever of its two ends is nearer
     expect(drag.snap).toMatchObject({ kind: 'alignment', guides: [{ held: 'x', at: 600 }] });
+  });
+
+  it('never takes the row of the Point its endpoint was posed on', () => {
+    const { plan } = twoWalls();
+    // B posed on the far wall's lower end, which is where this gesture begins
+    const [withRuler, id] = addRuler(plan, at(300, 900), at(600, 300));
+    const drag = aimPlanDrag(
+      beginPlanDrag(withRuler, {
+        kind: 'rulerEnd',
+        id,
+        end: 'b',
+        grabDelta: at(0, 0),
+        origin: at(600, 300),
+        axes: HORIZONTAL,
+      }),
+      at(350, 302.4),
+      FREE,
+    );
+    expect(drag.plan.rulers[id].b).toMatchObject({ x: 350, y: 302 });
+    expect(drag.snap).toMatchObject({ kind: 'free' });
   });
 });

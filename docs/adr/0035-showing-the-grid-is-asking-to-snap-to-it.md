@@ -3,6 +3,12 @@
 > **Supersedes [ADR 0007](0007-snap-is-a-state-alt-inverts-it.md)** — Snap is no
 > longer a state of its own, and Alt no longer inverts anything. What survives
 > of that decision is its storage discipline, which the Grid already had.
+>
+> **Amended by [ADR 0037](0037-an-alignment-is-a-line-the-plan-already-offers.md)**
+> — the cut below is one line off. There are two alignment targets, not one, and
+> the switch reaches only the ruling: an Alignment guide is offered by the plan
+> itself and stays live under a hidden Grid. Read "the alignment target (the
+> grid)" throughout as "the switchable alignment target".
 
 The editor asked the user to hold two ideas at once. The Grid was "purely
 visual: showing or hiding it never affects Snap", and Snap was a separate state

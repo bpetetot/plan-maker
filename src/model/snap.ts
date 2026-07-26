@@ -68,9 +68,8 @@ function guidesFor(plan: Plan, aim: Vec, options: SnapOptions): AlignmentGuide[]
   });
 }
 
-// One rule for the whole rung: a guide applies when the position it yields is
-// within the guide tolerance of the aim (ADR 0037). Here that position is the
-// slant's own crossing, so a near-parallel guide falls out on its own.
+// The one rule (ADR 0037), on a slant: the position a guide yields is its
+// crossing, so a near-parallel one falls out of tolerance on its own.
 function nearestCrossing(guides: AlignmentGuide[], lock: AxisLock, aim: Vec, reach: number) {
   let best: { guide: AlignmentGuide; at: Vec } | null = null;
   let bestDistance = reach;
@@ -86,9 +85,8 @@ function nearestCrossing(guides: AlignmentGuide[], lock: AxisLock, aim: Vec, rea
   return best;
 }
 
-// Priority: point > wall body > alignment > grid.
-// A free move drops the grid rung alone: the connection rungs and the guides
-// are not the Grid's to switch off (ADR 0035, ADR 0037).
+// Priority: point > wall body > alignment > grid. A free move drops the grid
+// rung alone — the guides are not the Grid's to switch off (ADR 0037).
 export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions): Snap {
   const aligning = !options.free;
   const lock = options.lock ?? null;
@@ -130,8 +128,7 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
   const held = axialHeld(lock);
 
   // A borrowed slant holds no coordinate, so a guide meets it at one point
-  // rather than lending it one; away from any guide the line is followed by
-  // the centimeter, the grid having no hold on it.
+  // rather than lending it one — and the grid has no hold on it at all.
   if (lock && !held) {
     const crossed = nearestCrossing(guides, lock, aim, options.guideTolerance ?? 0);
     const on = crossed ? crossed.at : lockAim(lock, aim);

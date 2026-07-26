@@ -3,6 +3,12 @@ import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import type { Opening, Plan } from './types';
 
+/** The Point a position is posed on — exact, every posed position coming from
+ *  a rung that lands on a Point's own integer centimeters. */
+export function pointIdAt(plan: Plan, at: Vec): string | undefined {
+  return Object.values(plan.points).find((p) => p.x === at.x && p.y === at.y)?.id;
+}
+
 export function movePoint(plan: Plan, id: string, x: number, y: number): Plan {
   return { ...plan, points: { ...plan.points, [id]: { id, x: Math.round(x), y: Math.round(y) } } };
 }

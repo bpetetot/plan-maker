@@ -16,7 +16,7 @@ import type { ElementRef } from '../model/selection';
 import { movedPointIds, selectionForRoom, translateElements } from '../model/selection';
 import { DIM_FONT_PX, railedDimT } from '../model/rail';
 import type { Plan } from '../model/types';
-import { movePoint, setDimPlacement } from '../model/walls';
+import { movePoint, pointIdAt, setDimPlacement } from '../model/walls';
 import { guideTolerance, snapTolerance } from './gesture';
 
 export type PlanDragSpec =
@@ -97,8 +97,6 @@ export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
 export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const spec = drag.spec;
   const tolerance = snapTolerance(env.pxPerCm);
-  // No `origin` (ADR 0037): a Point drag already excludes itself, and a Ruler's
-  // endpoint is not a Point of the plan at all.
   const guides = { guideTolerance: guideTolerance(env.pxPerCm), viewport: env.view };
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
   // A block's aim, brought onto its axis: `label` and `newLabel` share it.
@@ -117,6 +115,8 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       // Against the Point's own aimed position, not the raw pointer: that one
       // is offset by `grabDelta`, and could flip the axis near 45°.
       const lock = axisLock(spec.origin, p, spec.axes, env.locked);
+      // No `origin`: the dragged Point is its own origin, and `exclude` — which
+      // the guide search reads too — already holds it (ADR 0037).
       const snap = snapPoint(drag.plan, p.x, p.y, {
         tolerance,
         ...guides,
@@ -181,9 +181,12 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       if (!drag.plan.rulers[spec.id]) return drag;
       const p = grabbed(spec.grabDelta);
       const lock = axisLock(spec.origin, p, spec.axes, env.locked);
+      // The endpoint is no Point, but the one it was posed on is: that Point is
+      // where this gesture began, so it offers it nothing (ADR 0037).
       const snap = snapPoint(drag.plan, p.x, p.y, {
         tolerance,
         ...guides,
+        origin: pointIdAt(drag.plan, spec.origin),
         walls: true,
         free: env.free,
         lock,

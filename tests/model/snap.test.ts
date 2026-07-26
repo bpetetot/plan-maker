@@ -262,7 +262,7 @@ describe('the alignment rung', () => {
   });
 
   // Inside a sqrt(2)-widened envelope, outside both per-coordinate tests: the
-  // crossing gets no envelope of its own (ticket 04).
+  // crossing gets no envelope of its own (ADR 0037).
   it('widens no envelope at the crossing', () => {
     const s = snapPoint(crossed, 404.5, 404.5, REACH);
     expect(s).toMatchObject({ x: 400, y: 400, kind: 'grid' });
