@@ -1,7 +1,7 @@
 // CONTEXT.md: Placement, as a value (ADR 0025). Pure — no React, no store —
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
-import { axisLock } from '../model/axisLock';
+import { axisLock, WORLD_AXES } from '../model/axisLock';
 import { nearestWall } from '../model/geometry';
 import { placeOpening, railedOpeningOffset } from '../model/openings';
 import { commitPoint, commitWall, settleEdit } from '../model/settle';
@@ -98,7 +98,7 @@ const aimPoint = (p: Placement, plan: Plan, at: Vec, env: PlacementEnv): Snap =>
     tolerance: snapTolerance(env.pxPerCm),
     walls: true,
     free: env.free,
-    lock: axisLock(anchorOf(p, plan), at, env.locked),
+    lock: axisLock(anchorOf(p, plan), at, WORLD_AXES, env.locked),
   });
 
 export function beginPlacement(tool: PlacementTool): Placement {

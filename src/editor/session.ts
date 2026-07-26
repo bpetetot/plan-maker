@@ -1,11 +1,13 @@
 // CONTEXT.md: Session, and the pure transitions between two of them (ADR 0033).
 // No React, no DOM, no store: every write is declared, never performed.
 import type { Vec } from '../model/geometry';
+import { WORLD_AXES } from '../model/axisLock';
 import { projectOnWall } from '../model/geometry';
 import { wallDimension } from '../model/dimension';
 import { openingPlacement } from '../model/openings';
 import { DIM_FONT_PX } from '../model/rail';
 import { detectRooms, roomAt, roomKey } from '../model/rooms';
+import { rulerAxes } from '../model/rulers';
 import type { ElementRef } from '../model/selection';
 import {
   allElements,
@@ -17,6 +19,7 @@ import {
   toggleRef,
 } from '../model/selection';
 import type { Plan, RoomLabel } from '../model/types';
+import { wallAxesAt } from '../model/walls';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { roomTextBlocks } from '../sheet/rooms';
 import { textAtPoint } from '../sheet/texts';
@@ -211,6 +214,7 @@ function grabbed(
           kind: 'group',
           refs: selection,
           origin: c,
+          axes: WORLD_AXES,
           refPoint: referencePoint(plan, selection, c),
         },
       };
@@ -218,17 +222,34 @@ function grabbed(
     case 'handle': {
       const h = target.handle;
       // The origin is the element's own position at the grab, which `grabDelta`
-      // makes the same value as the aim at pointer-down (ticket 03).
+      // makes the same value as the aim at pointer-down (ticket 03); the axes
+      // are the ones the elements holding it lend (ticket 08).
       if (h.type === 'point') {
         const p = plan.points[h.id];
-        const grabDelta = p && { x: p.x - c.x, y: p.y - c.y };
-        return p ? { spec: { kind: 'point', id: p.id, grabDelta, origin: { x: p.x, y: p.y } } } : null;
+        if (!p) return null;
+        return {
+          spec: {
+            kind: 'point',
+            id: p.id,
+            grabDelta: { x: p.x - c.x, y: p.y - c.y },
+            origin: { x: p.x, y: p.y },
+            axes: wallAxesAt(plan, p.id),
+          },
+        };
       }
-      const p = plan.rulers[h.id]?.[h.end];
-      const grabDelta = p && { x: p.x - c.x, y: p.y - c.y };
-      return p
-        ? { spec: { kind: 'rulerEnd', id: h.id, end: h.end, grabDelta, origin: { x: p.x, y: p.y } } }
-        : null;
+      const ruler = plan.rulers[h.id];
+      const p = ruler?.[h.end];
+      if (!p) return null;
+      return {
+        spec: {
+          kind: 'rulerEnd',
+          id: h.id,
+          end: h.end,
+          grabDelta: { x: p.x - c.x, y: p.y - c.y },
+          origin: { x: p.x, y: p.y },
+          axes: rulerAxes(ruler),
+        },
+      };
     }
     case 'dim': {
       const wall = plan.walls[target.wallId];
@@ -247,14 +268,24 @@ function grabbed(
       // The block's own position, drawn: a label that is not placed sits on the
       // room anchor, which the plan does not hold for it.
       const origin = { x: block.x, y: block.y };
+      const axes = WORLD_AXES;
       const prev = s.selection;
       if (label) {
         return {
-          spec: { kind: 'label', id: label.id, room: block.room ?? null, grabDelta, origin, additive, prev },
+          spec: {
+            kind: 'label',
+            id: label.id,
+            room: block.room ?? null,
+            grabDelta,
+            origin,
+            axes,
+            additive,
+            prev,
+          },
         };
       }
       return block.room
-        ? { spec: { kind: 'newLabel', room: block.room, grabDelta, origin, additive, prev } }
+        ? { spec: { kind: 'newLabel', room: block.room, grabDelta, origin, axes, additive, prev } }
         : null;
     }
   }

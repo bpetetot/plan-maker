@@ -53,6 +53,34 @@ export function setWallThickness(plan: Plan, id: string, thickness: number): Pla
   return { ...plan, walls: { ...plan.walls, [id]: { ...wall, thickness } } };
 }
 
+/** The directions of the walls a Point holds, one per wall and unit length —
+ *  the lines a held Shift can slide that Point along. */
+export function wallAxesAt(plan: Plan, pointId: string): Vec[] {
+  const axes: Vec[] = [];
+  for (const wall of Object.values(plan.walls)) {
+    const otherId =
+      wall.startPointId === pointId
+        ? wall.endPointId
+        : wall.endPointId === pointId
+          ? wall.startPointId
+          : null;
+    const other = otherId && plan.points[otherId];
+    if (!other) continue;
+    const dir = unit(plan.points[pointId], other);
+    if (dir) axes.push(dir);
+  }
+  return axes;
+}
+
+// A wall too short to have a direction has none to lend.
+function unit(from: Vec | undefined, to: Vec): Vec | null {
+  if (!from) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  return length < 1 ? null : { x: dx / length, y: dy / length };
+}
+
 // The walls a chain drew: those lying on the polyline through its anchor Points,
 // which excludes the halves a crossing split off a pre-existing wall (they sit
 // on the crossed wall's line, not the drawn path).

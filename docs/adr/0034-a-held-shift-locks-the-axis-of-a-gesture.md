@@ -6,24 +6,40 @@ automatic lock with an explicit `Shift`-to-constrain modifier*. The need it
 called "not yet felt" is felt: holding a wall straight from an off-grid Point,
 or sliding a room label along one row, has no gesture.
 
-While Shift is held, a gesture that aims at a 2D position is confined to one of
-the **two world axes** — horizontal or vertical, no octants — running through
-**where its aim began**. Five moves take it (a Point, a group, a Room label
-placed or born, a Ruler endpoint) and two placements (a wall chain from its
-second click, a Ruler's B). The lock is a pure function of `(origin, aim,
-shift)`: no state, no band, the nearer axis recomputed at every aim, ties to the
-horizontal.
+While Shift is held, a gesture that aims at a 2D position is confined to a
+**line running through where its aim began**. Five moves take it (a Point, a
+group, a Room label placed or born, a Ruler endpoint) and two placements (a wall
+chain from its second click, a Ruler's B). The lock is a pure function of
+`(origin, aim, axes, shift)`: no state, no band, the nearest of the candidate
+lines recomputed at every aim.
+
+**Where the directions come from is the whole design.** The handle of an element
+already posed borrows the directions of the elements that hold it — one per wall
+meeting that Point, the A→B line for a Ruler endpoint. Everything else takes the
+**two world axes**, horizontal and vertical, no octants: a wall being drawn, a
+Ruler's B, a group, a Room label. That split is what the gesture means in each
+case. Drawing invents a segment, and what a straight one means is orthogonal;
+editing a posed element moves one end of something that already has a direction,
+and holding it there is "make this wall longer", not "flatten it". Locking a
+posed handle onto the horizontal would bend the very wall the user was steadying,
+and at a junction it would offer neither of the two lines actually under the
+pointer.
 
 ## It is a constraint the ladder respects, not a rung it runs
 
 The lock is an **alignment constraint of the gesture's own, with the last word
 over Snap's ladder**. A connection target off the axis is skipped rather than
-honoured: the Point rung filters to Points whose held coordinate is the
-origin's, the wall rung's projection is vetoed if it leaves the axis, and the
-grid keeps the free coordinate while the lock holds the other at the origin's
-value. What settles the precedence is the asymmetry of the escapes — releasing
-Shift is one finger and already the design, whereas under the opposite reading
-"no, really straight" is unreachable.
+honoured: the Point rung filters to Points the line runs through, the wall rung's
+projection is vetoed if it leaves the line. What settles the precedence is the
+asymmetry of the escapes — releasing Shift is one finger and already the design,
+whereas under the opposite reading "no, really straight" is unreachable.
+
+The grid composes with a world axis and not with a slant: on the first, it keeps
+the free coordinate while the lock holds the other at the origin's value; the
+second crosses no intersection, so no alignment rung is left to run and the line
+is followed by the centimeter. That is the price of a borrowed direction, and it
+is the honest one — a slant is not grid-commensurate, and rounding a projected
+position back onto the grid would leave the line the lock exists to hold.
 
 Above the lock sit the **model's invariants**, which do not propose a position
 but define which ones exist: `clampToRoom` keeps a label in its Room even when
@@ -32,20 +48,26 @@ apart, making off the axis the very connection the lock refused. Neither is a
 concession — the merge already overrides the grid in production.
 
 So the lock is a value of its own, `src/model/axisLock.ts`, named for the
-glossary noun (ADR 0032), and `snap.ts` composes with it rung by rung. Wrapping
-the ladder was tried on paper and fails at both ends: a pre-projected aim cannot
-filter the Point rung and grids the held coordinate, and a post-projected result
-slides the wall projection onto the axis, which is displacement where the rule
-says veto.
+glossary noun (ADR 0032) — a point and a direction, the world axes being one pair
+of candidates among others. Each noun lends the directions it knows: `walls.ts`
+those of the walls meeting a Point, `rulers.ts` the Ruler's own. `snap.ts`
+composes with the line rung by rung. Wrapping the ladder was tried on paper and
+fails at both ends: a pre-projected aim cannot filter the Point rung and grids
+the held coordinate, and a post-projected result slides the wall projection onto
+the axis, which is displacement where the rule says veto.
 
 ## Considered Options
 
-- **A third direction borrowed from the grabbed element** — the slant of the
-  wall or Ruler under the gesture, beside the two world axes. Deferred, not
-  rejected: it holds a *line* where this type holds a coordinate, gets no
-  composition rule from "one constraint per coordinate", and turns the label
-  clamp's near-coincidence into a divergence in the ordinary case. Nothing here
-  forecloses it — the lock is momentary, so there is no stored shape to migrate.
+- **The world axes for every gesture, posed handles included** — the shape this
+  decision first shipped with, and what a day of use rejected: a handle held on
+  the horizontal bends the wall it was meant to steady, and the user reads that
+  as the lock failing rather than as a rule. Keeping it would also have left the
+  editing gesture at odds with the drawing one, where the axis already runs
+  through the other end of the segment.
+- **Both — the world axes *and* the borrowed slants as candidates.** Rejected: on
+  a wall already horizontal the two coincide, and everywhere else the extra pair
+  gives the pointer a way to bend the wall by accident, which is the behaviour
+  being removed. What a posed handle needs is the lines it is on.
 - **The lock as a state or a preference**, symmetrical to Snap (ADR 0026) —
   rejected: a permanent "everything is locked" has no use case and would make
   half of all moves impossible without switching it off. Two-second bursts earn
@@ -83,5 +105,8 @@ says veto.
   the pointer changes nothing until the next `pointermove` — Alt's behaviour
   today, inherited unchanged.
 - The pointer router carries `locked` beside `free` on the three intents that
-  aim (ADR 0030); the five locking drag specs carry their `origin`, `group`'s
-  `start` renamed to what it always was.
+  aim (ADR 0030); the five locking drag specs carry their `origin` and their
+  `axes`, `group`'s `start` renamed to what it always was.
+- **A Point no wall holds has no lock**, as a chain's first click has none: an
+  empty candidate list and a missing origin say the same thing, and the type
+  carries both without a rule.

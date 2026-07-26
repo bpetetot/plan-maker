@@ -1,5 +1,5 @@
 import type { AxisLock } from './axisLock';
-import { lockAim, onAxis } from './axisLock';
+import { axialHeld, lockAim, onAxis } from './axisLock';
 import type { Vec } from './geometry';
 import { distance, nearestWall, wallAxis } from './geometry';
 import type { Plan } from './types';
@@ -36,9 +36,9 @@ export function realignDelta(
 ): { dx: number; dy: number } {
   // A group's lock is `delta = 0` on the held coordinate, which holds every one
   // of its points on its own axis — so `at` is never read here.
-  const held = a.lock?.held;
+  const held = axialHeld(a.lock ?? null);
   const locked = (d: { dx: number; dy: number }) =>
-    held === undefined ? d : held === 'x' ? { ...d, dx: 0 } : { ...d, dy: 0 };
+    held === null ? d : held === 'x' ? { ...d, dx: 0 } : { ...d, dy: 0 };
   if (a.free || !ref) return locked({ dx: Math.round(dx), dy: Math.round(dy) });
   const grid = (v: number) => Math.round(v / GRID) * GRID;
   return locked({ dx: grid(ref.x + dx) - ref.x, dy: grid(ref.y + dy) - ref.y });
@@ -82,6 +82,12 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
     }
   }
 
+  // A borrowed slant crosses no grid intersection, so there is no alignment
+  // rung left to run on it: the axis is followed by the centimeter.
+  if (lock && !axialHeld(lock)) {
+    const on = lockAim(lock, { x, y });
+    return { x: Math.round(on.x), y: Math.round(on.y), kind: 'free' };
+  }
   if (!aligning) return { ...lockAim(lock, { x: Math.round(x), y: Math.round(y) }), kind: 'free' };
 
   const grid = (v: number) => Math.round(v / GRID) * GRID;

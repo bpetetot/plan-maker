@@ -81,8 +81,8 @@ async function handlesOf(svg: SVGSVGElement, zone: Element, x: number, y: number
   return svg.querySelectorAll('.point-handle');
 }
 
-describe('a point drag under a held Shift', () => {
-  it('holds the y when the pointer ran further horizontally', async () => {
+describe('a wall point under a held Shift', () => {
+  it('slides along the wall that holds it', async () => {
     const { svg, zones } = await setup(wallPlan());
     const handles = await handlesOf(svg, zones()[0], 300, 100);
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 100) });
@@ -91,18 +91,20 @@ describe('a point drag under a held Shift', () => {
     expect(plan().points.b).toMatchObject({ x: 600, y: 100 });
   });
 
-  it('flips to the other axis across the diagonal, Shift never released', async () => {
+  // One wall lends one line, so there is no other axis to flip to: pulling
+  // across it shortens the wall instead of bending it.
+  it('does not leave that line, however far across it the pointer goes', async () => {
     const { svg, zones } = await setup(wallPlan());
     const handles = await handlesOf(svg, zones()[0], 300, 100);
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 100) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 600, 130) });
     expect(plan().points.b).toMatchObject({ x: 600, y: 100 });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 530, 300) });
-    expect(plan().points.b).toMatchObject({ x: 500, y: 300 });
+    expect(plan().points.b).toMatchObject({ x: 530, y: 100 });
     await pointer(svg, 'pointerup');
   });
 
-  it('returns the same axis on a Shift down → up → down round trip', async () => {
+  it('returns the same line on a Shift down → up → down round trip', async () => {
     const { svg, zones } = await setup(wallPlan());
     const handles = await handlesOf(svg, zones()[0], 300, 100);
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 100) });
@@ -124,7 +126,7 @@ describe('a point drag under a held Shift', () => {
     await pointer(svg, 'pointermove', clientAt(svg, 600, 300));
     expect(plan().points.b).toMatchObject({ x: 600, y: 300 });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 600, 300) });
-    expect(plan().points.b).toMatchObject({ x: 500, y: 300 });
+    expect(plan().points.b).toMatchObject({ x: 600, y: 100 });
     await pointer(svg, 'pointerup');
   });
 
@@ -146,6 +148,64 @@ describe('a point drag under a held Shift', () => {
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 603, 130) });
     await pointer(svg, 'pointerup');
     expect(plan().points.b).toMatchObject({ x: 603, y: 100 });
+  });
+});
+
+describe('a wall point that borrows a slant', () => {
+  // A 45° wall (100,100)–(400,400): its line crosses no grid intersection.
+  const slantPlan = (): Plan => ({
+    ...emptyPlan(),
+    points: { a: { id: 'a', x: 100, y: 100 }, b: { id: 'b', x: 400, y: 400 } },
+    walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
+  });
+
+  it('slides along the slant rather than onto a world axis', async () => {
+    const { svg, zones } = await setup(slantPlan());
+    const handles = await handlesOf(svg, zones()[0], 250, 250);
+    await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 400, 400) });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 460, 420) });
+    await pointer(svg, 'pointerup');
+    // the horizontal would have read (460,400): the wall would have bent
+    expect(plan().points.b).toMatchObject({ x: 440, y: 440 });
+  });
+
+  it('follows it by the centimeter, the grid having no hold on a slant', async () => {
+    const { svg, zones } = await setup(slantPlan());
+    const handles = await handlesOf(svg, zones()[0], 250, 250);
+    await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 400, 400) });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 463, 421) });
+    await pointer(svg, 'pointerup');
+    expect(plan().points.b).toMatchObject({ x: 442, y: 442 });
+  });
+});
+
+describe('a wall point two walls hold', () => {
+  // An L whose second leg is a 45° slant: the junction b lends two lines.
+  const junctionPlan = (): Plan => ({
+    ...emptyPlan(),
+    points: {
+      a: { id: 'a', x: 100, y: 100 },
+      b: { id: 'b', x: 500, y: 100 },
+      c: { id: 'c', x: 700, y: 300 },
+    },
+    walls: {
+      w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 },
+      w2: { id: 'w2', startPointId: 'b', endPointId: 'c', thickness: 10 },
+    },
+  });
+
+  it('takes the line of whichever wall passes nearest the aim', async () => {
+    const { svg, zones } = await setup(junctionPlan());
+    // select w1, whose far handle is the junction
+    const handles = await handlesOf(svg, zones()[0], 300, 100);
+    await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 100) });
+    // 30 cm off w1's line, 120 off w2's
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 620, 130) });
+    expect(plan().points.b).toMatchObject({ x: 620, y: 100 });
+    // 80 off w1's line, 14 off w2's
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 600, 180) });
+    expect(plan().points.b).toMatchObject({ x: 590, y: 190 });
+    await pointer(svg, 'pointerup');
   });
 });
 
@@ -173,29 +233,40 @@ describe('a Ruler endpoint under a held Shift', () => {
     rulers: { r1: { id: 'r1', a: { x: 100, y: 100 }, b: { x: 300, y: 300 }, t: 0.5 } },
   });
 
-  it('locks against its own position, not against A', async () => {
-    const { svg } = await setup(rulerPlan());
+  // Selecting the Ruler is what puts its endpoint handles on the sheet.
+  async function endpoints(svg: SVGSVGElement) {
     const grab = svg.querySelector('.ruler-grab')!;
     await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 200, 200) });
     await pointer(svg, 'pointerup');
-    const [, b] = svg.querySelectorAll('.point-handle');
+    return svg.querySelectorAll('.point-handle');
+  }
+
+  it('slides B along the measurement’s own line, which keeps its angle', async () => {
+    const { svg } = await setup(rulerPlan());
+    const [, b] = await endpoints(svg);
     await pointer(b, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 400, 330) });
     await pointer(svg, 'pointerup');
-    // locking against A would have read y = 100
-    expect(plan().rulers.r1.b).toMatchObject({ x: 400, y: 300 });
+    // a world axis would have read (400,300) — the measurement would have bent
+    expect(plan().rulers.r1.b).toMatchObject({ x: 365, y: 365 });
   });
 
-  it('holds its own x on the other axis', async () => {
+  it('does not leave that line, however far across it the pointer goes', async () => {
     const { svg } = await setup(rulerPlan());
-    const grab = svg.querySelector('.ruler-grab')!;
-    await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 200, 200) });
-    await pointer(svg, 'pointerup');
-    const [, b] = svg.querySelectorAll('.point-handle');
+    const [, b] = await endpoints(svg);
     await pointer(b, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 330, 500) });
     await pointer(svg, 'pointerup');
-    expect(plan().rulers.r1.b).toMatchObject({ x: 300, y: 500 });
+    expect(plan().rulers.r1.b).toMatchObject({ x: 415, y: 415 });
+  });
+
+  it('holds A on the same line, from the other end', async () => {
+    const { svg } = await setup(rulerPlan());
+    const [a] = await endpoints(svg);
+    await pointer(a, 'pointerdown', { button: 0, ...clientAt(svg, 100, 100) });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 40, 20) });
+    await pointer(svg, 'pointerup');
+    expect(plan().rulers.r1.a).toMatchObject({ x: 30, y: 30 });
   });
 });
 

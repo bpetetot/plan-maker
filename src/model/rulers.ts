@@ -1,5 +1,6 @@
 // Free-coordinate measurement (CONTEXT.md: Ruler): endpoints are its own, not
 // shared Points, so nothing in the wall graph moves it.
+import type { Vec } from './geometry';
 import type { Plan, Ruler } from './types';
 import { newId } from './types';
 
@@ -38,6 +39,15 @@ export function translateRuler(plan: Plan, id: string, dx: number, dy: number): 
     b: { x: Math.round(ruler.b.x + dx), y: Math.round(ruler.b.y + dy) },
   };
   return { ...plan, rulers: { ...plan.rulers, [id]: moved } };
+}
+
+/** The Ruler's own direction, unit length — the line a held Shift slides an
+ *  endpoint along. Empty when the two endpoints coincide. */
+export function rulerAxes(ruler: Ruler): Vec[] {
+  const dx = ruler.b.x - ruler.a.x;
+  const dy = ruler.b.y - ruler.a.y;
+  const length = Math.hypot(dx, dy);
+  return length < 1 ? [] : [{ x: dx / length, y: dy / length }];
 }
 
 export function deleteRuler(plan: Plan, id: string): Plan {

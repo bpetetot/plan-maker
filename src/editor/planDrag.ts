@@ -20,12 +20,13 @@ import { snapTolerance } from './gesture';
 
 export type PlanDragSpec =
   // `grabDelta` fixes the grab point so the handle never recenters on the cursor;
-  // `origin` is where the aim began, which is the axis a held Shift locks to.
-  | { kind: 'point'; id: string; grabDelta: Vec; origin: Vec }
+  // `origin` is where the aim began, and `axes` the directions Shift locks to.
+  | { kind: 'point'; id: string; grabDelta: Vec; origin: Vec; axes: Vec[] }
   | {
       kind: 'group';
       refs: ElementRef[];
       origin: Vec;
+      axes: Vec[];
       // Fixed at pointer-down, not recomputed: the preview would jump when
       // another candidate became the nearest.
       refPoint: Vec | null;
@@ -38,6 +39,7 @@ export type PlanDragSpec =
       room: Room | null;
       grabDelta: Vec;
       origin: Vec;
+      axes: Vec[];
       additive: boolean;
       prev: ElementRef[];
     }
@@ -48,6 +50,7 @@ export type PlanDragSpec =
       room: Room;
       grabDelta: Vec;
       origin: Vec;
+      axes: Vec[];
       additive: boolean;
       prev: ElementRef[];
     }
@@ -55,7 +58,7 @@ export type PlanDragSpec =
   | { kind: 'opening'; id: string; grabDelta: number }
   | { kind: 'dim'; id: string; grabDelta: number }
   // A Ruler endpoint: snaps with the placement ladder, wall bodies included.
-  | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec; origin: Vec };
+  | { kind: 'rulerEnd'; id: string; end: 'a' | 'b'; grabDelta: Vec; origin: Vec; axes: Vec[] };
 
 export interface PlanDrag {
   spec: PlanDragSpec;
@@ -89,9 +92,9 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const tolerance = snapTolerance(env.pxPerCm);
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
   // A block's aim, brought onto its axis: `label` and `newLabel` share it.
-  const aimed = (s: { grabDelta: Vec; origin: Vec }) => {
+  const aimed = (s: { grabDelta: Vec; origin: Vec; axes: Vec[] }) => {
     const target = grabbed(s.grabDelta);
-    return lockAim(axisLock(s.origin, target, env.locked), target);
+    return lockAim(axisLock(s.origin, target, s.axes, env.locked), target);
   };
   const moved = env.moved;
 
@@ -106,7 +109,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
         free: env.free,
         // Against the Point's own aimed position, not the raw pointer: that one
         // is offset by `grabDelta`, and could flip the axis near 45°.
-        lock: axisLock(spec.origin, p, env.locked),
+        lock: axisLock(spec.origin, p, spec.axes, env.locked),
       });
       return { ...drag, plan: movePoint(drag.plan, spec.id, snap.x, snap.y), snap, moved };
     }
@@ -116,7 +119,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       if (!moved) return { ...drag, moved };
       const delta = realignDelta(spec.refPoint, at.x - spec.origin.x, at.y - spec.origin.y, {
         free: env.free,
-        lock: axisLock(spec.origin, at, env.locked),
+        lock: axisLock(spec.origin, at, spec.axes, env.locked),
       });
       return { ...drag, plan: translateElements(drag.orig, spec.refs, delta.dx, delta.dy), moved };
     }
@@ -166,7 +169,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
         tolerance,
         walls: true,
         free: env.free,
-        lock: axisLock(spec.origin, p, env.locked),
+        lock: axisLock(spec.origin, p, spec.axes, env.locked),
       });
       const plan = moveRulerEndpoint(drag.plan, spec.id, spec.end, snap.x, snap.y);
       return { ...drag, plan, snap, moved };

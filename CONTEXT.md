@@ -459,8 +459,9 @@ _Avoid_: Magnetism, snapping grid, attach
 The Point a new wall segment is being drawn from — the fixed end of the segment
 being rubber-banded, and the Point the closing segment of a chain loops back to.
 It constrains one thing about where the moving end lands, and one only: it is
-the origin the Axis lock runs its axis through. Otherwise the placement ladder
-alone decides. A group move has no Drawing anchor: it aims at no connection.
+the origin the Axis lock runs its axis through — a world axis, the anchor
+lending its position and not its direction. Otherwise the placement ladder alone
+decides. A group move has no Drawing anchor: it aims at no connection.
 Pure editor state: never part of the plan.
 _Avoid_: Origin, start point, pivot
 
@@ -492,26 +493,33 @@ mean something.
 _Avoid_: Free mode, no-grid mode
 
 **Axis lock**:
-The world axis — horizontal or vertical, those two and no other — a gesture is
-confined to while Shift is held. It runs through where the gesture's aim began:
-the element's own position at the grab for a move, the Drawing anchor or a
-Ruler's A for a placement — fixed there for the whole gesture and never
-recomputed, so releasing Shift returns exactly the free result and pressing it
-again returns exactly the locked one. The active axis is the nearer of the two
-to the current aim, decided again at every aim, so it flips across the diagonal
-without the key ever being released. A gesture aiming at a position invented
-from nothing — a chain's first click, a Ruler's A — has no origin, so it has no
-lock. Momentary: no toggle, no preference, and nothing drawn on the sheet, the
-result on the axis being its own feedback.
+The line a gesture is confined to while Shift is held. It runs through where the
+gesture's aim began: the element's own position at the grab for a move, the
+Drawing anchor or a Ruler's A for a placement — fixed there for the whole
+gesture and never recomputed, so releasing Shift returns exactly the free result
+and pressing it again returns exactly the locked one. Its direction is borrowed,
+and from what depends on what the gesture holds: the handle of a posed element
+takes the directions of the elements that hold it — one per wall meeting that
+Point, the A→B line for a Ruler endpoint — so a wall is lengthened or shortened
+without being bent, and a junction offers the line of each of its walls.
+Everything else takes the two world axes, horizontal and vertical: a wall being
+drawn, a Ruler's B, a group, a Room label. Among the candidates the active one
+is whichever line passes nearest the current aim, decided again at every aim, so
+it changes hands without the key ever being released; a tie between the world
+axes falls to the horizontal. A gesture aiming at a position invented from
+nothing — a chain's first click, a Ruler's A — has no origin, so it has no lock,
+and neither has a Point no wall holds. Momentary: no toggle, no preference, and
+nothing drawn on the sheet, the result on the axis being its own feedback.
 It is an alignment constraint of the gesture's own, and it has the last word
 over Snap's ladder: while Shift is held the result is on the axis, full stop. A
-connection target off the axis is skipped rather than honoured — only Points
-whose held coordinate is the origin's are considered, and a wall body's
-projection is vetoed if it leaves the axis rather than slid onto it — while the
-grid keeps the free coordinate and the lock holds the other at the origin's
-value. A group move has no position to hold, only a delta: the lock keeps it at
-zero on the held coordinate and the realignment moves the Reference point on the
-free one alone.
+connection target off the axis is skipped rather than honoured — only Points the
+line runs through are considered, and a wall body's projection is vetoed if it
+leaves the line rather than slid onto it. On a world axis the grid keeps the free
+coordinate while the lock holds the other at the origin's value; a borrowed slant
+crosses no intersection at all, so there is no alignment left to run on it and
+the line is followed by the centimeter. A group move has no position to hold,
+only a delta: the lock keeps it at zero on the held coordinate and the
+realignment moves the Reference point on the free one alone.
 What outranks the lock is the model's invariants, which do not propose a
 position but define which ones exist: a Room label pushed into a re-entrant
 notch leaves the axis rather than leaving its Room, and two Points landing

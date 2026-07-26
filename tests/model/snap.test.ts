@@ -68,7 +68,7 @@ describe('realignDelta', () => {
 });
 
 describe('realignDelta under a lock', () => {
-  const horizontal = { held: 'y', at: 96 } as const;
+  const horizontal = { at: { x: 103, y: 96 }, dir: { x: 1, y: 0 } } as const;
 
   it('zeroes the held delta and realigns the free one', () => {
     expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { lock: horizontal })).toEqual({
@@ -83,7 +83,9 @@ describe('realignDelta under a lock', () => {
   });
 
   it('holds the x under a vertical lock', () => {
-    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { lock: { held: 'x', at: 103 } })).toEqual({
+    expect(
+      realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { lock: { at: { x: 103, y: 96 }, dir: { x: 0, y: 1 } } }),
+    ).toEqual({
       dx: 0,
       dy: -66,
     });
@@ -103,7 +105,7 @@ describe('realignDelta under a lock', () => {
 
 describe('snapPoint under a lock', () => {
   // A horizontal lock through (0, 0): the axis is y = 0.
-  const axis = { held: 'y', at: 0 } as const;
+  const axis = { at: { x: 0, y: 0 }, dir: { x: 1, y: 0 } } as const;
 
   it('an aligned point beats a nearer one off the axis', () => {
     const crowded = buildPlan((b) => {
@@ -145,18 +147,36 @@ describe('snapPoint under a lock', () => {
   });
 
   it('grids the free coordinate and holds the other at the origin’s value', () => {
-    const s = snapPoint(plan, 203, 118, { tolerance: 5, lock: { held: 'y', at: 127 } });
+    const s = snapPoint(plan, 203, 118, {
+      tolerance: 5,
+      lock: { at: { x: 0, y: 127 }, dir: { x: 1, y: 0 } },
+    });
     expect(s).toMatchObject({ x: 200, y: 127, kind: 'grid' });
   });
 
   it('an off-grid held coordinate does not heal under the lock', () => {
-    const s = snapPoint(plan, 203, 118, { tolerance: 5, lock: { held: 'x', at: 127 } });
+    const s = snapPoint(plan, 203, 118, {
+      tolerance: 5,
+      lock: { at: { x: 127, y: 0 }, dir: { x: 0, y: 1 } },
+    });
     expect(s).toMatchObject({ x: 127, y: 120, kind: 'grid' });
   });
 
   it('composes with a free move: 1 cm on the free coordinate, held on the axis', () => {
-    const s = snapPoint(plan, 203.4, 117.8, { tolerance: 5, free: true, lock: { held: 'y', at: 127 } });
+    const s = snapPoint(plan, 203.4, 117.8, {
+      tolerance: 5,
+      free: true,
+      lock: { at: { x: 0, y: 127 }, dir: { x: 1, y: 0 } },
+    });
     expect(s).toMatchObject({ x: 203, y: 127, kind: 'free' });
+  });
+
+  // A borrowed slant crosses no intersection, so the grid has nothing to say
+  // on it and the axis is followed by the centimeter.
+  it('follows a slant by the centimeter, the grid having no hold on it', () => {
+    const slant = { at: { x: 100, y: 100 }, dir: { x: Math.SQRT1_2, y: Math.SQRT1_2 } };
+    const s = snapPoint(plan, 260, 240, { tolerance: 5, lock: slant });
+    expect(s).toMatchObject({ x: 250, y: 250, kind: 'free' });
   });
 });
 
