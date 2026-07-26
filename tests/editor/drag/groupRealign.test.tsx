@@ -137,7 +137,9 @@ describe('a multi-selection grabbed by an opening', () => {
     // grabbed opening has no point of its own, so the reference is the wall's
     // endpoint a (103,96), nearest the grab
     await pointer(grabZones()[0], 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 350, 96) });
+    await pointer(svg, 'pointerup');
     await pointer(opening, 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 203, 96) });
+    await pointer(svg, 'pointerup');
     await pointer(opening, 'pointerdown', { button: 0, ...clientAt(svg, 203, 96) });
     await pointer(svg, 'pointermove', clientAt(svg, 253, 96));
     await pointer(svg, 'pointerup');
@@ -153,7 +155,9 @@ describe('a selection with no wall point', () => {
     const openings = svg.querySelectorAll('rect[width="120"][fill="transparent"]');
     expect(openings).toHaveLength(2);
     await pointer(openings[0], 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 203, 96) });
+    await pointer(svg, 'pointerup');
     await pointer(openings[1], 'pointerdown', { button: 0, shiftKey: true, ...clientAt(svg, 403, 96) });
+    await pointer(svg, 'pointerup');
     const before = plan();
     await pointer(openings[0], 'pointerdown', { button: 0, ...clientAt(svg, 203, 96) });
     await pointer(svg, 'pointermove', clientAt(svg, 260, 140));

@@ -120,15 +120,12 @@ describe('the button and Space policy', () => {
     expect(state.phase).toBe('grab');
   });
 
-  it('toggles the selection instead of grabbing on Shift + element', () => {
-    const [state, intent] = down(ELEMENT, { shiftKey: true });
-    expect(intent).toEqual({ type: 'toggleSelection', ref: { type: 'wall', id: 'w1' } });
-    expect(state).toBe(IDLE);
-  });
-
-  it('still grabs a non-element target under Shift, carrying the modifier', () => {
-    const [, intent] = down(DIM, { shiftKey: true });
-    expect(intent).toMatchObject({ type: 'beginGrab', additive: true });
+  it('grabs under Shift too, carrying the modifier — an element like anything else', () => {
+    for (const target of [ELEMENT, DIM]) {
+      const [state, intent] = down(target, { shiftKey: true });
+      expect(intent).toMatchObject({ type: 'beginGrab', target, additive: true });
+      expect(state.phase).toBe('grab');
+    }
   });
 });
 

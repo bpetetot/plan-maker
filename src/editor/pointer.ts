@@ -55,7 +55,6 @@ export const IDLE: PointerState = { phase: 'idle' };
  *  its shapes, resolved here because only this module holds the policy. */
 export type PointerIntent =
   | { type: 'none' }
-  | { type: 'toggleSelection'; ref: ElementRef }
   | { type: 'beginPan'; capture: true }
   | { type: 'beginMarquee'; at: Vec; additive: boolean; capture: true }
   | { type: 'beginGrab'; target: GrabTarget; at: Vec; additive: boolean; capture: true }
@@ -107,9 +106,6 @@ export function routePointerDown(
       { phase: 'marquee', pointerId: input.pointerId, start: startPx, moved: false },
       { type: 'beginMarquee', at: input.at, additive: input.shiftKey, capture: true },
     ];
-  }
-  if (target.kind === 'element' && input.shiftKey) {
-    return [state, { type: 'toggleSelection', ref: target.ref }];
   }
   return [
     {

@@ -129,13 +129,12 @@ describe('a ruler-endpoint drag', () => {
 });
 
 describe('a group drag', () => {
-  const groupDrag = (plan: Plan, wall: string, refPoint: Vec | null, clickRef?: ElementRef) =>
+  const groupDrag = (plan: Plan, wall: string, refPoint: Vec | null) =>
     beginPlanDrag(plan, {
       kind: 'group',
       refs: [{ type: 'wall', id: wall }],
       start: at(100, 0),
       refPoint,
-      clickRef,
     });
 
   it('stays put below the click threshold', () => {
@@ -167,18 +166,14 @@ describe('a group drag', () => {
     expect(twice.plan.points[a]).toMatchObject({ x: 10, y: 0 });
   });
 
-  it('falls back to the clicked element when the drag was really a click', () => {
+  // What a group drag that was really a click leaves selected is the session's
+  // call now, not the spec's: the drag itself never touches the Selection.
+  it('leaves the Selection alone, moved or not', () => {
     const { plan, wall } = wallPlan();
-    const clickRef: ElementRef = { type: 'wall', id: wall };
-    const drag = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0), clickRef), at(103, 2), CLICK));
-    expect(drag.selection).toEqual([clickRef]);
-  });
-
-  it('keeps the selection once it actually moved', () => {
-    const { plan, wall } = wallPlan();
-    const clickRef: ElementRef = { type: 'wall', id: wall };
-    const drag = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0), clickRef), at(107, 0), AIM));
-    expect(drag.selection).toBeNull();
+    const clicked = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0)), at(103, 2), CLICK));
+    expect(clicked.selection).toBeNull();
+    const dragged = commitPlanDrag(aimPlanDrag(groupDrag(plan, wall, at(0, 0)), at(107, 0), AIM));
+    expect(dragged.selection).toBeNull();
   });
 });
 

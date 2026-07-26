@@ -24,7 +24,6 @@ export type PlanDragSpec =
       kind: 'group';
       refs: ElementRef[];
       start: Vec;
-      clickRef?: ElementRef;
       // Fixed at pointer-down, not recomputed: the preview would jump when
       // another candidate became the nearest.
       refPoint: Vec | null;
@@ -173,10 +172,7 @@ export function commitPlanDrag(drag: PlanDrag): PlanDrag {
     case 'point':
       return landed(settled(new Set([spec.id])));
     case 'group':
-      return landed(
-        settled(movedPointIds(drag.plan, spec.refs)),
-        !drag.moved && spec.clickRef ? [spec.clickRef] : null,
-      );
+      return landed(settled(movedPointIds(drag.plan, spec.refs)));
     case 'dim':
       return landed(drag.plan, drag.moved ? null : [{ type: 'wall', id: spec.id }]);
     case 'label':

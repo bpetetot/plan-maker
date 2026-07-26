@@ -40,8 +40,13 @@ type Hover = { kind: 'wall' | 'ruler' | 'room'; id: string };
 type Drag =
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
   // CONTEXT.md: Plan drag. Its whole composition — snap, grab point, settle,
-  // selection — lives in planDrag.ts (ADR 0023).
-  | { kind: 'plan'; g: PlanDrag };
+  // selection — lives in planDrag.ts (ADR 0023). `click` stays out of it: the
+  // Selection is editor state, so its policy is not the drag's.
+  | { kind: 'plan'; g: PlanDrag; click: Click | null };
+
+// The marquee's pair, on the element a grab pressed: the answer is known at
+// pointer-down, and spent only if the drag turns out to have been a click.
+type Click = { ref: ElementRef; additive: boolean; prev: ElementRef[] };
 
 export interface Session {
   tool: Tool;
@@ -160,6 +165,13 @@ function withPlacementResult(s: Session, r: PlacementResult): SessionResult {
   };
 }
 
+// What a grab moves: the union under Shift, the whole multi-selection a member
+// was grabbed in, else the element alone — and that becomes the Selection.
+function grabRefs(selection: ElementRef[], ref: ElementRef, additive: boolean): ElementRef[] {
+  if (additive) return isSelected(selection, ref) ? selection : [...selection, ref];
+  return selection.length > 1 && isSelected(selection, ref) ? selection : [ref];
+}
+
 // A grabbed member of a multi-selection drags the group; anything else alone,
 // and a lone grab becomes the Selection.
 function grabbed(
@@ -173,19 +185,10 @@ function grabbed(
   switch (target.kind) {
     case 'element': {
       const ref = target.ref;
-      if (s.selection.length > 1 && isSelected(s.selection, ref)) {
-        return {
-          spec: {
-            kind: 'group',
-            refs: s.selection,
-            start: c,
-            clickRef: ref,
-            refPoint: referencePoint(plan, s.selection, c),
-          },
-        };
-      }
-      const selection = [ref];
-      if (ref.type === 'opening') {
+      // The union decides the branch, exactly as the selection's size does
+      // without Shift — so a lone opening still slides on its Rail (ticket 04).
+      const selection = grabRefs(s.selection, ref, additive);
+      if (selection.length === 1 && ref.type === 'opening') {
         const opening = plan.openings[ref.id];
         return {
           selection,
@@ -257,8 +260,6 @@ function applyPointer(
   switch (intent.type) {
     case 'none':
       return just(base);
-    case 'toggleSelection':
-      return just({ ...base, selection: toggleRef(base.selection, intent.ref) });
     case 'beginPan':
       return { session: base, capture: true };
     case 'beginMarquee':
@@ -281,13 +282,21 @@ function applyPointer(
       // handed is already the idle one, down to the phase.
       if (!got) return just(s);
       const selection = got.selection ?? base.selection;
+      const target = intent.target;
       return {
         // Or the tint flashes back onto the pre-drag room at pointer-up, and
         // stays there until the next pointermove.
         session: {
           ...withoutRoomHover(base),
           selection,
-          drag: { kind: 'plan', g: beginPlanDrag(env.plan, got.spec) },
+          drag: {
+            kind: 'plan',
+            g: beginPlanDrag(env.plan, got.spec),
+            click:
+              target.kind === 'element'
+                ? { ref: target.ref, additive: intent.additive, prev: base.selection }
+                : null,
+          },
         },
         // A Plan drag always opens an Edit — there is no variant that does not,
         // and the handle ends with the drag (ADR 0028).
@@ -316,7 +325,7 @@ function applyPointer(
         moved: intent.moved,
       });
       return {
-        session: { ...base, drag: { kind: 'plan', g: next } },
+        session: { ...base, drag: { ...g, g: next } },
         edit: { how: 'aim', plan: next.plan },
       };
     }
@@ -351,8 +360,16 @@ function applyPointer(
       if (g?.kind === 'plan') {
         // Settle included (CONTEXT.md: Settle) — inside the same Edit.
         const landed = commitPlanDrag(g.g);
+        // A drag that never crossed the threshold was a click, and under Shift
+        // a click toggles: what the press deferred, the levée spends.
+        const clicked =
+          !intent.moved && g.click
+            ? g.click.additive
+              ? toggleRef(g.click.prev, g.click.ref)
+              : [g.click.ref]
+            : null;
         return {
-          session: { ...dropped, selection: landed.selection ?? dropped.selection },
+          session: { ...dropped, selection: clicked ?? landed.selection ?? dropped.selection },
           edit: { how: 'land', plan: landed.plan },
         };
       }
