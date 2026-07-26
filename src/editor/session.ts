@@ -514,7 +514,7 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
     // The cancel ladder: the placement drops what it has pending, then the
     // Selection empties, then the tool falls back to Select (ADR 0018).
     case 'cancel': {
-      const dropped = s.placement && cancelPlacement(s.placement);
+      const dropped = s.placement && cancelPlacement(s.placement, env.plan);
       if (dropped) return just({ ...s, placement: dropped });
       if (s.selection.length > 0) return just({ ...s, selection: [] });
       return withTool(s, 'select');
@@ -548,7 +548,7 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
       return just(withoutRoomHover(s));
     case 'contextMenu': {
       if (s.pointer.phase !== 'idle') return just(s);
-      const dropped = s.placement && cancelPlacement(s.placement);
+      const dropped = s.placement && cancelPlacement(s.placement, env.plan);
       if (dropped) return just({ ...s, placement: dropped });
       return s.tool === 'select' ? just(s) : withTool(s, 'select');
     }

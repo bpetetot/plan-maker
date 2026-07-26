@@ -19,17 +19,13 @@ import type { Tool, ToolDefaults } from './tools';
 // Every Tool but Select, which poses nothing.
 type PlacementTool = Exclude<Tool, 'select'>;
 
-// The first click is held as a pending Snap, not committed: aborting the chain
-// must not touch the plan. Past it the chain names Points, which commits churn.
-type Chain = { pending: Snap } | { start: string; last: string };
-
 type OpeningPreview = { wallId: string; offset: Cm };
 
 export type Placement =
-  // `anchors` are the chain's Points in draw order — what it drew, robust to
-  // the splits and merges each commit performs (ADR 0018).
+  // `pending` is the first click, uncommitted: abandoning must touch no plan.
+  // Past it `anchors` is the chain — its Points in draw order (ADR 0018).
   // `lock`: the line the last aim resolved, for the Debug mode to draw (ADR 0036).
-  | { tool: 'wall'; chain: Chain | null; anchors: string[]; snap: Snap | null; lock: AxisLock | null }
+  | { tool: 'wall'; pending: Snap | null; anchors: string[]; snap: Snap | null; lock: AxisLock | null }
   | { tool: 'door' | 'window'; preview: OpeningPreview | null }
   | { tool: 'ruler'; a: Snap | null; snap: Snap | null; lock: AxisLock | null }
   | { tool: 'text'; typing: boolean; snap: Snap | null };
@@ -88,25 +84,34 @@ const snapText = (at: Vec, free: boolean): Snap =>
     ? { x: Math.round(at.x), y: Math.round(at.y), kind: 'free' }
     : { x: Math.round(at.x / GRID) * GRID, y: Math.round(at.y / GRID) * GRID, kind: 'grid' };
 
+// A Placement alone carries a Point id between two clicks, so it alone must
+// not trust one: an undo can take that Point back out (ADR 0025).
+const liveAnchors = (p: WallPlacement, plan: Plan): string[] =>
+  p.anchors.filter((id) => plan.points[id] !== undefined);
+
+// Where the chain stands: its last anchor the plan still holds, else the
+// uncommitted first click, which outlives its Point as bare coordinates.
+const wallAnchor = (p: WallPlacement, plan: Plan): Snap | null => {
+  const last = liveAnchors(p, plan).at(-1);
+  if (last) return pointSnap(plan, last);
+  const s = p.pending;
+  if (!s?.pointId || plan.points[s.pointId]) return s;
+  return { ...s, pointId: undefined, kind: 'free' };
+};
+
+// A chain is under way while it still holds an anchor the next click can build
+// on. Null is both of its endings: abandoned, or never started.
+const chaining = (p: WallPlacement, plan: Plan): boolean => wallAnchor(p, plan) !== null;
+
 // The anchor the rubber band runs from, and the origin a held Shift locks to.
 // Null before there is one: no origin, no lock.
-const anchorOf = (p: Placement, plan: Plan): Vec | null => {
-  if (p.tool === 'wall') {
-    if (!p.chain) return null;
-    return 'pending' in p.chain ? p.chain.pending : plan.points[p.chain.last];
-  }
-  return p.tool === 'ruler' ? p.a : null;
-};
+const anchorOf = (p: Placement, plan: Plan): Vec | null =>
+  p.tool === 'wall' ? wallAnchor(p, plan) : p.tool === 'ruler' ? p.a : null;
 
 // The anchor's Point, when the anchor has one: the Axis lock owns the
 // gesture's own origin, the Alignment guide owns every other Point (ADR 0037).
-const originOf = (p: Placement): string | undefined => {
-  if (p.tool === 'wall') {
-    if (!p.chain) return undefined;
-    return 'pending' in p.chain ? p.chain.pending.pointId : p.chain.last;
-  }
-  return p.tool === 'ruler' ? p.a?.pointId : undefined;
-};
+const originOf = (p: Placement, plan: Plan): string | undefined =>
+  p.tool === 'wall' ? wallAnchor(p, plan)?.pointId : p.tool === 'ruler' ? p.a?.pointId : undefined;
 
 // The aimed position and the line that constrained it, together: re-deriving
 // the second at the render is the one way it could disagree (ADR 0036).
@@ -121,7 +126,7 @@ const aimPoint = (
     snap: snapPoint(plan, at.x, at.y, {
       tolerance: snapTolerance(env.pxPerCm),
       guideTolerance: guideTolerance(env.pxPerCm),
-      origin: originOf(p),
+      origin: originOf(p, plan),
       viewport: env.view,
       walls: true,
       free: env.free,
@@ -134,7 +139,7 @@ const aimPoint = (
 export function beginPlacement(tool: PlacementTool): Placement {
   switch (tool) {
     case 'wall':
-      return { tool, chain: null, anchors: [], snap: null, lock: null };
+      return { tool, pending: null, anchors: [], snap: null, lock: null };
     case 'door':
     case 'window':
       return { tool, preview: null };
@@ -145,10 +150,10 @@ export function beginPlacement(tool: PlacementTool): Placement {
   }
 }
 
-export function placementStage(p: Placement): PlacementStage {
+export function placementStage(p: Placement, plan: Plan): PlacementStage {
   switch (p.tool) {
     case 'wall':
-      return p.chain ? 'chaining' : 'wall';
+      return chaining(p, plan) ? 'chaining' : 'wall';
     case 'door':
     case 'window':
       return 'opening';
@@ -206,36 +211,35 @@ type WallPlacement = Extract<Placement, { tool: 'wall' }>;
 function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): PlacementResult {
   // The same origin the aim used, so the click lands where the rubber band did.
   const { snap: s } = aimPoint(p, plan, at, env);
-  const chain = p.chain;
+  // Dead ids are dropped here rather than read around: this click writes, which
+  // spends the redo that alone could have brought their Points back.
+  const anchors = liveAnchors(p, plan);
+  const start = anchors[0];
+  const last = anchors.at(-1);
   // CONTEXT.md: Settle. No `moving` set — a drawing displaces no Point, it
   // creates one; the Room label pass is what commitWall lacked (ADR 0022).
   const settled = (after: Plan) => settleEdit(plan, after);
-  if (chain && 'start' in chain && s.pointId === chain.start && chain.last !== chain.start) {
+  if (last && s.pointId === start && last !== start) {
     const closed = settled(
-      commitWall(
-        plan,
-        pointSnap(plan, chain.last),
-        pointSnap(plan, chain.start),
-        env.defaults.wallThickness,
-      )[0],
+      commitWall(plan, pointSnap(plan, last), pointSnap(plan, start), env.defaults.wallThickness)[0],
     );
     // The closing segment runs last→start, so the path loops back to start.
-    return { plan: closed, ...finishChain(p, closed, [...p.anchors, chain.start]) };
+    return { plan: closed, ...finishChain(p, closed, [...anchors, start]) };
   }
+  const from = wallAnchor(p, plan);
   // `lock: null` here and below: the click moved the anchor, so the line the
   // aim resolved ran through the previous one. The next aim resolves the new.
-  if (!chain) return { placement: { ...p, chain: { pending: s }, lock: null } };
+  if (!from) return { placement: { ...p, pending: s, anchors: [], lock: null } };
   // One commit per drawn wall: the pending start and the wall land in a single
   // history entry (ADR 0002).
-  const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last);
-  const [withStart, startId] = commitPoint(plan, startSnap);
+  const [withStart, startId] = commitPoint(plan, from);
   const [next, pointId] = commitWall(withStart, pointSnap(withStart, startId), s, env.defaults.wallThickness);
   return {
     plan: settled(next),
     placement: {
       ...p,
-      chain: { start: 'pending' in chain ? startId : chain.start, last: pointId },
-      anchors: 'pending' in chain ? [startId, pointId] : [...p.anchors, pointId],
+      pending: null,
+      anchors: last ? [...anchors, pointId] : [startId, pointId],
       lock: null,
     },
   };
@@ -255,9 +259,9 @@ function finishChain(p: WallPlacement, plan: Plan, path: string[]): PlacementRes
 
 /** A chain's other ending: a double-click stops it where it stands. */
 export function finishPlacement(p: Placement, plan: Plan): PlacementResult {
-  // Only an active chain finishes; without one the anchors are stale.
-  if (p.tool !== 'wall' || !p.chain) return { placement: p };
-  return finishChain(p, plan, p.anchors);
+  // Only a chain the plan still backs finishes; without one nothing was drawn.
+  if (p.tool !== 'wall' || !chaining(p, plan)) return { placement: p };
+  return finishChain(p, plan, liveAnchors(p, plan));
 }
 
 function clickOpening(
@@ -301,10 +305,10 @@ function clickRuler(
 }
 
 /** null when nothing was pending: the caller steps down its own cancel ladder. */
-export function cancelPlacement(p: Placement): Placement | null {
+export function cancelPlacement(p: Placement, plan: Plan): Placement | null {
   switch (p.tool) {
     case 'wall':
-      return p.chain ? beginPlacement(p.tool) : null;
+      return chaining(p, plan) ? beginPlacement(p.tool) : null;
     case 'ruler':
       return p.a ? beginPlacement(p.tool) : null;
     case 'door':

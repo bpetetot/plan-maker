@@ -483,7 +483,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)' }}
       >
         {s.placement
-          ? placementHint(placementStage(s.placement))
+          ? placementHint(placementStage(s.placement, plan))
           : 'Click a room or an element · drag a box to select · Shift+click adds · Shift+drag locks the axis, a handle to its own line · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 

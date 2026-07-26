@@ -51,6 +51,16 @@ beforeEach(() => {
 const plan = () => usePlanStore.getState().plan;
 const wallCount = () => Object.keys(plan().walls).length;
 const nameInput = () => page.getByRole('textbox');
+const pointAt = (x: number, y: number) => Object.values(plan().points).find((p) => p.x === x && p.y === y);
+const wallBetween = (ax: number, ay: number, bx: number, by: number) => {
+  const [a, b] = [pointAt(ax, ay), pointAt(bx, by)];
+  if (!a || !b) return undefined;
+  return Object.values(plan().walls).find(
+    (w) =>
+      (w.startPointId === a.id && w.endPointId === b.id) ||
+      (w.startPointId === b.id && w.endPointId === a.id),
+  );
+};
 const pressed = (name: string) => page.getByLabelText(name).element().getAttribute('aria-pressed');
 // Scoped to the panel: a named room prints its name on the sheet too.
 
@@ -90,6 +100,49 @@ describe('history shortcuts', () => {
 
     await key('y', { ctrlKey: true });
     expect(wallCount()).toBe(3);
+    await unmount();
+  });
+
+  // The one gesture where the plan moves under a Placement mid-flight: the
+  // chain names its anchors by id, and this undo takes the last one away.
+  it('steps a wall chain back a segment, leaving it drawable from the anchor before', async () => {
+    const { svg, unmount } = await setup();
+    await key('2');
+    // Clear of the square's walls, so nothing here splits or merges.
+    await clickAt(svg, 200, 200);
+    await clickAt(svg, 300, 200);
+    await clickAt(svg, 300, 300);
+    expect(wallCount()).toBe(6);
+
+    await key('z', { ctrlKey: true });
+    expect(wallCount()).toBe(5);
+    expect(pointAt(300, 300)).toBeUndefined();
+    // The hint still reads 'chaining': the chain stepped back, it did not die.
+    await expect.element(page.getByText('click the start point to close the room')).toBeVisible();
+
+    await clickAt(svg, 400, 300);
+    expect(wallCount()).toBe(6);
+    expect(wallBetween(300, 200, 400, 300)).toBeDefined();
+    await unmount();
+  });
+
+  // Nothing is written to make this work: the anchors were kept, so the Points
+  // coming back is the whole of it.
+  it('gives a wall chain its far anchor back on redo', async () => {
+    const { svg, unmount } = await setup();
+    await key('2');
+    await clickAt(svg, 200, 200);
+    await clickAt(svg, 300, 200);
+    await clickAt(svg, 300, 300);
+
+    await key('z', { ctrlKey: true });
+    expect(pointAt(300, 300)).toBeUndefined();
+    await key('z', { ctrlKey: true, shiftKey: true });
+    expect(pointAt(300, 300)).toBeDefined();
+
+    // Drawn from (300,300) again, which only the restored anchor can give.
+    await clickAt(svg, 400, 300);
+    expect(wallBetween(300, 300, 400, 300)).toBeDefined();
     await unmount();
   });
 });

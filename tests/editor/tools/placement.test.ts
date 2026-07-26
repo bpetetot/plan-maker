@@ -48,7 +48,7 @@ describe('a wall chain', () => {
   it('holds its first click as a pending snap, leaving the plan alone', () => {
     const r = stroke(beginPlacement('wall'), emptyPlan(), 40, 40);
     expect(r.plan).toBeUndefined();
-    expect(placementStage(r.placement)).toBe('chaining');
+    expect(placementStage(r.placement, emptyPlan())).toBe('chaining');
   });
 
   it('commits one wall per click past the first', () => {
@@ -85,7 +85,7 @@ describe('a wall chain', () => {
     const pending = stroke(beginPlacement('wall'), emptyPlan(), 0, 0);
     const nothing = finishPlacement(pending.placement, emptyPlan());
     expect(nothing.tool).toBeUndefined();
-    expect(placementStage(nothing.placement)).toBe('wall');
+    expect(placementStage(nothing.placement, emptyPlan())).toBe('wall');
   });
 
   it('rubber-bands from its live end to the aimed point, and from nothing before', () => {
@@ -101,9 +101,83 @@ describe('a wall chain', () => {
 
   it('drops the chain on cancel, and reports nothing to drop before it starts', () => {
     const started = beginPlacement('wall');
-    expect(cancelPlacement(started)).toBeNull();
+    expect(cancelPlacement(started, emptyPlan())).toBeNull();
     const chained = stroke(started, emptyPlan(), 0, 0).placement;
-    expect(placementStage(cancelPlacement(chained)!)).toBe('wall');
+    expect(placementStage(cancelPlacement(chained, emptyPlan())!, emptyPlan())).toBe('wall');
+  });
+});
+
+// CONTEXT.md: Placement. The plan moves under a chain between two of its
+// clicks — an undo is the case ADR 0025 named and stopped one step short of.
+describe('a wall chain the plan moves under', () => {
+  // Two walls drawn, with the plan as it stands and as it stood one undo back.
+  const chained = () => {
+    const first = draw('wall', [
+      [0, 0],
+      [200, 0],
+    ]);
+    const second = stroke(first.placement, first.plan, 200, 200);
+    return { placement: second.placement, undone: first.plan, redone: second.plan! };
+  };
+
+  it('steps back to the previous anchor when an undo takes its last wall', () => {
+    const { placement, undone } = chained();
+    const aimed = aimPlacement(placement, undone, at(400, 200), ENV);
+    expect(placementChrome(aimed, undone, ENV.defaults).rubber).toMatchObject({
+      from: { x: 200, y: 0 },
+      to: { x: 400, y: 200 },
+    });
+    const drawnOn = clickPlacement(aimed, undone, at(400, 200), ENV);
+    expect(Object.keys(drawnOn.plan!.walls)).toHaveLength(2);
+  });
+
+  // Nothing is truncated, so the anchor follows whichever plan it is read
+  // against — which is what makes a redo restore the chain, one level up.
+  it('reads its anchor from the plan it is handed, not from the one it was drawn on', () => {
+    const { placement, undone, redone } = chained();
+    expect(
+      placementChrome(aimPlacement(placement, undone, at(0, 0), ENV), undone, ENV.defaults).rubber,
+    ).toMatchObject({ from: { x: 200, y: 0 } });
+    expect(
+      placementChrome(aimPlacement(placement, redone, at(0, 0), ENV), redone, ENV.defaults).rubber,
+    ).toMatchObject({ from: { x: 200, y: 200 } });
+  });
+
+  // A click writes, which spends the redo: the ids can never come back, so the
+  // chain stops carrying them.
+  it('drops the dead anchors as soon as a click writes', () => {
+    const { placement, undone } = chained();
+    const drawnOn = clickPlacement(
+      aimPlacement(placement, undone, at(400, 200), ENV),
+      undone,
+      at(400, 200),
+      ENV,
+    );
+    const anchors = (drawnOn.placement as Extract<Placement, { tool: 'wall' }>).anchors;
+    expect(anchors.every((id) => drawnOn.plan!.points[id])).toBe(true);
+  });
+
+  // Undone past its own start: the tool holds nothing, and it says so before
+  // the pointer moves — the hint and the cancel ladder read the same truth.
+  it('is abandoned when an undo takes every anchor, without waiting for a move', () => {
+    const { placement } = chained();
+    expect(placementStage(placement, emptyPlan())).toBe('wall');
+    expect(cancelPlacement(placement, emptyPlan())).toBeNull();
+    expect(placementChrome(placement, emptyPlan(), ENV.defaults).rubber).toBeNull();
+  });
+
+  // The first click names a Point without committing anything, so an undo can
+  // take that Point too — and the click falls back on where it was aimed.
+  it('starts from bare coordinates when an undo takes the Point its first click named', () => {
+    const plan = buildPlan((b) => {
+      b.point(100, 100);
+    });
+    const started = stroke(beginPlacement('wall'), plan, 100, 100).placement;
+    const drawn = stroke(started, emptyPlan(), 300, 100);
+    expect(Object.values(drawn.plan!.points).map((p) => ({ x: p.x, y: p.y }))).toEqual([
+      { x: 100, y: 100 },
+      { x: 300, y: 100 },
+    ]);
   });
 });
 
@@ -255,7 +329,7 @@ describe('a ruler', () => {
   it('holds A, previews A→cursor, then commits on B', () => {
     const first = stroke(beginPlacement('ruler'), emptyPlan(), 0, 0);
     expect(first.plan).toBeUndefined();
-    expect(placementStage(first.placement)).toBe('measuring');
+    expect(placementStage(first.placement, emptyPlan())).toBe('measuring');
     const aimed = aimPlacement(first.placement, emptyPlan(), at(200, 0), ENV);
     expect(placementChrome(aimed, emptyPlan(), ENV.defaults).rulerGhost).toMatchObject({
       a: { x: 0, y: 0 },
@@ -274,13 +348,13 @@ describe('a ruler', () => {
     const first = stroke(beginPlacement('ruler'), emptyPlan(), 0, 0);
     const again = stroke(first.placement, emptyPlan(), 0, 0);
     expect(again.plan).toBeUndefined();
-    expect(placementStage(again.placement)).toBe('measuring');
+    expect(placementStage(again.placement, emptyPlan())).toBe('measuring');
   });
 
   it('drops the pending A on cancel', () => {
     const first = stroke(beginPlacement('ruler'), emptyPlan(), 0, 0);
-    expect(placementStage(cancelPlacement(first.placement)!)).toBe('ruler');
-    expect(cancelPlacement(beginPlacement('ruler'))).toBeNull();
+    expect(placementStage(cancelPlacement(first.placement, emptyPlan())!, emptyPlan())).toBe('ruler');
+    expect(cancelPlacement(beginPlacement('ruler'), emptyPlan())).toBeNull();
   });
 
   it('aims through the full ladder, which Alt filters rather than short-circuits', () => {
@@ -331,7 +405,7 @@ describe('a text', () => {
     const r = stroke(beginPlacement('text'), emptyPlan(), 137, 143);
     expect(r.plan).toBeUndefined();
     expect(r.editor).toEqual({ x: 140, y: 140, size: ENV.defaults.textSize });
-    expect(placementStage(r.placement)).toBe('typing');
+    expect(placementStage(r.placement, emptyPlan())).toBe('typing');
   });
 
   it('marks nothing while the editor holds the spot', () => {

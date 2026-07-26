@@ -61,9 +61,9 @@ describe('the cancel ladder', () => {
     const pending = run({ ...drawing('wall'), selection: [{ type: 'wall', id: 'w1' }] }, [
       { type: 'pointerDown', input: input(10, 10), target: { kind: 'sheet' } },
     ]);
-    expect(pending.placement).toMatchObject({ chain: { pending: expect.anything() } });
+    expect(pending.placement).toMatchObject({ pending: expect.anything() });
     const cancelled = run(pending, [{ type: 'cancel' }]);
-    expect(cancelled.placement).toMatchObject({ chain: null });
+    expect(cancelled.placement).toMatchObject({ pending: null, anchors: [] });
     expect(cancelled.selection).toHaveLength(1);
     expect(cancelled.tool).toBe('wall');
   });
