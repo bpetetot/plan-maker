@@ -112,6 +112,26 @@ describe('the burger menu', () => {
   });
 });
 
+// CONTEXT.md: Debug mode. The menu is the only place that says it is on, so
+// the entry carries the state rather than merely spending a click (ADR 0036).
+describe('the debug toggle', () => {
+  it('starts off, turns on, and persists the choice', async () => {
+    await renderMenu();
+    await openMenu();
+    await expect.element(action('Debug mode')).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(action('Debug mode'));
+    await expect.element(action('Debug mode')).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('plan-maker:debug')).toBe('on');
+  });
+
+  it('keeps the menu open, a mode being a setting and not an action', async () => {
+    await renderMenu();
+    await openMenu();
+    await userEvent.click(action('Debug mode'));
+    await expect.element(action('Open')).toBeInTheDocument();
+  });
+});
+
 describe('theme picker', () => {
   it('offers the three options with system active by default', async () => {
     await renderMenu();

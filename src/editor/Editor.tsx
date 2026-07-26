@@ -24,6 +24,7 @@ import type { ElementRef } from '../model/selection';
 import { refKey, selectedRoom } from '../model/selection';
 import type { Opening, RoomLabel } from '../model/types';
 import { redo, undo, usePlanStore } from '../store/planStore';
+import { AxisLockLine } from './debug';
 import { GridLines } from './grid';
 import { editedSlot } from './inlineEdit';
 import { InlineEditor } from './inlineEditor';
@@ -31,7 +32,7 @@ import type { PointerInput, PointerTarget } from './pointer';
 import { placementChrome, placementStage } from './placement';
 import type { PlacementStage } from './placement';
 import type { Session, SessionEnv } from './session';
-import { initialSession, movingOpeningId, reshapingDrag } from './session';
+import { gestureLock, initialSession, movingOpeningId, reshapingDrag } from './session';
 import { useSession } from './useSession';
 import { togglePreference, usePreferences } from '../preferences/preferences';
 import type { RoomTextBlock } from '../sheet/rooms';
@@ -109,6 +110,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const canRedo = useStore(usePlanStore.temporal, (st) => st.futureStates.length > 0);
   const gridVisible = usePreferences((st) => st.grid);
   const measuresVisible = usePreferences((st) => st.measures);
+  const debug = usePreferences((st) => st.debug);
   const space = useSpaceHeld();
 
   const world = (): SessionEnv => ({
@@ -412,6 +414,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} fontPx={DIM_FONT_PX} />
         )}
         <SnapMarker snap={chrome?.snap ?? null} pxPerCm={zoomScale} />
+        {/* Over the sheet and its chrome both, or the very wall it holds
+            straight would hide it (CONTEXT.md: Debug mode) */}
+        {debug && <AxisLockLine lock={gestureLock(s)} view={view} />}
         {/* One box, keyed by what is typed: without the key the component's
             mirrored value would outlive a switch from one target to the other. */}
         {typed && (

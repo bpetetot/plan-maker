@@ -506,8 +506,9 @@ is whichever line passes nearest the current aim, decided again at every aim, so
 it changes hands without the key ever being released; a tie between the world
 axes falls to the horizontal. A gesture aiming at a position invented from
 nothing — a chain's first click, a Ruler's A — has no origin, so it has no lock,
-and neither has a Point no wall holds. Momentary: no toggle, no preference, and
-nothing drawn on the sheet, the result on the axis being its own feedback.
+and neither has a Point no wall holds. Momentary: no toggle of its own and
+nothing drawn on the sheet, the result on the axis being its own feedback — the
+Debug mode alone puts its line on screen, and for the developer, not the user.
 It is an alignment constraint of the gesture's own, and it has the last word
 over Snap's ladder: while Shift is held the result is on the axis, full stop. A
 connection target off the axis is skipped rather than honoured — only Points the
@@ -595,8 +596,9 @@ _Avoid_: Guide, track
 **Preference**:
 A per-device choice about how the editor looks or behaves, as opposed to
 anything the plan says: the visibility of the Grid — which carries its snapping
-with it — and of Measures, and the Theme. Never part of the plan — never saved with it, never exported, never
-carried to another device. Held for the session and remembered in local
+with it — and of Measures, the Theme, and the Debug mode. Never part of the
+plan — never saved with it, never exported, never carried to another device.
+Held for the session and remembered in local
 storage, which only makes it outlive a reload: the value the editor reads is
 the session's, so a device whose storage refuses the write still honors the
 choice until the tab closes. A preference left at its default stores nothing,
@@ -610,6 +612,16 @@ sheet. Chosen per device — follows the system by default, with a manual
 override — and never part of the plan: exports always render light, as a
 document.
 _Avoid_: Dark mode, appearance, color scheme
+
+**Debug mode**:
+A Preference that puts the editor's own workings on screen, for whoever builds
+it rather than whoever draws with it: a rule a finished gesture shows only
+through its result becomes visible while the gesture is still under way. Off by
+default, drawn over the sheet and never joining it — never exported, never part
+of the plan. What it shows is what the gesture actually computed, never a second
+reading of it, so a disagreement between the two is a bug and not a display.
+Today it shows one thing, the Axis lock's line.
+_Avoid_: Developer mode, inspector, overlay
 
 **Fit**:
 Framing the view so the whole plan is visible with a margin; on an empty plan

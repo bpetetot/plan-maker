@@ -1,5 +1,6 @@
 // CONTEXT.md: Plan drag — a drag that edits the Plan, as a value (ADR 0023).
 // Pure: no React, no store. The Editor advances it and mirrors what it renders.
+import type { AxisLock } from '../model/axisLock';
 import { axisLock, lockAim } from '../model/axisLock';
 import type { Vec } from '../model/geometry';
 import { projectOnWall, wallLength, wallSide } from '../model/geometry';
@@ -66,6 +67,9 @@ export interface PlanDrag {
   orig: Plan;
   plan: Plan;
   snap: Snap | null;
+  /** The line the last aim resolved, null when Shift was up or the spec locks
+   *  nothing — kept for the Debug mode to draw (ADR 0036). */
+  lock: AxisLock | null;
   moved: boolean;
   /** A `newLabel`'s label, born on the aim that crosses the threshold. */
   labelId: string | null;
@@ -84,7 +88,7 @@ export interface AimEnv {
 }
 
 export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
-  return { spec, orig: plan, plan, snap: null, moved: false, labelId: null, selection: null };
+  return { spec, orig: plan, plan, snap: null, lock: null, moved: false, labelId: null, selection: null };
 }
 
 export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
@@ -94,7 +98,8 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   // A block's aim, brought onto its axis: `label` and `newLabel` share it.
   const aimed = (s: { grabDelta: Vec; origin: Vec; axes: Vec[] }) => {
     const target = grabbed(s.grabDelta);
-    return lockAim(axisLock(s.origin, target, s.axes, env.locked), target);
+    const lock = axisLock(s.origin, target, s.axes, env.locked);
+    return { lock, at: lockAim(lock, target) };
   };
   const moved = env.moved;
 
@@ -103,44 +108,47 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
     // snap onto the very walls it carries.
     case 'point': {
       const p = grabbed(spec.grabDelta);
+      // Against the Point's own aimed position, not the raw pointer: that one
+      // is offset by `grabDelta`, and could flip the axis near 45°.
+      const lock = axisLock(spec.origin, p, spec.axes, env.locked);
       const snap = snapPoint(drag.plan, p.x, p.y, {
         tolerance,
         exclude: new Set([spec.id]),
         free: env.free,
-        // Against the Point's own aimed position, not the raw pointer: that one
-        // is offset by `grabDelta`, and could flip the axis near 45°.
-        lock: axisLock(spec.origin, p, spec.axes, env.locked),
+        lock,
       });
-      return { ...drag, plan: movePoint(drag.plan, spec.id, snap.x, snap.y), snap, moved };
+      return { ...drag, plan: movePoint(drag.plan, spec.id, snap.x, snap.y), snap, lock, moved };
     }
     // Rigid, and rebuilt from `orig` each aim rather than accumulated: a wobble
     // would otherwise compound into the translation.
     case 'group': {
       if (!moved) return { ...drag, moved };
+      const lock = axisLock(spec.origin, at, spec.axes, env.locked);
       const delta = realignDelta(spec.refPoint, at.x - spec.origin.x, at.y - spec.origin.y, {
         free: env.free,
-        lock: axisLock(spec.origin, at, spec.axes, env.locked),
+        lock,
       });
-      return { ...drag, plan: translateElements(drag.orig, spec.refs, delta.dx, delta.dy), moved };
+      return { ...drag, plan: translateElements(drag.orig, spec.refs, delta.dx, delta.dy), lock, moved };
     }
     case 'label': {
       if (!moved) return { ...drag, moved };
       // The Room clamps last: an invariant does not propose a position, it
       // defines which ones exist, so the lock chooses inside what it allows.
-      const target = aimed(spec);
+      const { lock, at: target } = aimed(spec);
       const t = spec.room ? clampToRoom(target, spec.room) : target;
-      return { ...drag, plan: moveRoomLabel(drag.plan, spec.id, t.x, t.y), moved };
+      return { ...drag, plan: moveRoomLabel(drag.plan, spec.id, t.x, t.y), lock, moved };
     }
     case 'newLabel': {
-      const t = clampToRoom(aimed(spec), spec.room);
+      const { lock, at: target } = aimed(spec);
+      const t = clampToRoom(target, spec.room);
       if (drag.labelId) {
-        return { ...drag, plan: moveRoomLabel(drag.plan, drag.labelId, t.x, t.y), moved };
+        return { ...drag, plan: moveRoomLabel(drag.plan, drag.labelId, t.x, t.y), lock, moved };
       }
       if (!moved) return { ...drag, moved };
       // Born of a placement gesture, so born placed: nothing else would keep
       // it alive (CONTEXT.md: Room label).
       const [plan, labelId] = addRoomLabel(drag.plan, '', t.x, t.y, true);
-      return { ...drag, plan, labelId, moved };
+      return { ...drag, plan, labelId, lock, moved };
     }
     case 'opening': {
       const opening = drag.plan.openings[spec.id];
@@ -165,14 +173,10 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
     case 'rulerEnd': {
       if (!drag.plan.rulers[spec.id]) return drag;
       const p = grabbed(spec.grabDelta);
-      const snap = snapPoint(drag.plan, p.x, p.y, {
-        tolerance,
-        walls: true,
-        free: env.free,
-        lock: axisLock(spec.origin, p, spec.axes, env.locked),
-      });
+      const lock = axisLock(spec.origin, p, spec.axes, env.locked);
+      const snap = snapPoint(drag.plan, p.x, p.y, { tolerance, walls: true, free: env.free, lock });
       const plan = moveRulerEndpoint(drag.plan, spec.id, spec.end, snap.x, snap.y);
-      return { ...drag, plan, snap, moved };
+      return { ...drag, plan, snap, lock, moved };
     }
   }
 }
@@ -186,6 +190,7 @@ export function commitPlanDrag(drag: PlanDrag): PlanDrag {
     ...drag,
     plan,
     snap: null,
+    lock: null,
     selection,
   });
   const room = (s: Extract<PlanDragSpec, { additive: boolean }>) =>

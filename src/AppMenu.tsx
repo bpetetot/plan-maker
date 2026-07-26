@@ -1,5 +1,6 @@
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import {
+  Bug,
   CircleQuestionMark,
   Eraser,
   FolderOpen,
@@ -13,7 +14,7 @@ import {
 import { openHelp } from './editor/helpStore';
 import { keyHint } from './editor/useAppHotkeys';
 import type { ShortcutAction } from './editor/useAppHotkeys';
-import { setPreference, usePreferences } from './preferences/preferences';
+import { setPreference, togglePreference, usePreferences } from './preferences/preferences';
 import type { ThemePreference } from './theme/theme';
 
 const THEME_OPTIONS: { value: ThemePreference; title: string; Icon: typeof Monitor }[] = [
@@ -40,6 +41,7 @@ const Hint = ({ action }: { action: ShortcutAction }) => (
 // Popover, not Menu: a menu's roving tabindex would strand the theme buttons.
 export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, resetDisabled }: AppMenuProps) {
   const themePreference = usePreferences((s) => s.theme);
+  const debug = usePreferences((s) => s.debug);
   return (
     <Popover>
       <div className="floating" style={{ position: 'fixed', top: 16, left: 16 }}>
@@ -91,6 +93,11 @@ export default function AppMenu({ onOpen, onSaveAs, onExportImage, onReset, rese
                   ))}
                 </div>
               </div>
+              {/* no close() either: the menu carries the mode's state, and it
+                  is the only place that says it is on (ADR 0036) */}
+              <button className="menu-item" aria-pressed={debug} onClick={() => togglePreference('debug')}>
+                <Bug size={16} aria-hidden /> Debug mode
+              </button>
               <div className="menu-sep" />
               <button className="menu-item danger-item" disabled={resetDisabled} onClick={run(onReset)}>
                 <Eraser size={16} aria-hidden /> Reset

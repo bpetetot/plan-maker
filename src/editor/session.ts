@@ -1,6 +1,7 @@
 // CONTEXT.md: Session, and the pure transitions between two of them (ADR 0033).
 // No React, no DOM, no store: every write is declared, never performed.
 import type { Vec } from '../model/geometry';
+import type { AxisLock } from '../model/axisLock';
 import { WORLD_AXES } from '../model/axisLock';
 import { projectOnWall } from '../model/geometry';
 import { wallDimension } from '../model/dimension';
@@ -566,6 +567,14 @@ export function movingOpeningId(s: Session): string | null {
   const g = s.drag;
   if (g?.kind !== 'plan') return null;
   return g.g.spec.kind === 'opening' && g.g.moved ? g.g.spec.id : null;
+}
+
+/** CONTEXT.md: Axis lock — the line the gesture under way resolved at its last
+ *  aim, drag or placement. Null when nothing locks; the Debug mode reads it. */
+export function gestureLock(s: Session): AxisLock | null {
+  if (s.drag?.kind === 'plan') return s.drag.g.lock;
+  if (!s.placement) return null;
+  return s.placement.tool === 'wall' || s.placement.tool === 'ruler' ? s.placement.lock : null;
 }
 
 /** The drag that displaces Points, so the room loops move under it — the plan

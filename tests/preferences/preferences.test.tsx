@@ -21,6 +21,7 @@ describe('the storage discipline', () => {
       grid: false,
       measures: true,
       theme: 'system',
+      debug: false,
     });
   });
 
@@ -85,6 +86,7 @@ describe('the table', () => {
   it.each([
     ['grid', 'plan-maker:grid', 'shown', false],
     ['measures', 'plan-maker:measures', 'hidden', true],
+    ['debug', 'plan-maker:debug', 'on', false],
   ] as const)('keeps %s on %s / %s', (name, key, sentinel, fallback) => {
     togglePreference(name);
     expect(localStorage.getItem(key)).toBe(sentinel);
@@ -105,12 +107,14 @@ describe('reloading', () => {
   it('re-reads every preference from storage, as a fresh load does', () => {
     togglePreference('grid');
     togglePreference('measures');
+    togglePreference('debug');
     setPreference('theme', 'light');
-    usePreferences.setState({ grid: false, measures: true, theme: 'system' });
+    usePreferences.setState({ grid: false, measures: true, theme: 'system', debug: false });
     reloadPreferences();
     expect(getPreference('grid')).toBe(true);
     expect(getPreference('measures')).toBe(false);
     expect(getPreference('theme')).toBe('light');
+    expect(getPreference('debug')).toBe(true);
   });
 });
 

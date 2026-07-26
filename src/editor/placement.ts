@@ -1,6 +1,7 @@
 // CONTEXT.md: Placement, as a value (ADR 0025). Pure — no React, no store —
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
+import type { AxisLock } from '../model/axisLock';
 import { axisLock, WORLD_AXES } from '../model/axisLock';
 import { nearestWall } from '../model/geometry';
 import { placeOpening, railedOpeningOffset } from '../model/openings';
@@ -27,9 +28,10 @@ type OpeningPreview = { wallId: string; offset: Cm };
 export type Placement =
   // `anchors` are the chain's Points in draw order — what it drew, robust to
   // the splits and merges each commit performs (ADR 0018).
-  | { tool: 'wall'; chain: Chain | null; anchors: string[]; snap: Snap | null }
+  // `lock`: the line the last aim resolved, for the Debug mode to draw (ADR 0036).
+  | { tool: 'wall'; chain: Chain | null; anchors: string[]; snap: Snap | null; lock: AxisLock | null }
   | { tool: 'door' | 'window'; preview: OpeningPreview | null }
-  | { tool: 'ruler'; a: Snap | null; snap: Snap | null }
+  | { tool: 'ruler'; a: Snap | null; snap: Snap | null; lock: AxisLock | null }
   | { tool: 'text'; typing: boolean; snap: Snap | null };
 
 /** The machine's state, flat: one word the screen can index a hint by. */
@@ -93,23 +95,35 @@ const anchorOf = (p: Placement, plan: Plan): Vec | null => {
   return p.tool === 'ruler' ? p.a : null;
 };
 
-const aimPoint = (p: Placement, plan: Plan, at: Vec, env: PlacementEnv): Snap =>
-  snapPoint(plan, at.x, at.y, {
-    tolerance: snapTolerance(env.pxPerCm),
-    walls: true,
-    free: env.free,
-    lock: axisLock(anchorOf(p, plan), at, WORLD_AXES, env.locked),
-  });
+// The aimed position and the line that constrained it, together: re-deriving
+// the second at the render is the one way it could disagree (ADR 0036).
+const aimPoint = (
+  p: Placement,
+  plan: Plan,
+  at: Vec,
+  env: PlacementEnv,
+): { snap: Snap; lock: AxisLock | null } => {
+  const lock = axisLock(anchorOf(p, plan), at, WORLD_AXES, env.locked);
+  return {
+    snap: snapPoint(plan, at.x, at.y, {
+      tolerance: snapTolerance(env.pxPerCm),
+      walls: true,
+      free: env.free,
+      lock,
+    }),
+    lock,
+  };
+};
 
 export function beginPlacement(tool: PlacementTool): Placement {
   switch (tool) {
     case 'wall':
-      return { tool, chain: null, anchors: [], snap: null };
+      return { tool, chain: null, anchors: [], snap: null, lock: null };
     case 'door':
     case 'window':
       return { tool, preview: null };
     case 'ruler':
-      return { tool, a: null, snap: null };
+      return { tool, a: null, snap: null, lock: null };
     case 'text':
       return { tool, typing: false, snap: null };
   }
@@ -132,8 +146,10 @@ export function placementStage(p: Placement): PlacementStage {
 export function aimPlacement(p: Placement, plan: Plan, at: Vec, env: PlacementEnv): Placement {
   switch (p.tool) {
     case 'wall':
-    case 'ruler':
-      return { ...p, snap: aimPoint(p, plan, at, env) };
+    case 'ruler': {
+      const { snap, lock } = aimPoint(p, plan, at, env);
+      return { ...p, snap, lock };
+    }
     // The open editor holds the spot: nothing chases the pointer under it.
     case 'text':
       return p.typing ? p : { ...p, snap: snapText(at, env.free) };
@@ -173,7 +189,7 @@ type WallPlacement = Extract<Placement, { tool: 'wall' }>;
 
 function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): PlacementResult {
   // The same origin the aim used, so the click lands where the rubber band did.
-  const s = aimPoint(p, plan, at, env);
+  const { snap: s } = aimPoint(p, plan, at, env);
   const chain = p.chain;
   // CONTEXT.md: Settle. No `moving` set — a drawing displaces no Point, it
   // creates one; the Room label pass is what commitWall lacked (ADR 0022).
@@ -190,7 +206,9 @@ function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): Pl
     // The closing segment runs last→start, so the path loops back to start.
     return { plan: closed, ...finishChain(p, closed, [...p.anchors, chain.start]) };
   }
-  if (!chain) return { placement: { ...p, chain: { pending: s } } };
+  // `lock: null` here and below: the click moved the anchor, so the line the
+  // aim resolved ran through the previous one. The next aim resolves the new.
+  if (!chain) return { placement: { ...p, chain: { pending: s }, lock: null } };
   // One commit per drawn wall: the pending start and the wall land in a single
   // history entry (ADR 0002).
   const startSnap = 'pending' in chain ? chain.pending : pointSnap(plan, chain.last);
@@ -202,6 +220,7 @@ function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): Pl
       ...p,
       chain: { start: 'pending' in chain ? startId : chain.start, last: pointId },
       anchors: 'pending' in chain ? [startId, pointId] : [...p.anchors, pointId],
+      lock: null,
     },
   };
 }
@@ -252,8 +271,8 @@ function clickRuler(
   at: Vec,
   env: PlacementEnv,
 ): PlacementResult {
-  const s = aimPoint(p, plan, at, env);
-  if (!p.a) return { placement: { ...p, a: s, snap: s } };
+  const { snap: s } = aimPoint(p, plan, at, env);
+  if (!p.a) return { placement: { ...p, a: s, snap: s, lock: null } };
   // B on A is a mis-click: ignore it, the pending A keeps rubber-banding.
   if (Math.hypot(s.x - p.a.x, s.y - p.a.y) * env.pxPerCm < SAME_POINT_PX) return { placement: p };
   const [next, id] = addRuler(plan, { x: p.a.x, y: p.a.y }, { x: s.x, y: s.y });

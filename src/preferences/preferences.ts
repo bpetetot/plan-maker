@@ -8,6 +8,8 @@ interface Preferences {
   grid: boolean;
   measures: boolean;
   theme: ThemePreference;
+  /** CONTEXT.md: Debug mode (ADR 0036). */
+  debug: boolean;
 }
 
 type Name = keyof Preferences;
@@ -40,6 +42,7 @@ const TABLE: { [K in Name]: Entry<Preferences[K]> } = {
     decode: (raw) => (raw === 'light' || raw === 'dark' ? raw : 'system'),
     encode: (value) => value,
   },
+  debug: boolEntry('plan-maker:debug', 'on', false),
 };
 
 function load<K extends Name>(name: K): Preferences[K] {
@@ -69,6 +72,7 @@ const loadAll = (): Preferences => ({
   grid: load('grid'),
   measures: load('measures'),
   theme: load('theme'),
+  debug: load('debug'),
 });
 
 export const usePreferences = create<Preferences>(loadAll);

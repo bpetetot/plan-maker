@@ -217,6 +217,13 @@ svg foreignObject textarea.text-note-input {
 .menu-item.danger-item:hover:not(:disabled) {
   background: var(--danger-surface);
 }
+/* The pressed language of the theme swatches beside it. The hover selector is
+   repeated: .menu-item:hover:not(:disabled) would otherwise outrank it. */
+.menu-item[aria-pressed='true'],
+.menu-item[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
 .menu-sep {
   height: 1px;
   background: var(--separator);
