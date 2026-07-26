@@ -1,6 +1,8 @@
+import type { AlignmentGuide } from './alignment';
+import { alignmentGuides, guideCrossing } from './alignment';
 import type { AxisLock } from './axisLock';
 import { axialHeld, lockAim, onAxis } from './axisLock';
-import type { Vec } from './geometry';
+import type { Rect, Vec } from './geometry';
 import { distance, nearestWall, wallAxis } from './geometry';
 import type { Plan } from './types';
 import { GRID } from './types';
@@ -8,9 +10,12 @@ import { GRID } from './types';
 export interface Snap {
   x: number;
   y: number;
-  kind: 'point' | 'wall' | 'grid' | 'free';
+  kind: 'point' | 'wall' | 'alignment' | 'grid' | 'free';
   pointId?: string;
   wallId?: string;
+  /** The guides the position rides, at most two — filled whether or not
+   *  anything draws them (ADR 0036). */
+  guides?: AlignmentGuide[];
 }
 
 /** The two alignment constraints a gesture carries — Alt's free move, and the
@@ -24,6 +29,14 @@ export interface SnapOptions extends Alignment {
   tolerance: number;
   exclude?: Set<string>;
   walls?: boolean;
+  /** The alignment rung's own reach, in plan centimeters. Absent, the rung
+   *  does not run — the caller is the one who knows a screen pixel. */
+  guideTolerance?: number;
+  /** The gesture's own origin Point, which is never a candidate: the Axis lock
+   *  owns it, the Alignment guide owns every other Point (ADR 0037). */
+  origin?: string;
+  /** What the viewport shows, in plan coordinates. Everything when absent. */
+  viewport?: Rect | null;
 }
 
 // Rigid: one delta landing `ref` on a grid intersection, not a per-element snap —
@@ -44,8 +57,38 @@ export function realignDelta(
   return locked({ dx: grid(ref.x + dx) - ref.x, dy: grid(ref.y + dy) - ref.y });
 }
 
-// Priority: point > wall body > grid.
-// A free move (Alt) filters the ladder, not short-circuits it: alignment rungs off, connection rungs on.
+// The guides on offer at this aim, the gesture's own origin taken out — none
+// when the caller named no reach.
+function guidesFor(plan: Plan, aim: Vec, options: SnapOptions): AlignmentGuide[] {
+  if (options.guideTolerance === undefined) return [];
+  return alignmentGuides(plan, aim, {
+    tolerance: options.guideTolerance,
+    exclude: options.origin ? new Set(options.exclude).add(options.origin) : options.exclude,
+    within: options.viewport,
+  });
+}
+
+// One rule for the whole rung: a guide applies when the position it yields is
+// within the guide tolerance of the aim (ADR 0037). Here that position is the
+// slant's own crossing, so a near-parallel guide falls out on its own.
+function nearestCrossing(guides: AlignmentGuide[], lock: AxisLock, aim: Vec, reach: number) {
+  let best: { guide: AlignmentGuide; at: Vec } | null = null;
+  let bestDistance = reach;
+  for (const guide of guides) {
+    const at = guideCrossing(guide, lock);
+    if (!at) continue;
+    const d = distance(at.x, at.y, aim.x, aim.y);
+    if (d <= bestDistance) {
+      bestDistance = d;
+      best = { guide, at };
+    }
+  }
+  return best;
+}
+
+// Priority: point > wall body > alignment > grid.
+// A free move drops the grid rung alone: the connection rungs and the guides
+// are not the Grid's to switch off (ADR 0035, ADR 0037).
 export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions): Snap {
   const aligning = !options.free;
   const lock = options.lock ?? null;
@@ -82,14 +125,31 @@ export function snapPoint(plan: Plan, x: number, y: number, options: SnapOptions
     }
   }
 
-  // A borrowed slant crosses no grid intersection, so there is no alignment
-  // rung left to run on it: the axis is followed by the centimeter.
-  if (lock && !axialHeld(lock)) {
-    const on = lockAim(lock, { x, y });
-    return { x: Math.round(on.x), y: Math.round(on.y), kind: 'free' };
-  }
-  if (!aligning) return { ...lockAim(lock, { x: Math.round(x), y: Math.round(y) }), kind: 'free' };
+  const aim = { x, y };
+  const guides = guidesFor(plan, aim, options);
+  const held = axialHeld(lock);
 
+  // A borrowed slant holds no coordinate, so a guide meets it at one point
+  // rather than lending it one; away from any guide the line is followed by
+  // the centimeter, the grid having no hold on it.
+  if (lock && !held) {
+    const crossed = nearestCrossing(guides, lock, aim, options.guideTolerance ?? 0);
+    const on = crossed ? crossed.at : lockAim(lock, aim);
+    const landed = { x: Math.round(on.x), y: Math.round(on.y) };
+    return crossed ? { ...landed, kind: 'alignment', guides: [crossed.guide] } : { ...landed, kind: 'free' };
+  }
+
+  // The lock has the last word on its own coordinate, so a guide holding it has
+  // nothing left to hold.
+  const live = guides.filter((g) => g.held !== held);
   const grid = (v: number) => Math.round(v / GRID) * GRID;
-  return { ...lockAim(lock, { x: grid(x), y: grid(y) }), kind: 'grid' };
+  const base = lockAim(lock, aligning ? { x: grid(x), y: grid(y) } : { x: Math.round(x), y: Math.round(y) });
+  if (live.length > 0) {
+    // The held coordinates come from the guides, the free one from the rung
+    // below — exactly how the lock already composes.
+    const on = { ...base };
+    for (const g of live) on[g.held] = g.at;
+    return { ...on, kind: 'alignment', guides: live };
+  }
+  return { ...base, kind: aligning ? 'grid' : 'free' };
 }

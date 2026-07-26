@@ -5,6 +5,15 @@ export interface Vec {
   y: number;
 }
 
+/** An axis-aligned box in plan coordinates — the shape the editor's viewBox
+ *  already has, so a viewport travels into the model without conversion. */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export const distance = (ax: number, ay: number, bx: number, by: number) => Math.hypot(bx - ax, by - ay);
 
 export const wallPoints = (plan: Plan, wall: Wall): [Point, Point] => [

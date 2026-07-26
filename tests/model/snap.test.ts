@@ -230,3 +230,129 @@ describe('snapPoint on wall bodies', () => {
     expect(s).toMatchObject({ x: 155, y: 155, kind: 'wall' });
   });
 });
+
+// The rung above the grid (ADR 0037). Its reach is its own — 4 cm here against
+// the ladder's 15 — because a guide is a band across the sheet, not a disc.
+describe('the alignment rung', () => {
+  // Alone at (400, 400), way outside every other rung's reach: what it offers
+  // is its row and its column, and nothing else.
+  const alone = buildPlan((b) => {
+    b.point(400, 400);
+  });
+  const sourceId = () => Object.keys(alone.points)[0];
+  const REACH = { tolerance: 15, guideTolerance: 4 };
+
+  it('holds the aim on a distant Point’s row and grids the free coordinate', () => {
+    const s = snapPoint(alone, 203, 402, REACH);
+    expect(s).toMatchObject({ x: 200, y: 400, kind: 'alignment' });
+    expect(s.guides).toEqual([{ pointId: sourceId(), held: 'y', at: 400 }]);
+  });
+
+  // One Point lends its column, another its row, and both are far enough that
+  // no other rung has anything to say.
+  const crossed = buildPlan((b) => {
+    b.point(400, 900);
+    b.point(900, 400);
+  });
+
+  it('crosses two guides on one aim, both coordinates held', () => {
+    const s = snapPoint(crossed, 403, 402, REACH);
+    expect(s).toMatchObject({ x: 400, y: 400, kind: 'alignment' });
+    expect(s.guides).toHaveLength(2);
+  });
+
+  // Inside a sqrt(2)-widened envelope, outside both per-coordinate tests: the
+  // crossing gets no envelope of its own (ticket 04).
+  it('widens no envelope at the crossing', () => {
+    const s = snapPoint(crossed, 404.5, 404.5, REACH);
+    expect(s).toMatchObject({ x: 400, y: 400, kind: 'grid' });
+    expect(s.guides).toBeUndefined();
+  });
+
+  it('runs without a visible grid too, on the integer centimeter', () => {
+    const s = snapPoint(alone, 203.4, 402, { ...REACH, free: true });
+    expect(s).toMatchObject({ x: 203, y: 400, kind: 'alignment' });
+  });
+
+  it('does not run at all without a guide tolerance', () => {
+    const s = snapPoint(alone, 203, 402, { tolerance: 15 });
+    expect(s).toMatchObject({ x: 200, y: 400, kind: 'grid' });
+    expect(s.guides).toBeUndefined();
+  });
+
+  it('never takes the gesture’s own origin — ADR 0020 stays buried', () => {
+    const s = snapPoint(alone, 203, 402, { ...REACH, origin: sourceId() });
+    expect(s).toMatchObject({ x: 200, y: 400, kind: 'grid' });
+  });
+
+  it('offers nothing from a Point the viewport does not show', () => {
+    const s = snapPoint(alone, 203, 402, { ...REACH, viewport: { x: 0, y: 0, w: 300, h: 300 } });
+    expect(s.kind).toBe('grid');
+  });
+
+  it('loses to the wall rung, which fires with no guides at all', () => {
+    // A wall to catch the aim, and an aligned Point 1 cm off its row.
+    const near = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+      b.point(700, 5);
+    });
+    const s = snapPoint(near, 200, 6, { ...REACH, walls: true });
+    expect(s.kind).toBe('wall');
+    expect(s.guides).toBeUndefined();
+  });
+
+  it('loses to the point rung', () => {
+    const s = snapPoint(alone, 402, 403, REACH);
+    expect(s).toMatchObject({ x: 400, y: 400, kind: 'point' });
+    expect(s.guides).toBeUndefined();
+  });
+});
+
+describe('the alignment rung under a lock', () => {
+  const REACH = { tolerance: 15, guideTolerance: 4 };
+  // Holds y at 400; the aim is free on x alone.
+  const horizontal = { at: { x: 0, y: 400 }, dir: { x: 1, y: 0 } } as const;
+
+  it('skips a guide holding the locked coordinate', () => {
+    const row = buildPlan((b) => {
+      b.point(700, 402);
+    });
+    expect(snapPoint(row, 203, 400, REACH)).toMatchObject({ y: 402, kind: 'alignment' });
+    const s = snapPoint(row, 203, 400, { ...REACH, lock: horizontal });
+    expect(s).toMatchObject({ x: 200, y: 400, kind: 'grid' });
+    expect(s.guides).toBeUndefined();
+  });
+
+  it('lets a guide take the free coordinate, above the grid', () => {
+    const column = buildPlan((b) => {
+      b.point(302, 700);
+    });
+    const s = snapPoint(column, 300, 380, { ...REACH, lock: horizontal });
+    expect(s).toMatchObject({ x: 302, y: 400, kind: 'alignment' });
+  });
+
+  // Straight from here, and level with that: the drawing act a slant makes
+  // possible is lengthening a wall until it meets a foreign Point's column.
+  it('meets a borrowed slant at the line ∩ guide', () => {
+    const column = buildPlan((b) => {
+      b.point(300, 700);
+    });
+    const slant = { at: { x: 100, y: 100 }, dir: { x: Math.SQRT1_2, y: Math.SQRT1_2 } };
+    const s = snapPoint(column, 298, 298, { ...REACH, lock: slant });
+    expect(s).toMatchObject({ x: 300, y: 300, kind: 'alignment' });
+  });
+
+  // No angle threshold: as the angle closes the crossing races away from the
+  // aim and falls out of tolerance on its own.
+  it('drops a guide the slant meets too far away', () => {
+    const row = buildPlan((b) => {
+      b.point(400, 3);
+    });
+    const shallow = { x: 100, y: 1 };
+    const len = Math.hypot(shallow.x, shallow.y);
+    const slant = { at: { x: 0, y: 0 }, dir: { x: shallow.x / len, y: shallow.y / len } };
+    const s = snapPoint(row, 200, 2, { ...REACH, lock: slant });
+    expect(s.kind).toBe('free');
+    expect(s.guides).toBeUndefined();
+  });
+});
