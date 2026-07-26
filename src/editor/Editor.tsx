@@ -64,10 +64,10 @@ import { useSpaceHeld, useView } from './useView';
 const placementHint = (stage: PlacementStage): string =>
   ({
     wall: `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
-    chaining: `Click to add a wall · click the start point to close the room · ${keyHint('cancel')} / double-click to stop`,
+    chaining: `Click to add a wall · click the start point to close the room · Shift locks the axis · ${keyHint('cancel')} / double-click to stop`,
     opening: 'Hover a wall, click to place',
     ruler: `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
-    measuring: `Click to set the end point · ${keyHint('cancel')} / right-click cancels`,
+    measuring: `Click to set the end point · Shift locks the axis · ${keyHint('cancel')} / right-click cancels`,
     text: `Click to place text · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
     typing: `Type freely · ${keyHint('cancel')} cancels · Ctrl+Enter or click away commits`,
   })[stage];
@@ -488,7 +488,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       >
         {s.placement
           ? placementHint(placementStage(s.placement))
-          : 'Click a room or an element · drag a box to select · Shift+click adds · double-click a room to name it · Space+drag pans · scroll zooms'}
+          : 'Click a room or an element · drag a box to select · Shift+click adds · Shift+drag locks the axis · double-click a room to name it · Space+drag pans · scroll zooms'}
       </div>
 
       <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8 }}>
