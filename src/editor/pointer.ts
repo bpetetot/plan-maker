@@ -61,7 +61,7 @@ export type PointerIntent =
   | { type: 'placementClick'; at: Vec; free: boolean }
   | { type: 'panBy'; dxPx: number; dyPx: number }
   | { type: 'aimMarquee'; at: Vec }
-  | { type: 'aimGrab'; at: Vec; free: boolean; moved: boolean }
+  | { type: 'aimGrab'; at: Vec; free: boolean; locked: boolean; moved: boolean }
   | { type: 'aimPlacement'; at: Vec; free: boolean }
   | { type: 'hover'; at: Vec }
   | { type: 'end'; kind: DragKind; moved: boolean }
@@ -69,7 +69,9 @@ export type PointerIntent =
 
 const NONE: PointerIntent = { type: 'none' };
 
-// Alt inverts the current snap state for the gesture (ADR 0007).
+// Alt inverts the current snap state for the gesture (ADR 0007). Shift needs no
+// such helper, but it is read twice over one gesture and the two never meet:
+// additive at the press, the axis lock at every aim after it.
 const isFree = (input: PointerInput, ctx: PointerCtx) => !ctx.snapEnabled !== input.altKey;
 
 // The click threshold, owned here and nowhere else: euclidean, in screen px,
@@ -148,7 +150,7 @@ export function routePointerMove(
       const moved = state.handle || state.moved || crossed(state.start, input);
       return [
         { ...state, moved },
-        { type: 'aimGrab', at: input.at, free: isFree(input, ctx), moved },
+        { type: 'aimGrab', at: input.at, free: isFree(input, ctx), locked: input.shiftKey, moved },
       ];
     }
   }

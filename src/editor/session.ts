@@ -207,18 +207,27 @@ function grabbed(
       // translation, same grid realignment.
       return {
         selection,
-        spec: { kind: 'group', refs: selection, start: c, refPoint: referencePoint(plan, selection, c) },
+        spec: {
+          kind: 'group',
+          refs: selection,
+          origin: c,
+          refPoint: referencePoint(plan, selection, c),
+        },
       };
     }
     case 'handle': {
       const h = target.handle;
+      // The origin is the element's own position at the grab, which `grabDelta`
+      // makes the same value as the aim at pointer-down (ticket 03).
       if (h.type === 'point') {
         const p = plan.points[h.id];
-        return p ? { spec: { kind: 'point', id: p.id, grabDelta: { x: p.x - c.x, y: p.y - c.y } } } : null;
+        const grabDelta = p && { x: p.x - c.x, y: p.y - c.y };
+        return p ? { spec: { kind: 'point', id: p.id, grabDelta, origin: { x: p.x, y: p.y } } } : null;
       }
       const p = plan.rulers[h.id]?.[h.end];
+      const grabDelta = p && { x: p.x - c.x, y: p.y - c.y };
       return p
-        ? { spec: { kind: 'rulerEnd', id: h.id, end: h.end, grabDelta: { x: p.x - c.x, y: p.y - c.y } } }
+        ? { spec: { kind: 'rulerEnd', id: h.id, end: h.end, grabDelta, origin: { x: p.x, y: p.y } } }
         : null;
     }
     case 'dim': {
@@ -235,11 +244,18 @@ function grabbed(
     case 'label': {
       const { block, label } = target;
       const grabDelta = { x: block.x - c.x, y: block.y - c.y };
+      // The block's own position, drawn: a label that is not placed sits on the
+      // room anchor, which the plan does not hold for it.
+      const origin = { x: block.x, y: block.y };
       const prev = s.selection;
       if (label) {
-        return { spec: { kind: 'label', id: label.id, room: block.room ?? null, grabDelta, additive, prev } };
+        return {
+          spec: { kind: 'label', id: label.id, room: block.room ?? null, grabDelta, origin, additive, prev },
+        };
       }
-      return block.room ? { spec: { kind: 'newLabel', room: block.room, grabDelta, additive, prev } } : null;
+      return block.room
+        ? { spec: { kind: 'newLabel', room: block.room, grabDelta, origin, additive, prev } }
+        : null;
     }
   }
 }
@@ -322,6 +338,7 @@ function applyPointer(
       const next = aimPlanDrag(g.g, intent.at, {
         pxPerCm: env.pxPerCm,
         free: intent.free,
+        locked: intent.locked,
         moved: intent.moved,
       });
       return {

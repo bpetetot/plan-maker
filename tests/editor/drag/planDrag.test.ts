@@ -13,9 +13,9 @@ import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from '../../../src/editor/
 
 // pxPerCm 1 puts the snap tolerance at 14 cm. The click-vs-drag verdict comes
 // with the env: the pointer router owns the threshold (ADR 0030).
-const AIM = { pxPerCm: 1, free: false, moved: true };
-const FREE = { pxPerCm: 1, free: true, moved: true };
-const CLICK = { pxPerCm: 1, free: false, moved: false };
+const AIM = { pxPerCm: 1, free: false, locked: false, moved: true };
+const FREE = { pxPerCm: 1, free: true, locked: false, moved: true };
+const CLICK = { pxPerCm: 1, free: false, locked: false, moved: false };
 
 const wallPlan = () => {
   let ids = { a: '', b: '', wall: '' };
@@ -33,7 +33,7 @@ describe('a point drag', () => {
   it('lands the Point on the aimed position, snapped to the grid', () => {
     const { plan, a } = wallPlan();
     const drag = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0) }),
       at(37, 4),
       AIM,
     );
@@ -44,7 +44,7 @@ describe('a point drag', () => {
   it('keeps the aimed centimeters when the move is free', () => {
     const { plan, a } = wallPlan();
     const drag = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0) }),
       at(37, 4),
       FREE,
     );
@@ -55,7 +55,7 @@ describe('a point drag', () => {
   it('settles on commit: the Point dropped on its neighbour merges into one', () => {
     const { plan, a, b } = wallPlan();
     const dropped = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0) }),
       at(400, 0),
       AIM,
     );
@@ -71,7 +71,7 @@ describe('a point drag', () => {
     const { plan, a } = wallPlan();
     // Grabbed 30 cm to the right of the Point: the Point trails the cursor by that.
     const drag = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(-30, 0) }),
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(-30, 0), origin: at(0, 0) }),
       at(130, 2),
       AIM,
     );
@@ -89,7 +89,7 @@ describe('a ruler-endpoint drag', () => {
   it('snaps the endpoint onto an existing Point', () => {
     const { plan, id, a } = rulerPlan();
     const drag = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'a', grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'a', grabDelta: at(0, 0), origin: at(100, 100) }),
       at(6, 5),
       AIM,
     );
@@ -100,7 +100,7 @@ describe('a ruler-endpoint drag', () => {
   it('snaps onto a wall body, which a Point drag never does', () => {
     const { plan, id, wall } = rulerPlan();
     const drag = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'b', grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'b', grabDelta: at(0, 0), origin: at(300, 100) }),
       at(203, 7),
       AIM,
     );
@@ -110,7 +110,13 @@ describe('a ruler-endpoint drag', () => {
 
   it('leaves the drag untouched once its Ruler is gone', () => {
     const { plan, id } = rulerPlan();
-    const drag = beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'a', grabDelta: at(0, 0) });
+    const drag = beginPlanDrag(plan, {
+      kind: 'rulerEnd',
+      id,
+      end: 'a',
+      grabDelta: at(0, 0),
+      origin: at(100, 100),
+    });
     const orphaned = { ...drag, plan: { ...plan, rulers: {} } };
     expect(aimPlanDrag(orphaned, at(6, 5), AIM)).toBe(orphaned);
   });
@@ -118,7 +124,7 @@ describe('a ruler-endpoint drag', () => {
   it('does not settle on commit: a Ruler moves no Point and no Wall', () => {
     const { plan, id } = rulerPlan();
     const aimed = aimPlanDrag(
-      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'a', grabDelta: at(0, 0) }),
+      beginPlanDrag(plan, { kind: 'rulerEnd', id, end: 'a', grabDelta: at(0, 0), origin: at(100, 100) }),
       at(6, 5),
       AIM,
     );
@@ -133,7 +139,7 @@ describe('a group drag', () => {
     beginPlanDrag(plan, {
       kind: 'group',
       refs: [{ type: 'wall', id: wall }],
-      start: at(100, 0),
+      origin: at(100, 0),
       refPoint,
     });
 
@@ -272,6 +278,7 @@ describe('a room-label drag', () => {
       id,
       room,
       grabDelta: at(0, 0),
+      origin: at(200, 200),
       additive,
       prev,
     });
@@ -312,6 +319,7 @@ describe('a new-label drag', () => {
       kind: 'newLabel',
       room,
       grabDelta: at(0, 0),
+      origin: at(200, 200),
       additive: false,
       prev: [],
     });
