@@ -51,7 +51,9 @@ export type PointerState =
 
 export const IDLE: PointerState = { phase: 'idle' };
 
-export type Intent =
+/** The session's Intent for the pointer stream (CONTEXT.md: Intent) — one of
+ *  its shapes, resolved here because only this module holds the policy. */
+export type PointerIntent =
   | { type: 'none' }
   | { type: 'toggleSelection'; ref: ElementRef }
   | { type: 'beginPan'; capture: true }
@@ -66,7 +68,7 @@ export type Intent =
   | { type: 'end'; kind: DragKind; moved: boolean }
   | { type: 'cancel'; kind: DragKind };
 
-const NONE: Intent = { type: 'none' };
+const NONE: PointerIntent = { type: 'none' };
 
 // Alt inverts the current snap state for the gesture (ADR 0007).
 const isFree = (input: PointerInput, ctx: PointerCtx) => !ctx.snapEnabled !== input.altKey;
@@ -81,7 +83,7 @@ export function routePointerDown(
   input: PointerInput,
   target: PointerTarget,
   ctx: PointerCtx,
-): [PointerState, Intent] {
+): [PointerState, PointerIntent] {
   if (state.phase !== 'idle') return [state, NONE];
   const startPx = { x: input.clientX, y: input.clientY };
   // CONTEXT.md: Pan — Space + drag and middle-click + drag, whatever sits
@@ -125,7 +127,7 @@ export function routePointerMove(
   state: PointerState,
   input: PointerInput,
   ctx: PointerCtx,
-): [PointerState, Intent] {
+): [PointerState, PointerIntent] {
   if (state.phase === 'idle') {
     if (ctx.placementOpen) return [state, { type: 'aimPlacement', at: input.at, free: isFree(input, ctx) }];
     return [state, { type: 'hover', at: input.at }];
@@ -156,12 +158,12 @@ export function routePointerMove(
   }
 }
 
-export function routePointerUp(state: PointerState, input: PointerInput): [PointerState, Intent] {
+export function routePointerUp(state: PointerState, input: PointerInput): [PointerState, PointerIntent] {
   if (state.phase === 'idle' || input.pointerId !== state.pointerId) return [state, NONE];
   return [IDLE, { type: 'end', kind: state.phase, moved: 'moved' in state ? state.moved : true }];
 }
 
-export function routePointerCancel(state: PointerState, input: PointerInput): [PointerState, Intent] {
+export function routePointerCancel(state: PointerState, input: PointerInput): [PointerState, PointerIntent] {
   if (state.phase === 'idle' || input.pointerId !== state.pointerId) return [state, NONE];
   return [IDLE, { type: 'cancel', kind: state.phase }];
 }

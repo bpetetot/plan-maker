@@ -251,6 +251,20 @@ chosen in the Tool panel with the last used becoming the tool default. Horizonta
 only, one style for all: no rotation, no rich runs, no per-text color or font.
 _Avoid_: Label, note, caption, annotation, callout
 
+**Session**:
+What the editor is doing right now: the active Tool, the Selection, the
+Placement under way, the Plan drag in flight, the box open on the sheet, what
+the pointer has hold of, what it is hovering, and the Tool defaults it has
+remembered. One of them exists at a time, and each of its parts has its own
+entry here — the Session is the whole of which they are the parts, and the word
+for asking "what state is the editor in?" without naming a part.
+It holds no plan and no camera: the Plan is what the editor acts *on*, the Pan
+and Zoom are where it is *looking* from, and a Preference outlives it. A gesture
+reads all three but a Session never contains them, which is why closing a plan
+and opening another leaves the Tool and the Tool defaults exactly where they
+were. Never part of the plan, and never stored: it starts over at every launch.
+_Avoid_: editor state, mode, context
+
 **Tool**:
 The editor's active instrument, which determines what clicking the sheet does.
 Exactly one tool is active at a time: Select — the default —, Wall, Door,
@@ -384,15 +398,17 @@ state: never part of the plan.
 _Avoid_: Gesture, drag operation, manipulation
 
 **Intent**:
-What one pointer event means to the editor, resolved once before anything acts
-on it. The button and a held Space pick the gesture — panning, selecting,
-grabbing, placing — whatever sits under the pointer: Space + drag Pans from a
-Point handle exactly as from the sheet. Alt resolves whether the move is Free,
-read from the event itself. One click threshold tells a click from a drag for
-every gesture alike — a distance travelled on screen, not a box, and a drag
-that returns to its start was still a drag. What was under the pointer names
-the subject; the Intent names the verb, and no gesture re-decides any of it.
-Pure editor behavior: never part of the plan.
+What one event means to the editor, resolved once before anything acts on it,
+and the only thing a Session ever advances on. A click on a tool button names
+its intent outright; the pointer stream is the one source whose events have to
+be *interpreted* into one. There, the button and a held Space pick the gesture —
+panning, selecting, grabbing, placing — whatever sits under the pointer: Space +
+drag Pans from a Point handle exactly as from the sheet. Alt resolves whether
+the move is Free, read from the event itself. One click threshold tells a click
+from a drag for every gesture alike — a distance travelled on screen, not a box,
+and a drag that returns to its start was still a drag. What was under the
+pointer names the subject; the Intent names the verb, and no gesture re-decides
+any of it. Pure editor behavior: never part of the plan.
 _Avoid_: gesture, action, command
 
 **Grab zone**:
