@@ -101,7 +101,9 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
     // would otherwise compound into the translation.
     case 'group': {
       if (!moved) return { ...drag, moved };
-      const delta = realignDelta(spec.refPoint, at.x - spec.start.x, at.y - spec.start.y, env.free);
+      const delta = realignDelta(spec.refPoint, at.x - spec.start.x, at.y - spec.start.y, {
+        free: env.free,
+      });
       return { ...drag, plan: translateElements(drag.orig, spec.refs, delta.dx, delta.dy), moved };
     }
     case 'label': {

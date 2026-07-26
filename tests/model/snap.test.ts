@@ -47,23 +47,116 @@ describe('snapPoint', () => {
 describe('realignDelta', () => {
   it('lands the reference point on a grid intersection', () => {
     // ref off-grid by (3, -4); the delta absorbs it
-    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, false)).toEqual({ dx: 147, dy: -66 });
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, {})).toEqual({ dx: 147, dy: -66 });
   });
 
   it('realigns an off-grid reference even for a near-zero displacement', () => {
-    expect(realignDelta({ x: 103, y: 96 }, 1, -1, false)).toEqual({ dx: -3, dy: 4 });
+    expect(realignDelta({ x: 103, y: 96 }, 1, -1, {})).toEqual({ dx: -3, dy: 4 });
   });
 
   it('keeps an on-grid reference on the grid', () => {
-    expect(realignDelta({ x: 100, y: 100 }, 147.2, -63.8, false)).toEqual({ dx: 150, dy: -60 });
+    expect(realignDelta({ x: 100, y: 100 }, 147.2, -63.8, {})).toEqual({ dx: 150, dy: -60 });
   });
 
   it('a free move (Alt) only rounds to integer centimeters', () => {
-    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, true)).toEqual({ dx: 147, dy: -64 });
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { free: true })).toEqual({ dx: 147, dy: -64 });
   });
 
   it('falls back to whole-centimeter rounding without a reference point', () => {
-    expect(realignDelta(null, 147.2, -63.8, false)).toEqual({ dx: 147, dy: -64 });
+    expect(realignDelta(null, 147.2, -63.8, {})).toEqual({ dx: 147, dy: -64 });
+  });
+});
+
+describe('realignDelta under a lock', () => {
+  const horizontal = { held: 'y', at: 96 } as const;
+
+  it('zeroes the held delta and realigns the free one', () => {
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { lock: horizontal })).toEqual({
+      dx: 147,
+      dy: 0,
+    });
+  });
+
+  it('leaves an off-grid reference off-grid on the held coordinate', () => {
+    // y stays 96: the lock preserves the alignment the group had
+    expect(realignDelta({ x: 103, y: 96 }, 1, -1, { lock: horizontal })).toEqual({ dx: -3, dy: 0 });
+  });
+
+  it('holds the x under a vertical lock', () => {
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { lock: { held: 'x', at: 103 } })).toEqual({
+      dx: 0,
+      dy: -66,
+    });
+  });
+
+  it('zeroes the held delta without a reference point too', () => {
+    expect(realignDelta(null, 147.2, -63.8, { lock: horizontal })).toEqual({ dx: 147, dy: 0 });
+  });
+
+  it('composes with a free move: 1 cm on the free coordinate, zero on the held one', () => {
+    expect(realignDelta({ x: 103, y: 96 }, 147.2, -63.8, { free: true, lock: horizontal })).toEqual({
+      dx: 147,
+      dy: 0,
+    });
+  });
+});
+
+describe('snapPoint under a lock', () => {
+  // A horizontal lock through (0, 0): the axis is y = 0.
+  const axis = { held: 'y', at: 0 } as const;
+
+  it('an aligned point beats a nearer one off the axis', () => {
+    const crowded = buildPlan((b) => {
+      b.point(400, 0);
+      b.point(397, 5);
+    });
+    const s = snapPoint(crowded, 396, 2, { tolerance: 15, lock: axis });
+    expect(s).toMatchObject({ x: 400, y: 0, kind: 'point' });
+  });
+
+  it('takes no point at all when none is on the axis', () => {
+    const off = buildPlan((b) => {
+      b.point(397, 5);
+    });
+    const s = snapPoint(off, 396, 2, { tolerance: 15, lock: axis });
+    expect(s.kind).not.toBe('point');
+  });
+
+  it('connects to a wall that crosses the axis', () => {
+    const crossing = buildPlan((b) => {
+      const p1 = b.point(400, -200);
+      const p2 = b.point(400, 200);
+      b.wall(p1, p2);
+    });
+    const s = snapPoint(crossing, 395, 6, { tolerance: 15, walls: true, lock: axis });
+    expect(s).toMatchObject({ x: 400, y: 0, kind: 'wall' });
+  });
+
+  it('vetoes an oblique wall and falls through to the grid rung', () => {
+    const oblique = buildPlan((b) => {
+      const p1 = b.point(100, -100);
+      const p2 = b.point(300, 100);
+      b.wall(p1, p2);
+    });
+    const free = snapPoint(oblique, 198, 2, { tolerance: 15, walls: true });
+    expect(free.kind).toBe('wall');
+    const s = snapPoint(oblique, 198, 2, { tolerance: 15, walls: true, lock: axis });
+    expect(s).toMatchObject({ x: 200, y: 0, kind: 'grid' });
+  });
+
+  it('grids the free coordinate and holds the other at the origin’s value', () => {
+    const s = snapPoint(plan, 203, 118, { tolerance: 5, lock: { held: 'y', at: 127 } });
+    expect(s).toMatchObject({ x: 200, y: 127, kind: 'grid' });
+  });
+
+  it('an off-grid held coordinate does not heal under the lock', () => {
+    const s = snapPoint(plan, 203, 118, { tolerance: 5, lock: { held: 'x', at: 127 } });
+    expect(s).toMatchObject({ x: 127, y: 120, kind: 'grid' });
+  });
+
+  it('composes with a free move: 1 cm on the free coordinate, held on the axis', () => {
+    const s = snapPoint(plan, 203.4, 117.8, { tolerance: 5, free: true, lock: { held: 'y', at: 127 } });
+    expect(s).toMatchObject({ x: 203, y: 127, kind: 'free' });
   });
 });
 
