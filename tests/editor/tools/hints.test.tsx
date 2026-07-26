@@ -14,7 +14,7 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear();
 });
 
-const lock = () => page.getByText('Shift locks the axis');
+const lock = () => page.getByText('Shift locks horizontal or vertical');
 
 async function setup() {
   const { container } = await render(<EditorWithHotkeys />);
@@ -24,7 +24,9 @@ async function setup() {
 describe('the idle hint', () => {
   it('names both readings of Shift: additive at the press, locked at the move', async () => {
     await setup();
-    await expect.element(page.getByText('Shift+click adds · Shift+drag locks the axis')).toBeVisible();
+    await expect
+      .element(page.getByText('Shift+click adds · Shift+drag locks the axis, a handle to its own line'))
+      .toBeVisible();
   });
 });
 

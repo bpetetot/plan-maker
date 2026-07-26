@@ -93,12 +93,15 @@ describe('every shortcut is documented', () => {
 });
 
 describe('the gestures are documented beside the keys', () => {
-  it('lists the two things Shift does, one row each', async () => {
+  it('lists the three things Shift does, one row each', async () => {
     const { unmount } = await setupEditor();
     await key('?', { shiftKey: true });
 
     await expect.element(page.getByText('Add to the selection', { exact: true })).toBeVisible();
-    await expect.element(page.getByText('Lock the move to one axis', { exact: true })).toBeVisible();
+    await expect.element(page.getByText('Lock the move to a world axis', { exact: true })).toBeVisible();
+    await expect
+      .element(page.getByText('Slide it along its own wall or measurement', { exact: true }))
+      .toBeVisible();
     await unmount();
   });
 });
