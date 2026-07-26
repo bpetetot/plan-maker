@@ -263,15 +263,7 @@ const SOURCE_PX = 3.4;
 /** CONTEXT.md: Alignment guide — a bounded segment from the source Point to
  *  the aim, plus a square naming the source. Draws the value, never re-derives
  *  it (ADR 0036); a crossing is two of them and nothing more. */
-export function AlignmentGuides({
-  snap,
-  plan,
-  pxPerCm,
-}: {
-  snap: Snap | null;
-  plan: Plan;
-  pxPerCm: number;
-}) {
+export function AlignmentGuides({ snap, plan, pxPerCm }: { snap: Snap | null; plan: Plan; pxPerCm: number }) {
   if (!snap?.guides) return null;
   const r = SOURCE_PX / pxPerCm;
   return (

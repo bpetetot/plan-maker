@@ -181,7 +181,13 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       if (!drag.plan.rulers[spec.id]) return drag;
       const p = grabbed(spec.grabDelta);
       const lock = axisLock(spec.origin, p, spec.axes, env.locked);
-      const snap = snapPoint(drag.plan, p.x, p.y, { tolerance, ...guides, walls: true, free: env.free, lock });
+      const snap = snapPoint(drag.plan, p.x, p.y, {
+        tolerance,
+        ...guides,
+        walls: true,
+        free: env.free,
+        lock,
+      });
       const plan = moveRulerEndpoint(drag.plan, spec.id, spec.end, snap.x, snap.y);
       return { ...drag, plan, snap, lock, moved };
     }

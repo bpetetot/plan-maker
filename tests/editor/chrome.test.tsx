@@ -3,7 +3,13 @@ import { cleanup, render } from 'vitest-browser-react';
 import type { Snap } from '../../src/model/snap';
 import { buildPlan, oneWallPlan } from '../helpers';
 import { COLORS } from '../../src/sheet/paint';
-import { AlignmentGuides, OpeningGrabZone, RubberWall, SnapMarker, WallGrabZone } from '../../src/editor/chrome';
+import {
+  AlignmentGuides,
+  OpeningGrabZone,
+  RubberWall,
+  SnapMarker,
+  WallGrabZone,
+} from '../../src/editor/chrome';
 
 describe('Grab zones', () => {
   // Body plus a constant 2 screen px per side (CONTEXT.md: Grab zone).

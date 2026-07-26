@@ -433,15 +433,17 @@ _Avoid_: Hit zone, hit target, hover area
 
 **Snap**:
 The magnetic guidance of any placement or move in the editor:
-positions are drawn to existing points, walls, or the 10 cm grid —
-that ladder governs placing a point. Snap is not a state of its own and has no
-toggle: its rungs are of two natures, and only one of them is switchable. The
-connection targets — existing Point, wall body — decide what the placed
-Point is attached to, and are always live. The alignment target — the grid —
-only decides where the Point sits, and exists exactly when the Grid is visible
-(ADR 0035): showing the Grid is asking to snap to it, hiding it is asking not
-to, and the Grid being hidden by default a placement is free until the user
-says otherwise. A Free move keeps the first nature and drops the second. A
+positions are drawn to existing points, walls, an Alignment guide, or the 10 cm
+grid — that ladder governs placing a point. Snap is not a state of its own and
+has no toggle: its rungs are of two natures, and only one of them is
+switchable. The connection targets — existing Point, wall body — decide what
+the placed Point is attached to, and are always live. The alignment targets
+only decide where the Point sits: the grid exists exactly when the Grid is
+visible (ADR 0035) — showing the Grid is asking to snap to it, hiding it is
+asking not to, and the Grid being hidden by default a placement is free until
+the user says otherwise — while an Alignment guide is what the plan itself
+offers and is always live, whatever the Grid says (ADR 0037). A Free move keeps
+the first nature, keeps the guides, and drops the grid alone. A
 group
 move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
@@ -451,7 +453,8 @@ non-Free move — with one exception, the Axis lock, which preserves the alignme
 the element had on the coordinate it holds. Snap shows the aimed position with a marker of constant on-screen
 size (ADR 0019): an *attached* ring — the Point handle's shape in the snap ink
 (Grab zone) — when the click lands on an existing Point or wall, a small dot
-otherwise. Pure editor behavior: never part of the plan.
+otherwise, an aligned position included: it attaches to nothing, so the ring
+would lie. Pure editor behavior: never part of the plan.
 _Avoid_: Magnetism, snapping grid, attach
 
 **Drawing anchor**:
@@ -481,8 +484,11 @@ switches it off. A free placement is therefore drawn to an existing Point or to
 a wall's body exactly as an ordinary one is, but never to the grid;
 away from every connection target only the integer-centimeter rounding remains
 (Points have integer coordinates). Connecting is topology, aligning is
-geometry, and only the second is what a Free move escapes: a wall drawn freely
-still joins the plan instead of landing beside it. A group move, which runs no
+geometry, and only part of the second is what a Free move escapes: what it
+suspends is the ruling, never the plan — a wall drawn freely still joins the
+plan instead of landing beside it, and still catches the row of an existing
+Point, which is a fact about the drawing rather than about a lattice
+(ADR 0037). A group move, which runs no
 ladder, keeps its own rule: a Free move suspends its realignment — so an
 off-grid group realigns only under a visible Grid. Showing or hiding the Grid
 takes effect immediately, both ways, including mid-gesture. It leaves the Axis
@@ -510,13 +516,19 @@ and neither has a Point no wall holds. Momentary: no toggle of its own and
 nothing drawn on the sheet, the result on the axis being its own feedback — the
 Debug mode alone puts its line on screen, and for the developer, not the user.
 It is an alignment constraint of the gesture's own, and it has the last word
-over Snap's ladder: while Shift is held the result is on the axis, full stop. A
+over Snap's ladder: while Shift is held the result is on the axis, full stop.
+It is the only thing that aligns a gesture to where that gesture began: the
+Axis lock owns the gesture's own origin, the Alignment guide owns every other
+Point (ADR 0037). A
 connection target off the axis is skipped rather than honoured — only Points the
 line runs through are considered, and a wall body's projection is vetoed if it
 leaves the line rather than slid onto it. On a world axis the grid keeps the free
-coordinate while the lock holds the other at the origin's value; a borrowed slant
-crosses no intersection at all, so there is no alignment left to run on it and
-the line is followed by the centimeter. A group move has no position to hold,
+coordinate while the lock holds the other at the origin's value, and an
+Alignment guide competes for that same free coordinate above the grid — one
+holding the locked coordinate is skipped; a borrowed slant crosses no
+intersection at all, so the grid has nothing to say on it and the line is
+followed by the centimeter, save where a guide meets it, that crossing being
+the position the guide yields. A group move has no position to hold,
 only a delta: the lock keeps it at zero on the held coordinate and the
 realignment moves the Reference point on the free one alone.
 What outranks the lock is the model's invariants, which do not propose a
@@ -526,13 +538,38 @@ within a centimeter of each other merge — making, off the axis, the very
 connection the lock had refused. Pure editor behavior: never part of the plan.
 _Avoid_: angle lock, 45° lock, ortho mode
 
+**Alignment guide**:
+The line an existing Point offers a gesture: its own row or its own column,
+discovered by the aim rather than asked for. Automatic — no modifier of its own
+and no toggle — and momentary: it exists for the length of the gesture and
+nothing of it is stored. Only wall Points offer one, and only the two world
+axes: never a direction borrowed from a wall, a foreign Point lending its
+position and not its line. It is a rung of Snap's ladder, between the wall body
+and the grid, so connecting still outranks aligning and near a wall body no
+guide fires; the coordinate it does not hold comes from the rung below. It
+applies when the position it yields is within its own reach of the aim — a
+constant 4 screen px, tighter than the ladder's 14, because a guide is a band
+across the whole sheet and not a disc. Two can be live at once, one per
+coordinate, and that crossing is nothing more than two independent winners. It
+composes with the Axis lock: a guide holding the locked coordinate is skipped, a
+guide holding the free one competes for it, and on a borrowed slant the position
+it yields is where the two lines meet. Candidates are the Points the viewport
+shows — a guide whose source cannot be seen cannot be explained — and never the
+gesture's own origin, which belongs to the Axis lock. Unlike the lock, it draws
+itself, because an alignment you discovered has to say so: a bounded segment
+from the source Point to the aim, in the snap ink, with a small square naming
+the source. Pure editor behavior: never part of the plan, never exported.
+_Avoid_: Smart guide, snap line, alignment path, tracking line
+
 **Grid**:
 The sheet's visible ruling, materializing what Snap aligns to: minor grid
 lines — dashed — every 10 cm, the snap step, and major grid lines — solid —
-every 50 cm. What it materializes, it attracts: the Grid is Snap's alignment
-target and its switch at once (ADR 0035), so showing it puts placements and
-group moves on the 10 cm step and hiding it takes them off — one concept, one
-button, one key, no modifier. Always legible, never noise:
+every 50 cm. What it materializes, it attracts: the Grid is Snap's
+switchable alignment target and its switch at once (ADR 0035), so showing it
+puts placements and group moves on the 10 cm step and hiding it takes them
+off — one concept, one button, one key, no modifier. Its switch reaches the
+ruling alone: an Alignment guide is offered by the plan itself and stays live
+under a hidden Grid (ADR 0037). Always legible, never noise:
 minor lines fade out when their cells get too small on screen, major lines
 follow at extreme zoom-out. Hidden by default, so a plan is drawn at its real
 measurements until asked otherwise; the show/hide choice is a
@@ -620,7 +657,8 @@ through its result becomes visible while the gesture is still under way. Off by
 default, drawn over the sheet and never joining it — never exported, never part
 of the plan. What it shows is what the gesture actually computed, never a second
 reading of it, so a disagreement between the two is a bug and not a display.
-Today it shows one thing, the Axis lock's line.
+Today it shows one thing, the Axis lock's line, in an ink of its own — the snap
+ink is spent on the Alignment guide, which the user reads (ADR 0037).
 _Avoid_: Developer mode, inspector, overlay
 
 **Fit**:

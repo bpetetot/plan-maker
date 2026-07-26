@@ -51,12 +51,7 @@ describe('a dragged Point', () => {
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 300, 100) });
     await pointer(svg, 'pointermove', clientAt(svg, 500, 403));
     const line = svg.querySelector('line.alignment-guide')!;
-    expect(['x1', 'y1', 'x2', 'y2'].map((at) => line.getAttribute(at))).toEqual([
-      '700',
-      '403',
-      '500',
-      '403',
-    ]);
+    expect(['x1', 'y1', 'x2', 'y2'].map((at) => line.getAttribute(at))).toEqual(['700', '403', '500', '403']);
     expect(usePlanStore.getState().plan.points.b).toMatchObject({ x: 500, y: 403 });
 
     await pointer(svg, 'pointerup');
