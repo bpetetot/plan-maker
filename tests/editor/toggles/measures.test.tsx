@@ -6,7 +6,7 @@ import { buildPlan, namedRoomPlan } from '../../helpers';
 import { emptyPlan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import Editor from '../../../src/editor/Editor';
-import { getPreference, reloadPreferences } from '../../../src/preferences/preferences';
+import { getPreference, reloadPreferences, setPreference } from '../../../src/preferences/preferences';
 import { clientAt, pointer } from '../../kit';
 
 beforeEach(() => {
@@ -53,6 +53,7 @@ describe('measure visibility toggle', () => {
   });
 
   it('leaves the grid alone', async () => {
+    setPreference('grid', true);
     const { svg } = await setup();
     await userEvent.click(toggle());
     expect(svg.querySelector('[data-grid]')).not.toBeNull();

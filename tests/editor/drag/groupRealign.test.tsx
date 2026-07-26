@@ -6,8 +6,12 @@ import type { Plan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
 import Editor from '../../../src/editor/Editor';
 import { clientAt, pointer } from '../../kit';
+import { setPreference } from '../../../src/preferences/preferences';
 
 beforeEach(() => {
+  // The realignment is what showing the Grid asks for (ADR 0035): this whole
+  // file is about that landing, so it says so.
+  setPreference('grid', true);
   usePlanStore.temporal.getState().clear();
 });
 
@@ -63,18 +67,15 @@ describe('dragging an off-grid wall body', () => {
     expect(plan().points.b).toMatchObject({ x: 483, y: 100 });
   });
 
-  it('rounds to whole centimeters with Alt held, without moving the reference', async () => {
+  it('rounds to whole centimeters while the Grid is hidden, realigning nothing', async () => {
+    setPreference('grid', false);
     const { svg, grabZones } = await setup();
     await pointer(grabZones()[0], 'pointerdown', { button: 0, ...clientAt(svg, 110, 96) });
-    await pointer(svg, 'pointermove', { ...clientAt(svg, 290, 96), altKey: true });
-    // free mode: the raw 180 cm displacement, offsets preserved
-    expect(plan().points.a).toMatchObject({ x: 283, y: 96 });
-    expect(plan().points.b).toMatchObject({ x: 486, y: 96 });
-    // Alt released: realigns off the pointer-down reference, not the endpoint
-    // nearest the current position
     await pointer(svg, 'pointermove', clientAt(svg, 290, 96));
     await pointer(svg, 'pointerup');
-    expect(plan().points.a).toMatchObject({ x: 280, y: 100 });
+    // free move: the raw 180 cm displacement, both offsets preserved
+    expect(plan().points.a).toMatchObject({ x: 283, y: 96 });
+    expect(plan().points.b).toMatchObject({ x: 486, y: 96 });
   });
 });
 

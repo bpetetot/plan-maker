@@ -123,7 +123,6 @@ describe('editing a selected Text', () => {
     load(oneTextPlan());
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
-    await userEvent.click(page.getByLabelText('Snap')); // off: land on the raw delta
 
     await pointer(grab(svg)!, 'pointerdown', { button: 0, ...clientAt(svg, 200, 200) });
     await pointer(svg, 'pointermove', clientAt(svg, 260, 240));
@@ -172,7 +171,6 @@ describe('group move', () => {
     load(wallAndTextPlan());
     const { container, unmount } = await render(<EditorWithHotkeys />);
     const svg = container.querySelector('svg')!;
-    await userEvent.click(page.getByLabelText('Snap')); // free: the shift is the raw delta
     await key('a', { ctrlKey: true }); // wall + text
 
     const before = plan().texts.t;

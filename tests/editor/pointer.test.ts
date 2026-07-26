@@ -1,5 +1,5 @@
 // CONTEXT.md: Intent. The policy of the whole pointer stream — button, Space,
-// Alt, threshold, capture — asserted here without a DOM.
+// the Grid, threshold, capture — asserted here without a DOM.
 import { describe, expect, it } from 'vitest';
 import {
   IDLE,
@@ -18,7 +18,6 @@ const input = (over: Partial<PointerInput> = {}): PointerInput => {
     pointerId: 1,
     button: 0,
     shiftKey: false,
-    altKey: false,
     clientX,
     clientY,
     at: { x: clientX, y: clientY },
@@ -28,7 +27,7 @@ const input = (over: Partial<PointerInput> = {}): PointerInput => {
 
 const ctx = (over: Partial<PointerCtx> = {}): PointerCtx => ({
   space: false,
-  snapEnabled: true,
+  gridVisible: true,
   placementOpen: false,
   textEditing: false,
   ...over,
@@ -148,15 +147,13 @@ describe('a Placement takes the click, second only to the Pan', () => {
     expect(intent).toEqual({ type: 'beginPan', capture: true });
   });
 
-  it('resolves free once, off the event: Alt inverts the snap preference (ADR 0007)', () => {
-    const free = (altKey: boolean, snapEnabled: boolean) => {
-      const [, intent] = down(SHEET, { altKey }, ctx({ placementOpen: true, snapEnabled }));
+  it('resolves free from the Grid alone: hidden is free, shown is snapped (ADR 0035)', () => {
+    const free = (gridVisible: boolean) => {
+      const [, intent] = down(SHEET, {}, ctx({ placementOpen: true, gridVisible }));
       return intent.type === 'placementClick' && intent.free;
     };
-    expect(free(false, true)).toBe(false);
-    expect(free(true, true)).toBe(true);
-    expect(free(false, false)).toBe(true);
-    expect(free(true, false)).toBe(false);
+    expect(free(true)).toBe(false);
+    expect(free(false)).toBe(true);
   });
 
   it('swallows the sheet click while a text editor is open', () => {
@@ -202,10 +199,12 @@ describe('the click threshold — one euclidean predicate', () => {
     expect(g.move(1, 0)).toMatchObject({ type: 'aimGrab', moved: true });
   });
 
-  it('resolves free on every aim, off the event', () => {
-    const g = track(ELEMENT);
-    expect(g.move(10, 0, { altKey: true })).toMatchObject({ type: 'aimGrab', free: true });
-    expect(g.move(12, 0)).toMatchObject({ type: 'aimGrab', free: false });
+  it('resolves free on every aim, from the Grid the gesture runs under', () => {
+    expect(track(ELEMENT, {}, ctx({ gridVisible: false })).move(10, 0)).toMatchObject({
+      type: 'aimGrab',
+      free: true,
+    });
+    expect(track(ELEMENT).move(12, 0)).toMatchObject({ type: 'aimGrab', free: false });
   });
 });
 
@@ -225,9 +224,9 @@ describe('the idle stream', () => {
     expect(state).toBe(IDLE);
   });
 
-  it('aims the open placement instead, free resolved off the event', () => {
-    const [, intent] = routePointerMove(IDLE, input({ altKey: true }), ctx({ placementOpen: true }));
-    expect(intent).toMatchObject({ type: 'aimPlacement', free: true });
+  it('aims the open placement instead, free resolved from the Grid', () => {
+    const c = ctx({ placementOpen: true, gridVisible: false });
+    expect(routePointerMove(IDLE, input(), c)[1]).toMatchObject({ type: 'aimPlacement', free: true });
   });
 
   it('ignores an up or a cancel that ends nothing', () => {

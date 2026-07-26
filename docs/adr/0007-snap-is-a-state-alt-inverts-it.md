@@ -1,5 +1,14 @@
 # Snap is a state, and Alt inverts it
 
+> **Superseded by [ADR 0035](0035-showing-the-grid-is-asking-to-snap-to-it.md)**
+> (2026-07-26) — both theses below are gone. Snap is no longer a state of its
+> own: its alignment target is the Grid, switched by the Grid's own visibility,
+> which is hidden by default. Alt inverts nothing and the `S` key is unassigned.
+> What survives is the storage discipline this ADR chose — a per-device
+> preference, never in the plan, never exported — now carried by the Grid alone.
+> Kept for why the separate state existed, which is what to read before
+> reopening it.
+>
 > **Amended by ADR 0020** — axis snapping has been removed. A Free move now
 > suspends only the grid (the 45° axis lock no longer exists), and the rejected
 > "Free keeps the 45° axis lock" option is moot. The state/inversion mechanic

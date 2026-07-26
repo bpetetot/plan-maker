@@ -1,5 +1,11 @@
 # A preference is an entry in a table
 
+> **Amended by [ADR 0035](0035-showing-the-grid-is-asking-to-snap-to-it.md)**
+> (2026-07-26): the table holds three entries, not four — Snap merged into the
+> Grid — and `boolEntry` takes the default as a parameter, its sentinel being
+> the non-default value. The two consequences below about the Alt inversion and
+> about Snap being readable outside React no longer have a subject.
+
 CONTEXT.md defines **one** Preference — the per-device choices about how the
 editor looks or behaves. The code had four implementations of it. `snapPref.ts`
 and `measurePref.ts` were four lines each, a key and a sentinel; the Grid's key

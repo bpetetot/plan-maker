@@ -24,8 +24,6 @@ export interface PointerInput {
   pointerId: number;
   button: number;
   shiftKey: boolean;
-  /** Off the live event, never a tracked state (ADR 0007). */
-  altKey: boolean;
   clientX: number;
   clientY: number;
   /** The same position in plan coordinates — converted once, by the caller. */
@@ -34,7 +32,7 @@ export interface PointerInput {
 
 export interface PointerCtx {
   space: boolean;
-  snapEnabled: boolean;
+  gridVisible: boolean;
   placementOpen: boolean;
   textEditing: boolean;
 }
@@ -69,9 +67,9 @@ export type PointerIntent =
 
 const NONE: PointerIntent = { type: 'none' };
 
-// Alt inverts the current snap state for the gesture (ADR 0007). Shift is read
-// twice and the two never meet: additive at the press, locked at every aim.
-const isFree = (input: PointerInput, ctx: PointerCtx) => !ctx.snapEnabled !== input.altKey;
+// A hidden Grid is what makes a gesture free (ADR 0035). Shift is read twice
+// and the two never meet: additive at the press, locked at every aim.
+const isFree = (ctx: PointerCtx) => !ctx.gridVisible;
 
 // The click threshold, owned here and nowhere else: euclidean, in screen px,
 // against the down position — a drag never un-moves.
@@ -99,10 +97,7 @@ export function routePointerDown(
   // must not place anything or start a marquee underneath it.
   if (ctx.placementOpen) {
     if (ctx.textEditing) return [state, NONE];
-    return [
-      state,
-      { type: 'placementClick', at: input.at, free: isFree(input, ctx), locked: input.shiftKey },
-    ];
+    return [state, { type: 'placementClick', at: input.at, free: isFree(ctx), locked: input.shiftKey }];
   }
   if (target.kind === 'sheet') {
     if (ctx.textEditing) return [state, NONE];
@@ -130,10 +125,7 @@ export function routePointerMove(
 ): [PointerState, PointerIntent] {
   if (state.phase === 'idle') {
     if (ctx.placementOpen) {
-      return [
-        state,
-        { type: 'aimPlacement', at: input.at, free: isFree(input, ctx), locked: input.shiftKey },
-      ];
+      return [state, { type: 'aimPlacement', at: input.at, free: isFree(ctx), locked: input.shiftKey }];
     }
     return [state, { type: 'hover', at: input.at }];
   }
@@ -157,7 +149,7 @@ export function routePointerMove(
       const moved = state.handle || state.moved || crossed(state.start, input);
       return [
         { ...state, moved },
-        { type: 'aimGrab', at: input.at, free: isFree(input, ctx), locked: input.shiftKey, moved },
+        { type: 'aimGrab', at: input.at, free: isFree(ctx), locked: input.shiftKey, moved },
       ];
     }
   }

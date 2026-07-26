@@ -80,7 +80,7 @@ export interface SessionEnv {
   plan: Plan;
   pxPerCm: number;
   space: boolean;
-  snapEnabled: boolean;
+  gridVisible: boolean;
   measuresVisible: boolean;
 }
 
@@ -442,7 +442,7 @@ function applyPointer(
 
 const pointerCtx = (s: Session, env: SessionEnv) => ({
   space: env.space,
-  snapEnabled: env.snapEnabled,
+  gridVisible: env.gridVisible,
   placementOpen: s.placement !== null,
   // Only a Text box swallows the click: a Room label box coexists with a
   // marquee, which its own blur-commit does not disturb.

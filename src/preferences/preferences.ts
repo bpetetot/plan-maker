@@ -7,7 +7,6 @@ import type { ThemePreference } from '../theme/theme';
 interface Preferences {
   grid: boolean;
   measures: boolean;
-  snap: boolean;
   theme: ThemePreference;
 }
 
@@ -21,20 +20,19 @@ interface Entry<T> {
   encode: (value: T) => string;
 }
 
-// On by default, the off choice stored as a sentinel. `encode` never sees
-// `true`: `persist` removes the key for the fallback instead.
-const boolEntry = (key: string, offSentinel: string): Entry<boolean> => ({
+// The sentinel is the non-default value, so `encode` never sees the fallback:
+// `persist` removes the key for it instead.
+const boolEntry = (key: string, sentinel: string, fallback = true): Entry<boolean> => ({
   key,
-  fallback: true,
-  decode: (raw) => raw !== offSentinel,
-  encode: () => offSentinel,
+  fallback,
+  decode: (raw) => (raw === sentinel ? !fallback : fallback),
+  encode: () => sentinel,
 });
 
 // Keys and sentinels are frozen: a rename silently resets every existing device.
 const TABLE: { [K in Name]: Entry<Preferences[K]> } = {
-  grid: boolEntry('plan-maker:grid', 'hidden'),
+  grid: boolEntry('plan-maker:grid', 'shown', false),
   measures: boolEntry('plan-maker:measures', 'hidden'),
-  snap: boolEntry('plan-maker:snap', 'off'),
   theme: {
     // Also read by the anti-flash inline script in index.html — keep in sync.
     key: 'plan-maker:theme',
@@ -70,7 +68,6 @@ function persist<K extends Name>(name: K, value: Preferences[K]): void {
 const loadAll = (): Preferences => ({
   grid: load('grid'),
   measures: load('measures'),
-  snap: load('snap'),
   theme: load('theme'),
 });
 

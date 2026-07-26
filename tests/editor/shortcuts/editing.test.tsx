@@ -125,14 +125,14 @@ describe('the advertised key is the working key', () => {
     await unmount();
   });
 
-  it('toggles snap by pressing the key named in the toggle title', async () => {
+  it('toggles the grid by pressing the key named in the toggle title', async () => {
     const { container, unmount } = await setup();
-    const snap = container.querySelector('button[aria-label="Snap"]')!;
-    // title reads "Disable snap (S)"
-    const hint = snap.getAttribute('title')!.match(/\(([^)]+)\)/)![1];
-    expect(snap.getAttribute('aria-pressed')).toBe('true');
+    const grid = container.querySelector('button[aria-label="Grid"]')!;
+    // title reads "Show grid (G)"
+    const hint = grid.getAttribute('title')!.match(/\(([^)]+)\)/)![1];
+    expect(grid.getAttribute('aria-pressed')).toBe('false');
     await key(hint);
-    expect(snap.getAttribute('aria-pressed')).toBe('false');
+    expect(grid.getAttribute('aria-pressed')).toBe('true');
     await unmount();
   });
 });
@@ -181,15 +181,15 @@ describe('the typing guard', () => {
     await unmount();
   });
 
-  it('does not toggle snap when S is typed into a room name', async () => {
+  it('does not toggle the grid when G is typed into a room name', async () => {
     const { svg, unmount } = await setup();
-    const snapPressed = () => page.getByLabelText('Snap').element().getAttribute('aria-pressed');
-    expect(snapPressed()).toBe('true');
+    const gridPressed = () => page.getByLabelText('Grid').element().getAttribute('aria-pressed');
+    expect(gridPressed()).toBe('false');
 
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     expect(document.activeElement).toBe(nameInput().element());
-    await key('s');
-    expect(snapPressed()).toBe('true');
+    await key('g');
+    expect(gridPressed()).toBe('false');
     await unmount();
   });
 

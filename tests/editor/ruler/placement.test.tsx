@@ -69,7 +69,6 @@ describe('the Ruler tool places a measured segment', () => {
     usePlanStore.setState({ plan: wallPlan() });
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
-    await userEvent.click(page.getByLabelText('Snap')); // aim the point rung
     await userEvent.click(page.getByLabelText('Ruler'));
 
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 103, 102) });

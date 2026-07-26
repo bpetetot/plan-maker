@@ -41,14 +41,14 @@ const zoomPercent = () => Number(zoomLabel()!.replace('%', ''));
 describe('the view toggles', () => {
   it('G shows and hides the grid', async () => {
     const { container, unmount } = await render(<EditorWithHotkeys />);
-    expect(container.querySelector('svg [data-grid]')).not.toBeNull();
-
-    await key('g');
     expect(container.querySelector('svg [data-grid]')).toBeNull();
-    expect(pressed('Grid')).toBe('false');
 
     await key('g');
+    expect(container.querySelector('svg [data-grid]')).not.toBeNull();
     expect(pressed('Grid')).toBe('true');
+
+    await key('g');
+    expect(pressed('Grid')).toBe('false');
     await unmount();
   });
 
@@ -67,7 +67,7 @@ describe('the view toggles', () => {
   it('leaves the grid alone when the same letter arrives with Mod', async () => {
     const { unmount } = await render(<EditorWithHotkeys />);
     await key('g', { ctrlKey: true });
-    expect(pressed('Grid')).toBe('true');
+    expect(pressed('Grid')).toBe('false');
     await unmount();
   });
 });
@@ -218,7 +218,7 @@ describe('before the app is ready', () => {
     await key('o', { ctrlKey: true });
     await key('g');
     expect(open).not.toHaveBeenCalled();
-    expect(pressed('Grid')).toBe('true');
+    expect(pressed('Grid')).toBe('false');
     await unmount();
   });
 });

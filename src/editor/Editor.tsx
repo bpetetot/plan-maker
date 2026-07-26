@@ -1,13 +1,11 @@
 // Editor UX per spec §4 — variant A "Floating minimal" of the ticket 05 prototype.
 // Render and event forwarding: every session rule lives in session.ts (ADR 0033).
 import { useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import { useKeyHold } from '@tanstack/react-hotkeys';
 import {
   BrickWall,
   DoorClosed,
   Grid2x2,
   Grid3x3,
-  Magnet,
   MousePointer2,
   Redo2,
   Ruler,
@@ -63,12 +61,12 @@ import { useSpaceHeld, useView } from './useView';
 // One line per Placement stage; a missing one is a type error, not a blank hint.
 const placementHint = (stage: PlacementStage): string =>
   ({
-    wall: `Click to start a wall chain · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    wall: 'Click to start a wall chain',
     chaining: `Click to add a wall · click the start point to close the room · Shift locks horizontal or vertical · ${keyHint('cancel')} / double-click to stop`,
     opening: 'Hover a wall, click to place',
-    ruler: `Click to start a measurement · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    ruler: 'Click to start a measurement',
     measuring: `Click to set the end point · Shift locks horizontal or vertical · ${keyHint('cancel')} / right-click cancels`,
-    text: `Click to place text · ${keyHint('toggleSnap')} toggles snap · Alt inverts it`,
+    text: 'Click to place text',
     typing: `Type freely · ${keyHint('cancel')} cancels · Ctrl+Enter or click away commits`,
   })[stage];
 
@@ -79,7 +77,6 @@ export interface EditorCommands {
   selectAll: () => void;
   deleteSelection: () => void;
   selectTool: (tool: Tool) => void;
-  toggleSnap: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fit: () => void;
@@ -93,7 +90,6 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
   selectAll: () => ref.current?.selectAll(),
   deleteSelection: () => ref.current?.deleteSelection(),
   selectTool: (tool: Tool) => ref.current?.selectTool(tool),
-  toggleSnap: () => ref.current?.toggleSnap(),
   zoomIn: () => ref.current?.zoomIn(),
   zoomOut: () => ref.current?.zoomOut(),
   fit: () => ref.current?.fit(),
@@ -113,13 +109,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const canRedo = useStore(usePlanStore.temporal, (st) => st.futureStates.length > 0);
   const gridVisible = usePreferences((st) => st.grid);
   const measuresVisible = usePreferences((st) => st.measures);
-  const snapEnabled = usePreferences((st) => st.snap);
   const space = useSpaceHeld();
-  // Tracked only so the snap toggle re-renders on Alt transitions: every
-  // gesture reads Alt off its own event (ADR 0007, ADR 0030).
-  const altHeld = useKeyHold('Alt');
-  // Alt inverts the current snap state (ADR 0007).
-  const free = !snapEnabled !== altHeld;
 
   const world = (): SessionEnv => ({
     // The store, not the render closure: a transition following a write in the
@@ -127,7 +117,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     plan: usePlanStore.getState().plan,
     pxPerCm: pxPerCm(),
     space,
-    snapEnabled,
+    gridVisible,
     measuresVisible,
   });
 
@@ -168,8 +158,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
       : null;
   const hoveredRoom = hovered && roomWallIds(plan, hovered) ? hovered : null;
 
-  const toggleSnap = () => togglePreference('snap');
-
   // No dependency list: a list naming the session and the camera goes stale the
   // first time someone forgets to extend it.
   useImperativeHandle(commands, () => ({
@@ -177,7 +165,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     selectAll: () => send({ type: 'selectAll' }),
     deleteSelection: () => send({ type: 'deleteSelection' }),
     selectTool: (tool) => send({ type: 'selectTool', tool }),
-    toggleSnap,
     zoomIn: () => zoomCenter(1 / 1.25),
     zoomOut: () => zoomCenter(1.25),
     fit: () => fitPlan(plan),
@@ -191,7 +178,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     pointerId: e.pointerId,
     button: e.button,
     shiftKey: e.shiftKey,
-    altKey: e.altKey,
     clientX: e.clientX,
     clientY: e.clientY,
     at: toPlan(e.clientX, e.clientY),
@@ -519,17 +505,6 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
             <ZoomIn size={16} aria-hidden />
           </button>
           <span className="floating-sep" />
-          {/* Effective state: a click toggles snapping itself, never Alt's
-              inversion. */}
-          <button
-            className={free ? 'floating-btn icon' : 'floating-btn icon active'}
-            title={`${snapEnabled ? 'Disable' : 'Enable'} snap (${keyHint('toggleSnap')})`}
-            aria-label="Snap"
-            aria-pressed={!free}
-            onClick={toggleSnap}
-          >
-            <Magnet size={16} aria-hidden />
-          </button>
           <button
             className={gridVisible ? 'floating-btn icon active' : 'floating-btn icon'}
             title={`${gridVisible ? 'Hide' : 'Show'} grid (${keyHint('toggleGrid')})`}

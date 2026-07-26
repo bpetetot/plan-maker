@@ -94,7 +94,6 @@ describe('editing a selected Ruler', () => {
     load(rulerPlan());
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
-    await userEvent.click(page.getByLabelText('Snap')); // off: land exactly on the aim
 
     const grab = svg.querySelector('.ruler-grab')!;
     await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 250, 150) });
@@ -172,7 +171,6 @@ describe('group move', () => {
     load(wallAndRulerPlan());
     const { container, unmount } = await render(<EditorWithHotkeys />);
     const svg = container.querySelector('svg')!;
-    await userEvent.click(page.getByLabelText('Snap')); // free: the shift is the raw delta
     await key('a', { ctrlKey: true }); // wall + ruler
 
     const before = plan().rulers.r;

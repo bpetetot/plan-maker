@@ -5,6 +5,12 @@
 > progressive healing promised below only holds while Snap is on. Alt is now an
 > inversion of that state, not the sole cause of a Free move — read "non-Alt
 > move" throughout as "snapped move".
+>
+> **Amended again by [ADR 0035](0035-showing-the-grid-is-asking-to-snap-to-it.md)**
+> (2026-07-26): that state is now the Grid's own visibility, hidden by default.
+> The realignment below is mechanically untouched, but it is no longer a promise
+> the model makes — read "snapped move" throughout as "move made under a visible
+> Grid", and expect a plan drawn on the default to never meet one.
 
 The editor promises that everything lands on the 10 cm grid, and group moves
 broke that promise: the delta of a wall-body or multi-selection drag was rounded

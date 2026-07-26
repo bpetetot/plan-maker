@@ -46,7 +46,7 @@ describe('drawing a wall chain with Shift held', () => {
     const { svg } = await setup('2');
     await click(svg, 137, 104, { shiftKey: true });
     await click(svg, 300, 300, { shiftKey: true });
-    expect(spots()).toContainEqual({ x: 140, y: 100 });
+    expect(spots()).toContainEqual({ x: 137, y: 104 });
   });
 });
 

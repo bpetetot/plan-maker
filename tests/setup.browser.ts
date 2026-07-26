@@ -6,12 +6,12 @@ import { blur } from './kit';
 import '../src/styles.css';
 
 // Per-device preferences share one localStorage and one singleton store across
-// every file in the browser worker: a test that toggles Snap off (or Measures)
-// otherwise leaks it into the next file, whose grid-snapping assertions then
-// silently fail. Clear storage, then re-seed the store from those defaults.
+// every file in the browser worker: a test that shows the Grid (or hides
+// Measures) otherwise leaks it into the next file, whose free-placement
+// assertions then silently fail. Clear storage, then re-seed from the defaults.
 afterEach(() => {
   // The held-key tracker is a singleton outliving the tree: a mid-hold test
-  // leaks Alt into the next.
+  // leaks Space into the next.
   blur(window);
   localStorage.clear();
   reloadPreferences();

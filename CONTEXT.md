@@ -408,9 +408,9 @@ and the only thing a Session ever advances on. A click on a tool button names
 its intent outright; the pointer stream is the one source whose events have to
 be *interpreted* into one. There, the button and a held Space pick the gesture —
 panning, selecting, grabbing, placing — whatever sits under the pointer: Space +
-drag Pans from a Point handle exactly as from the sheet. Alt resolves whether
-the move is Free and Shift whether its axis is locked, both read from the event
-itself. One click threshold tells a click
+drag Pans from a Point handle exactly as from the sheet. The Grid's visibility
+resolves whether the move is Free, and Shift — read from the event itself —
+whether its axis is locked. One click threshold tells a click
 from a drag for every gesture alike — a distance travelled on screen, not a box,
 and a drag that returns to its start was still a drag. What was under the
 pointer names the subject; the Intent names the verb, and no gesture re-decides
@@ -434,15 +434,14 @@ _Avoid_: Hit zone, hit target, hover area
 **Snap**:
 The magnetic guidance of any placement or move in the editor:
 positions are drawn to existing points, walls, or the 10 cm grid —
-that ladder governs placing a point. Snap is a state, not a permanent
-behavior: it is on by default and can be turned off for the whole editor —
-a per-device preference like the Grid or the Theme, never part of the plan,
-never exported — and Alt inverts whichever state is current for the duration
-of the gesture, so the same key reaches a Free move from Snap and a snapped
-one from Free. Its rungs are of two natures: the
-connection targets — existing Point, wall body — which decide what the placed
-Point is attached to, and the alignment target — the grid — which only
-decides where it sits; a Free move keeps the first and drops the second. A
+that ladder governs placing a point. Snap is not a state of its own and has no
+toggle: its rungs are of two natures, and only one of them is switchable. The
+connection targets — existing Point, wall body — decide what the placed
+Point is attached to, and are always live. The alignment target — the grid —
+only decides where the Point sits, and exists exactly when the Grid is visible
+(ADR 0035): showing the Grid is asking to snap to it, hiding it is asking not
+to, and the Grid being hidden by default a placement is free until the user
+says otherwise. A Free move keeps the first nature and drops the second. A
 group
 move follows its own rule: it translates rigidly — the group's shape stays
 intact — and the translation is
@@ -475,21 +474,20 @@ plan.
 _Avoid_: Pivot, handle
 
 **Free move**:
-Any placement or move made while Snap is inactive — because Snap is off, or
-because Alt inverts it while Snap is on; the two causes are indistinguishable
-in their effect. Snap's alignment targets are suspended, its connection
-targets are not — a Free move filters the ladder, it never switches it
-off. A free placement is therefore drawn to an existing Point or to a wall's
-body exactly as an ordinary one is, but never to the grid;
+Any placement or move made while the Grid is hidden, which is the default: it
+has one cause and no modifier of its own. Snap's alignment target is suspended,
+its connection targets are not — a Free move filters the ladder, it never
+switches it off. A free placement is therefore drawn to an existing Point or to
+a wall's body exactly as an ordinary one is, but never to the grid;
 away from every connection target only the integer-centimeter rounding remains
 (Points have integer coordinates). Connecting is topology, aligning is
 geometry, and only the second is what a Free move escapes: a wall drawn freely
 still joins the plan instead of landing beside it. A group move, which runs no
 ladder, keeps its own rule: a Free move suspends its realignment — so an
-off-grid group heals on its first snapped move, and never while Snap is off.
-Toggles immediately, both ways, including mid-gesture. Alt leaves the Axis lock
-alone: the two modifiers are independent, and all four of their combinations
-mean something.
+off-grid group realigns only under a visible Grid. Showing or hiding the Grid
+takes effect immediately, both ways, including mid-gesture. It leaves the Axis
+lock alone: alignment to the grid and confinement to a line are independent,
+and all four of their combinations mean something.
 _Avoid_: Free mode, no-grid mode
 
 **Axis lock**:
@@ -530,10 +528,13 @@ _Avoid_: angle lock, 45° lock, ortho mode
 **Grid**:
 The sheet's visible ruling, materializing what Snap aligns to: minor grid
 lines — dashed — every 10 cm, the snap step, and major grid lines — solid —
-every 50 cm. Purely
-visual: showing or hiding it never affects Snap. Always legible, never noise:
+every 50 cm. What it materializes, it attracts: the Grid is Snap's alignment
+target and its switch at once (ADR 0035), so showing it puts placements and
+group moves on the 10 cm step and hiding it takes them off — one concept, one
+button, one key, no modifier. Always legible, never noise:
 minor lines fade out when their cells get too small on screen, major lines
-follow at extreme zoom-out. Shown by default; the show/hide choice is a
+follow at extreme zoom-out. Hidden by default, so a plan is drawn at its real
+measurements until asked otherwise; the show/hide choice is a
 per-device preference, like the Theme — never part of the plan, never
 exported.
 _Avoid_: Sur-grille, sous-grille, overlay, mesh
@@ -593,8 +594,8 @@ _Avoid_: Guide, track
 
 **Preference**:
 A per-device choice about how the editor looks or behaves, as opposed to
-anything the plan says: the visibility of the Grid and of Measures, Snap, the
-Theme. Never part of the plan — never saved with it, never exported, never
+anything the plan says: the visibility of the Grid — which carries its snapping
+with it — and of Measures, and the Theme. Never part of the plan — never saved with it, never exported, never
 carried to another device. Held for the session and remembered in local
 storage, which only makes it outlive a reload: the value the editor reads is
 the session's, so a device whose storage refuses the write still honors the

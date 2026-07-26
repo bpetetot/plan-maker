@@ -14,36 +14,36 @@ beforeEach(() => {
 });
 
 describe('the storage discipline', () => {
+  // The Grid is the one off by default, and it carries the snapping with it
+  // (ADR 0035).
   it('starts every preference at its default when nothing is stored', () => {
     expect(usePreferences.getState()).toEqual({
-      grid: true,
+      grid: false,
       measures: true,
-      snap: true,
       theme: 'system',
     });
   });
 
   it('stores nothing for the default, so an untouched device follows it', () => {
-    togglePreference('snap');
-    togglePreference('snap');
-    expect(localStorage.getItem('plan-maker:snap')).toBeNull();
-    expect(getPreference('snap')).toBe(true);
+    togglePreference('grid');
+    togglePreference('grid');
+    expect(localStorage.getItem('plan-maker:grid')).toBeNull();
+    expect(getPreference('grid')).toBe(false);
   });
 
   it('reads a corrupted stored value as the default', () => {
-    localStorage.setItem('plan-maker:grid', 'garbage');
+    localStorage.setItem('plan-maker:measures', 'garbage');
     localStorage.setItem('plan-maker:theme', 'blue');
     reloadPreferences();
-    expect(getPreference('grid')).toBe(true);
+    expect(getPreference('measures')).toBe(true);
     expect(getPreference('theme')).toBe('system');
   });
 
   it('keeps preferences on distinct keys independent', () => {
     togglePreference('grid');
     reloadPreferences();
-    expect(getPreference('grid')).toBe(false);
+    expect(getPreference('grid')).toBe(true);
     expect(getPreference('measures')).toBe(true);
-    expect(getPreference('snap')).toBe(true);
   });
 
   it('degrades silently when storage refuses the write', () => {
@@ -52,8 +52,8 @@ describe('the storage discipline', () => {
       throw new DOMException('quota');
     };
     try {
-      expect(() => togglePreference('grid')).not.toThrow();
-      expect(getPreference('grid')).toBe(false);
+      expect(() => togglePreference('measures')).not.toThrow();
+      expect(getPreference('measures')).toBe(false);
     } finally {
       Storage.prototype.setItem = setItem;
     }
@@ -80,14 +80,15 @@ describe('the storage discipline', () => {
 
 // Keys and sentinels are frozen: a rename silently resets every existing device.
 describe('the table', () => {
+  // The sentinel is the non-default value, so the two polarities store the
+  // opposite words.
   it.each([
-    ['grid', 'plan-maker:grid', 'hidden'],
-    ['measures', 'plan-maker:measures', 'hidden'],
-    ['snap', 'plan-maker:snap', 'off'],
-  ] as const)('keeps %s on %s / %s', (name, key, sentinel) => {
+    ['grid', 'plan-maker:grid', 'shown', false],
+    ['measures', 'plan-maker:measures', 'hidden', true],
+  ] as const)('keeps %s on %s / %s', (name, key, sentinel, fallback) => {
     togglePreference(name);
     expect(localStorage.getItem(key)).toBe(sentinel);
-    expect(getPreference(name)).toBe(false);
+    expect(getPreference(name)).toBe(!fallback);
     togglePreference(name);
     expect(localStorage.getItem(key)).toBeNull();
   });
@@ -103,12 +104,12 @@ describe('the table', () => {
 describe('reloading', () => {
   it('re-reads every preference from storage, as a fresh load does', () => {
     togglePreference('grid');
-    togglePreference('snap');
+    togglePreference('measures');
     setPreference('theme', 'light');
-    usePreferences.setState({ grid: true, snap: true, theme: 'system' });
+    usePreferences.setState({ grid: false, measures: true, theme: 'system' });
     reloadPreferences();
-    expect(getPreference('grid')).toBe(false);
-    expect(getPreference('snap')).toBe(false);
+    expect(getPreference('grid')).toBe(true);
+    expect(getPreference('measures')).toBe(false);
     expect(getPreference('theme')).toBe('light');
   });
 });

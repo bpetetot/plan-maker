@@ -24,11 +24,10 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear();
 });
 
-// Snap off so clicks land on the exact plan coordinates; point-snapping stays
-// active, so a click on the start vertex still closes the loop.
+// The Grid is hidden by default, so clicks land on the exact plan coordinates;
+// point-snapping stays active, so a click on the start vertex still closes the loop.
 const drawWith = async () => {
   await userEvent.click(page.getByLabelText('Wall'));
-  await userEvent.click(page.getByLabelText('Snap'));
 };
 
 describe('a completed wall chain returns to Select', () => {

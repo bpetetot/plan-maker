@@ -10,7 +10,6 @@ export type ShortcutAction =
   | 'cancel'
   | 'selectAll'
   | 'deleteSelection'
-  | 'toggleSnap'
   | 'toggleGrid'
   | 'toggleMeasures'
   | 'zoomIn'
@@ -75,8 +74,6 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
     name: 'Delete selection',
     sections: { editor: 'Delete the selection' },
   },
-  // Bare S, not Mod+S: that is the browser's Save, and the flip is persisted.
-  toggleSnap: { hotkey: 'S', name: 'Toggle snap', sections: { editor: 'Toggle snap' } },
   toggleGrid: { hotkey: 'G', name: 'Toggle grid', sections: { view: 'Show or hide the grid' } },
   toggleMeasures: {
     hotkey: 'M',
@@ -133,7 +130,6 @@ const GESTURES: { gesture: string; sections: HelpLabels; after?: ShortcutAction 
     sections: { editor: 'Slide it along its own wall or measurement' },
   },
   { gesture: 'Double-click', sections: { editor: 'Name a room, or end the wall chain' } },
-  { gesture: 'Alt', sections: { editor: 'Invert snap while held' } },
   { gesture: 'Ctrl/Cmd + scroll', sections: { view: 'Zoom in and out' }, after: 'zoomOut' },
   { gesture: 'Scroll', sections: { view: 'Pan the view top-down' } },
   { gesture: 'Shift + scroll', sections: { view: 'Pan the view sideways' } },

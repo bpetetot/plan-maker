@@ -12,7 +12,7 @@ const env = (over: Partial<SessionEnv> = {}): SessionEnv => ({
   plan: emptyPlan(),
   pxPerCm: 1,
   space: false,
-  snapEnabled: true,
+  gridVisible: true,
   measuresVisible: true,
   ...over,
 });
@@ -21,7 +21,6 @@ const input = (x = 0, y = 0, over: Partial<PointerInput> = {}): PointerInput => 
   pointerId: 1,
   button: 0,
   shiftKey: false,
-  altKey: false,
   clientX: x,
   clientY: y,
   at: { x, y },

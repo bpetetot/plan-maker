@@ -7,6 +7,7 @@ import { usePlanStore } from '../../../src/store/planStore';
 import Editor from '../../../src/editor/Editor';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, key, mouse, pointer } from '../../kit';
+import { setPreference } from '../../../src/preferences/preferences';
 
 beforeEach(() => {
   localStorage.clear();
@@ -114,7 +115,8 @@ describe('placing a Text', () => {
     expect(texts()[0].content).toBe('a\nb');
   });
 
-  it('snaps the placement to the grid (snap is on by default)', async () => {
+  it('snaps the placement to the grid once the grid is shown', async () => {
+    setPreference('grid', true);
     const { svg } = await setup();
     await placeAt(svg, 137, 143);
     await userEvent.type(editor()!, 'x');
@@ -122,9 +124,9 @@ describe('placing a Text', () => {
     expect(texts()[0]).toMatchObject({ x: 140, y: 140 });
   });
 
-  it('honors Alt to place freely, off the grid', async () => {
+  it('places freely off the grid, which is the default', async () => {
     const { svg } = await setup();
-    await placeAt(svg, 137, 143, { altKey: true });
+    await placeAt(svg, 137, 143);
     await userEvent.type(editor()!, 'x');
     await clickAway();
     expect(texts()[0]).toMatchObject({ x: 137, y: 143 });
