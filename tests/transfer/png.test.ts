@@ -172,6 +172,7 @@ describe('buildExportSvg', () => {
     expect(drawn).not.toContain('room-fill');
     expect(drawn).not.toContain('placement-chip');
     expect(drawn).not.toContain('point-handle');
+    expect(drawn).not.toContain('alignment-guide');
   });
 
   // Free-standing 1,20 m wall: extent -5..125, a 6-character plate 40 wide at

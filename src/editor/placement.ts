@@ -1,6 +1,6 @@
 // CONTEXT.md: Placement, as a value (ADR 0025). Pure — no React, no store —
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
-import type { Vec } from '../model/geometry';
+import type { Rect, Vec } from '../model/geometry';
 import type { AxisLock } from '../model/axisLock';
 import { axisLock, WORLD_AXES } from '../model/axisLock';
 import { nearestWall } from '../model/geometry';
@@ -13,7 +13,7 @@ import { snapPoint } from '../model/snap';
 import type { Cm, Opening, Plan, TextSize } from '../model/types';
 import { GRID, WALL_THICKNESS } from '../model/types';
 import { wallsAlongPath } from '../model/walls';
-import { snapTolerance } from './gesture';
+import { guideTolerance, snapTolerance } from './gesture';
 import type { Tool, ToolDefaults } from './tools';
 
 // Every Tool but Select, which poses nothing.
@@ -43,6 +43,9 @@ interface PlacementEnv {
   free: boolean;
   // Shift, read the same way. The three tools with no anchor ignore it.
   locked: boolean;
+  // What the viewport shows: a guide whose source Point is off screen cannot
+  // be explained (ADR 0037).
+  view: Rect;
   defaults: ToolDefaults;
 }
 
@@ -95,6 +98,16 @@ const anchorOf = (p: Placement, plan: Plan): Vec | null => {
   return p.tool === 'ruler' ? p.a : null;
 };
 
+// The anchor's Point, when the anchor has one: the Axis lock owns the
+// gesture's own origin, the Alignment guide owns every other Point (ADR 0037).
+const originOf = (p: Placement): string | undefined => {
+  if (p.tool === 'wall') {
+    if (!p.chain) return undefined;
+    return 'pending' in p.chain ? p.chain.pending.pointId : p.chain.last;
+  }
+  return p.tool === 'ruler' ? p.a?.pointId : undefined;
+};
+
 // The aimed position and the line that constrained it, together: re-deriving
 // the second at the render is the one way it could disagree (ADR 0036).
 const aimPoint = (
@@ -107,6 +120,9 @@ const aimPoint = (
   return {
     snap: snapPoint(plan, at.x, at.y, {
       tolerance: snapTolerance(env.pxPerCm),
+      guideTolerance: guideTolerance(env.pxPerCm),
+      origin: originOf(p),
+      viewport: env.view,
       walls: true,
       free: env.free,
       lock,

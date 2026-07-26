@@ -29,6 +29,9 @@
   --grid-major: rgba(100, 116, 139, 0.26);
 
   /* chrome */
+  /* the Debug mode's own ink: the snap green is spent on the Alignment guide,
+     which the user reads (ADR 0037) */
+  --debug: #7c3aed;
   --text: #222;
   --text-muted: #777;
   --text-faint: #999;

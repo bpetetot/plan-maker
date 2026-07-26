@@ -1,6 +1,6 @@
 // CONTEXT.md: Session, and the pure transitions between two of them (ADR 0033).
 // No React, no DOM, no store: every write is declared, never performed.
-import type { Vec } from '../model/geometry';
+import type { Rect, Vec } from '../model/geometry';
 import type { AxisLock } from '../model/axisLock';
 import { WORLD_AXES } from '../model/axisLock';
 import { projectOnWall } from '../model/geometry';
@@ -19,6 +19,7 @@ import {
   selectionForRoom,
   toggleRef,
 } from '../model/selection';
+import type { Snap } from '../model/snap';
 import type { Plan, RoomLabel } from '../model/types';
 import { wallAxesAt } from '../model/walls';
 import type { RoomTextBlock } from '../sheet/rooms';
@@ -76,10 +77,13 @@ export const initialSession: Session = {
 };
 
 /** Everything a transition reads of the world outside the Session: the plan it
- *  acts on, the camera scale, the two Preferences a gesture consults. */
+ *  acts on, the camera, the two Preferences a gesture consults. */
 export interface SessionEnv {
   plan: Plan;
   pxPerCm: number;
+  /** What the viewport shows, in plan coordinates: an aim asks it which Points
+   *  may offer an Alignment guide (ADR 0037). */
+  view: Rect;
   space: boolean;
   gridVisible: boolean;
   measuresVisible: boolean;
@@ -132,6 +136,7 @@ const placementEnv = (s: Session, env: SessionEnv, free: boolean, locked: boolea
   pxPerCm: env.pxPerCm,
   free,
   locked,
+  view: env.view,
   defaults: s.defaults,
 });
 
@@ -372,6 +377,7 @@ function applyPointer(
         free: intent.free,
         locked: intent.locked,
         moved: intent.moved,
+        view: env.view,
       });
       return {
         session: { ...base, drag: { ...g, g: next } },
@@ -567,6 +573,12 @@ export function movingOpeningId(s: Session): string | null {
   const g = s.drag;
   if (g?.kind !== 'plan') return null;
   return g.g.spec.kind === 'opening' && g.g.moved ? g.g.spec.id : null;
+}
+
+/** The aimed position a Plan drag holds — a placement's own comes through its
+ *  chrome, and re-reading it here would give the guides a second source. */
+export function dragSnap(s: Session): Snap | null {
+  return s.drag?.kind === 'plan' ? s.drag.g.snap : null;
 }
 
 /** CONTEXT.md: Axis lock — the line the gesture under way resolved at its last

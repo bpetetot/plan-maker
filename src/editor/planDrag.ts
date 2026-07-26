@@ -2,7 +2,7 @@
 // Pure: no React, no store. The Editor advances it and mirrors what it renders.
 import type { AxisLock } from '../model/axisLock';
 import { axisLock, lockAim } from '../model/axisLock';
-import type { Vec } from '../model/geometry';
+import type { Rect, Vec } from '../model/geometry';
 import { projectOnWall, wallLength, wallSide } from '../model/geometry';
 import { moveOpening } from '../model/openings';
 import { settleEdit } from '../model/settle';
@@ -17,7 +17,7 @@ import { movedPointIds, selectionForRoom, translateElements } from '../model/sel
 import { DIM_FONT_PX, railedDimT } from '../model/rail';
 import type { Plan } from '../model/types';
 import { movePoint, setDimPlacement } from '../model/walls';
-import { snapTolerance } from './gesture';
+import { guideTolerance, snapTolerance } from './gesture';
 
 export type PlanDragSpec =
   // `grabDelta` fixes the grab point so the handle never recenters on the cursor;
@@ -85,6 +85,9 @@ export interface AimEnv {
   locked: boolean;
   /** The click-vs-drag verdict, owned by the pointer router (ADR 0030). */
   moved: boolean;
+  /** What the viewport shows: a guide whose source Point is off screen cannot
+   *  be explained (ADR 0037). */
+  view: Rect;
 }
 
 export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
@@ -94,6 +97,9 @@ export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
 export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const spec = drag.spec;
   const tolerance = snapTolerance(env.pxPerCm);
+  // No `origin` (ADR 0037): a Point drag already excludes itself, and a Ruler's
+  // endpoint is not a Point of the plan at all.
+  const guides = { guideTolerance: guideTolerance(env.pxPerCm), viewport: env.view };
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
   // A block's aim, brought onto its axis: `label` and `newLabel` share it.
   const aimed = (s: { grabDelta: Vec; origin: Vec; axes: Vec[] }) => {
@@ -113,6 +119,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       const lock = axisLock(spec.origin, p, spec.axes, env.locked);
       const snap = snapPoint(drag.plan, p.x, p.y, {
         tolerance,
+        ...guides,
         exclude: new Set([spec.id]),
         free: env.free,
         lock,
@@ -174,7 +181,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       if (!drag.plan.rulers[spec.id]) return drag;
       const p = grabbed(spec.grabDelta);
       const lock = axisLock(spec.origin, p, spec.axes, env.locked);
-      const snap = snapPoint(drag.plan, p.x, p.y, { tolerance, walls: true, free: env.free, lock });
+      const snap = snapPoint(drag.plan, p.x, p.y, { tolerance, ...guides, walls: true, free: env.free, lock });
       const plan = moveRulerEndpoint(drag.plan, spec.id, spec.end, snap.x, snap.y);
       return { ...drag, plan, snap, lock, moved };
     }

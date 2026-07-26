@@ -18,8 +18,10 @@ import {
 } from '../../../src/editor/placement';
 import { initialToolDefaults } from '../../../src/editor/tools';
 
-// pxPerCm 1 puts the snap tolerance at 14 cm and the mis-click reach at 1 cm.
-const ENV = { pxPerCm: 1, free: false, locked: false, defaults: initialToolDefaults() };
+// pxPerCm 1 puts the snap tolerance at 14 cm, the guide reach at 4 and the
+// mis-click reach at 1. The view holds every fixture below.
+const WIDE = { x: -1000, y: -1000, w: 3000, h: 3000 };
+const ENV = { pxPerCm: 1, free: false, locked: false, defaults: initialToolDefaults(), view: WIDE };
 const FREE = { ...ENV, free: true };
 const at = (x: number, y: number) => ({ x, y });
 
@@ -336,5 +338,68 @@ describe('a text', () => {
     const typing = stroke(beginPlacement('text'), emptyPlan(), 137, 143).placement;
     const still = aimPlacement(typing, emptyPlan(), at(300, 300), ENV);
     expect(placementChrome(still, emptyPlan(), ENV.defaults).snap).toBeNull();
+  });
+});
+
+// CONTEXT.md: Alignment guide. The gain is the gesture the Axis lock cannot
+// serve — one aimed in open space, with no origin of its own.
+describe('the guides a placement discovers', () => {
+  // Far from every other rung: a lone Point offering its row and its column.
+  const distant = () =>
+    buildPlan((b) => {
+      b.point(700, 300);
+    });
+
+  it('catches a distant Point’s row while a wall is drawn in open space', () => {
+    const plan = distant();
+    const chain = stroke(beginPlacement('wall'), plan, 100, 100).placement;
+    const aimed = aimPlacement(chain, plan, at(400, 302), ENV);
+    const snap = placementChrome(aimed, plan, ENV.defaults).snap!;
+    expect(snap).toMatchObject({ x: 400, y: 300, kind: 'alignment' });
+    expect(snap.guides).toEqual([{ pointId: Object.keys(plan.points)[0], held: 'y', at: 300 }]);
+  });
+
+  // The load-bearing one: catch the anchor's own row and the feature is the
+  // automatic axis snapping ADR 0020 removed.
+  it('never catches the Drawing anchor’s own row', () => {
+    const plan = buildPlan((b) => {
+      b.point(100, 100);
+    });
+    const chain = stroke(beginPlacement('wall'), plan, 100, 100).placement;
+    const aimed = aimPlacement(chain, plan, at(400, 103), FREE);
+    expect(placementChrome(aimed, plan, ENV.defaults).snap).toMatchObject({ y: 103, kind: 'free' });
+  });
+
+  it('catches that very row when a foreign Point offers it', () => {
+    const plan = buildPlan((b) => {
+      b.point(100, 100);
+      b.point(700, 100);
+    });
+    const chain = stroke(beginPlacement('wall'), plan, 100, 100).placement;
+    const aimed = aimPlacement(chain, plan, at(400, 103), FREE);
+    expect(placementChrome(aimed, plan, ENV.defaults).snap).toMatchObject({ y: 100, kind: 'alignment' });
+  });
+
+  it('offers nothing from a Point the viewport does not show', () => {
+    const plan = distant();
+    const narrow = { ...ENV, view: { x: 0, y: 0, w: 500, h: 500 } };
+    const chain = stroke(beginPlacement('wall'), plan, 100, 100, narrow).placement;
+    const aimed = aimPlacement(chain, plan, at(400, 302), narrow);
+    expect(placementChrome(aimed, plan, ENV.defaults).snap).toMatchObject({ y: 300, kind: 'grid' });
+  });
+
+  it('serves a Ruler’s A, which has no origin at all', () => {
+    const plan = distant();
+    const aimed = aimPlacement(beginPlacement('ruler'), plan, at(400, 302), ENV);
+    expect(placementChrome(aimed, plan, ENV.defaults).snap).toMatchObject({ y: 300, kind: 'alignment' });
+  });
+
+  it('excludes a Ruler’s A once it is posed on a Point', () => {
+    const plan = buildPlan((b) => {
+      b.point(100, 100);
+    });
+    const started = stroke(beginPlacement('ruler'), plan, 100, 100).placement;
+    const aimed = aimPlacement(started, plan, at(400, 103), FREE);
+    expect(placementChrome(aimed, plan, ENV.defaults).snap).toMatchObject({ y: 103, kind: 'free' });
   });
 });

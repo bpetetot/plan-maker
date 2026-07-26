@@ -255,6 +255,60 @@ export function SnapMarker({ snap, pxPerCm }: { snap: Snap | null; pxPerCm: numb
   );
 }
 
+// Screen px, settled on a bench at 1:1 (ADR 0037): a hairline segment, and a
+// square small enough to name a Point without covering it.
+const GUIDE_PX = 1.25;
+const SOURCE_PX = 3.4;
+
+/** CONTEXT.md: Alignment guide — a bounded segment from the source Point to
+ *  the aim, plus a square naming the source. Draws the value, never re-derives
+ *  it (ADR 0036); a crossing is two of them and nothing more. */
+export function AlignmentGuides({
+  snap,
+  plan,
+  pxPerCm,
+}: {
+  snap: Snap | null;
+  plan: Plan;
+  pxPerCm: number;
+}) {
+  if (!snap?.guides) return null;
+  const r = SOURCE_PX / pxPerCm;
+  return (
+    <g pointerEvents="none">
+      {snap.guides.map((guide) => {
+        // A guide whose Point vanished mid-gesture: the next aim drops it.
+        const source = plan.points[guide.pointId];
+        if (!source) return null;
+        return (
+          <g key={`${guide.held}:${guide.pointId}`}>
+            <line
+              className="alignment-guide"
+              x1={source.x}
+              y1={source.y}
+              x2={snap.x}
+              y2={snap.y}
+              stroke={COLORS.snap}
+              strokeWidth={GUIDE_PX}
+              vectorEffect="non-scaling-stroke"
+            />
+            <rect
+              x={source.x - r}
+              y={source.y - r}
+              width={2 * r}
+              height={2 * r}
+              fill="var(--sheet)"
+              stroke={COLORS.snap}
+              strokeWidth={1.6}
+              vectorEffect="non-scaling-stroke"
+            />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 // Screen px: the ring (RING_PX, shared with the snap marker) stays small and
 // constant at every zoom, while a wider invisible disc catches the pointer.
 const HANDLE_GRAB_PX = 14;

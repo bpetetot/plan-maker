@@ -6,6 +6,7 @@ import { emptyPlan } from '../../src/model/types';
 import type { Plan } from '../../src/model/types';
 import { usePlanStore } from '../../src/store/planStore';
 import { reloadPreferences, setPreference } from '../../src/preferences/preferences';
+import { COLORS } from '../../src/sheet/paint';
 import { EditorWithHotkeys } from '../harness';
 import { clientAt, key, pointer } from '../kit';
 
@@ -96,6 +97,18 @@ describe('with the mode on', () => {
     // through the grab, which for a handle is the Point's own position
     expect(drawn.offsetTo({ x: 400, y: 400 })).toBeCloseTo(0, 6);
     await pointer(svg, 'pointerup');
+  });
+
+  // The snap ink is spent on the Alignment guide the user reads, so the
+  // developer's hairline takes one of its own (ADR 0037).
+  it('draws its hairline in an ink of its own, not the snap green', async () => {
+    const { svg } = await setup();
+    await key('2');
+    await click(svg, 100, 100);
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 300, 130) });
+    const stroke = svg.querySelector('[data-debug="axis-lock"]')!.getAttribute('stroke');
+    expect(stroke).toBe('var(--debug)');
+    expect(stroke).not.toBe(COLORS.snap);
   });
 
   it('draws the world axis a wall chain elected, through its anchor', async () => {

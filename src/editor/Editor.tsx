@@ -32,12 +32,13 @@ import type { PointerInput, PointerTarget } from './pointer';
 import { placementChrome, placementStage } from './placement';
 import type { PlacementStage } from './placement';
 import type { Session, SessionEnv } from './session';
-import { gestureLock, initialSession, movingOpeningId, reshapingDrag } from './session';
+import { dragSnap, gestureLock, initialSession, movingOpeningId, reshapingDrag } from './session';
 import { useSession } from './useSession';
 import { togglePreference, usePreferences } from '../preferences/preferences';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { ToolPanel } from './ToolPanel';
 import {
+  AlignmentGuides,
   Handle,
   OpeningGrabZone,
   PlacementDims,
@@ -118,6 +119,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     // same handler must see what that write produced.
     plan: usePlanStore.getState().plan,
     pxPerCm: pxPerCm(),
+    view,
     space,
     gridVisible,
     measuresVisible,
@@ -413,6 +415,9 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         {chrome?.rulerGhost && (
           <RulerLabel ruler={{ id: '__ghost', ...chrome.rulerGhost, t: 0.5 }} fontPx={DIM_FONT_PX} />
         )}
+        {/* Under the marker, and drawn for a drag as much as for a placement:
+            an alignment you discovered has to say so (ADR 0037) */}
+        <AlignmentGuides snap={chrome?.snap ?? dragSnap(s)} plan={plan} pxPerCm={zoomScale} />
         <SnapMarker snap={chrome?.snap ?? null} pxPerCm={zoomScale} />
         {/* Over the sheet and its chrome both, or the very wall it holds
             straight would hide it (CONTEXT.md: Debug mode) */}

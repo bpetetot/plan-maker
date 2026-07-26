@@ -27,6 +27,7 @@
   --grid-minor: rgba(148, 163, 184, 0.09);
   --grid-major: rgba(148, 163, 184, 0.19);
 
+  --debug: #a78bfa;
   --text: #e5e7eb;
   --text-muted: #9ca3af;
   --text-faint: #6b7280;

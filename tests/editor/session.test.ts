@@ -11,6 +11,9 @@ import { buildPlan } from '../helpers';
 const env = (over: Partial<SessionEnv> = {}): SessionEnv => ({
   plan: emptyPlan(),
   pxPerCm: 1,
+  // Wide enough to show every fixture here: the viewport only ever narrows
+  // which Points may offer an Alignment guide.
+  view: { x: -1000, y: -1000, w: 3000, h: 3000 },
   space: false,
   gridVisible: true,
   measuresVisible: true,

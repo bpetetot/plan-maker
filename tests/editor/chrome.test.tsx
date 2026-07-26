@@ -3,7 +3,7 @@ import { cleanup, render } from 'vitest-browser-react';
 import type { Snap } from '../../src/model/snap';
 import { buildPlan, oneWallPlan } from '../helpers';
 import { COLORS } from '../../src/sheet/paint';
-import { OpeningGrabZone, RubberWall, SnapMarker, WallGrabZone } from '../../src/editor/chrome';
+import { AlignmentGuides, OpeningGrabZone, RubberWall, SnapMarker, WallGrabZone } from '../../src/editor/chrome';
 
 describe('Grab zones', () => {
   // Body plus a constant 2 screen px per side (CONTEXT.md: Grab zone).
@@ -112,6 +112,64 @@ describe('SnapMarker', () => {
       (el) => el.getAttribute('fill') === COLORS.snap,
     )!;
     expect(dot.getAttribute('r')).toBe('2.6');
+  });
+});
+
+describe('AlignmentGuides', () => {
+  // Two Points far apart: one lends its column, the other its row.
+  const plan = buildPlan((b) => {
+    b.point(100, 900);
+    b.point(900, 100);
+  });
+  const [column, row] = Object.keys(plan.points);
+
+  const renderGuides = async (snap: Snap, pxPerCm = 1) => {
+    const { container } = await render(
+      <svg>
+        <AlignmentGuides snap={snap} plan={plan} pxPerCm={pxPerCm} />
+      </svg>,
+    );
+    return container;
+  };
+
+  const aligned = (guides: Snap['guides']): Snap => ({ x: 100, y: 100, kind: 'alignment', guides });
+
+  it('draws nothing for a snap that rides no guide', async () => {
+    const c = await renderGuides({ x: 100, y: 100, kind: 'grid' });
+    expect(c.querySelector('line')).toBeNull();
+  });
+
+  it('bounds the segment between the source Point and the aim', async () => {
+    const c = await renderGuides(aligned([{ pointId: column, held: 'x', at: 100 }]));
+    const line = c.querySelector('line.alignment-guide')!;
+    expect(['x1', 'y1', 'x2', 'y2'].map((a) => line.getAttribute(a))).toEqual(['100', '900', '100', '100']);
+    expect(line.getAttribute('stroke')).toBe(COLORS.snap);
+    expect(line.getAttribute('vector-effect')).toBe('non-scaling-stroke');
+  });
+
+  it('names the source with a small sheet-filled square', async () => {
+    const c = await renderGuides(aligned([{ pointId: column, held: 'x', at: 100 }]));
+    const square = c.querySelector('rect')!;
+    expect(square.getAttribute('fill')).toBe('var(--sheet)');
+    expect(square.getAttribute('stroke')).toBe(COLORS.snap);
+    // centred on the source Point, 3.4 screen px each way
+    expect([square.getAttribute('x'), square.getAttribute('y')]).toEqual(['96.6', '896.6']);
+  });
+
+  it('holds the square at a constant on-screen size', async () => {
+    const c = await renderGuides(aligned([{ pointId: column, held: 'x', at: 100 }]), 2);
+    expect(c.querySelector('rect')!.getAttribute('width')).toBe('3.4');
+  });
+
+  it('draws one segment per live guide, and nothing extra at the crossing', async () => {
+    const c = await renderGuides(
+      aligned([
+        { pointId: column, held: 'x', at: 100 },
+        { pointId: row, held: 'y', at: 100 },
+      ]),
+    );
+    expect(c.querySelectorAll('line.alignment-guide')).toHaveLength(2);
+    expect(c.querySelectorAll('rect')).toHaveLength(2);
   });
 });
 

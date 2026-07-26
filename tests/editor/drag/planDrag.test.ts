@@ -12,11 +12,13 @@ import type { Plan } from '../../../src/model/types';
 import { WORLD_AXES } from '../../../src/model/axisLock';
 import { aimPlanDrag, beginPlanDrag, commitPlanDrag } from '../../../src/editor/planDrag';
 
-// pxPerCm 1 puts the snap tolerance at 14 cm. The click-vs-drag verdict comes
-// with the env: the pointer router owns the threshold (ADR 0030).
-const AIM = { pxPerCm: 1, free: false, locked: false, moved: true };
-const FREE = { pxPerCm: 1, free: true, locked: false, moved: true };
-const CLICK = { pxPerCm: 1, free: false, locked: false, moved: false };
+// pxPerCm 1 puts the snap tolerance at 14 cm and the guide reach at 4. The
+// click-vs-drag verdict comes with the env: the pointer router owns the
+// threshold (ADR 0030); the view holds every fixture below.
+const WIDE = { x: -1000, y: -1000, w: 3000, h: 3000 };
+const AIM = { pxPerCm: 1, free: false, locked: false, moved: true, view: WIDE };
+const FREE = { pxPerCm: 1, free: true, locked: false, moved: true, view: WIDE };
+const CLICK = { pxPerCm: 1, free: false, locked: false, moved: false, view: WIDE };
 
 const wallPlan = () => {
   let ids = { a: '', b: '', wall: '' };
@@ -39,10 +41,11 @@ describe('a point drag', () => {
     const { plan, a } = wallPlan();
     const drag = aimPlanDrag(
       beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0), axes: HORIZONTAL }),
-      at(37, 4),
+      // Clear of the wall's other end at y=0, whose row would offer a guide
+      at(37, 24),
       AIM,
     );
-    expect(drag.plan.points[a]).toMatchObject({ x: 40, y: 0 });
+    expect(drag.plan.points[a]).toMatchObject({ x: 40, y: 20 });
     expect(drag.snap).toMatchObject({ kind: 'grid' });
   });
 
@@ -50,10 +53,10 @@ describe('a point drag', () => {
     const { plan, a } = wallPlan();
     const drag = aimPlanDrag(
       beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0), axes: HORIZONTAL }),
-      at(37, 4),
+      at(37.4, 23.6),
       FREE,
     );
-    expect(drag.plan.points[a]).toMatchObject({ x: 37, y: 4 });
+    expect(drag.plan.points[a]).toMatchObject({ x: 37, y: 24 });
     expect(drag.snap).toMatchObject({ kind: 'free' });
   });
 
@@ -389,5 +392,67 @@ describe('a new-label drag', () => {
     expect(Object.values(drag.plan.roomLabels)).toEqual([
       expect.objectContaining({ name: '', x: 250, y: 260, placed: true }),
     ]);
+  });
+});
+
+// CONTEXT.md: Alignment guide, on the two drags that run the ladder.
+describe('the guides a drag discovers', () => {
+  // The dragged wall, plus a second one far enough that only its rows and its
+  // columns are ever in reach.
+  const twoWalls = () => {
+    let ids = { a: '', b: '', far: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 90);
+      const p3 = b.point(600, 300);
+      const p4 = b.point(600, 700);
+      b.wall(p1, p2);
+      b.wall(p3, p4);
+      ids = { a: p1.id, b: p2.id, far: p3.id };
+    });
+    return { plan, ...ids };
+  };
+
+  it('lands a dragged Point on a foreign Point’s row', () => {
+    const { plan, a, far } = twoWalls();
+    const drag = aimPlanDrag(
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0), axes: HORIZONTAL }),
+      at(200, 298),
+      AIM,
+    );
+    expect(drag.plan.points[a]).toMatchObject({ x: 200, y: 300 });
+    expect(drag.snap).toMatchObject({ kind: 'alignment', guides: [{ pointId: far, held: 'y', at: 300 }] });
+  });
+
+  it('never takes the row the dragged Point started on', () => {
+    const { plan, a } = twoWalls();
+    const drag = aimPlanDrag(
+      beginPlanDrag(plan, { kind: 'point', id: a, grabDelta: at(0, 0), origin: at(0, 0), axes: HORIZONTAL }),
+      at(200, 2.4),
+      FREE,
+    );
+    expect(drag.plan.points[a]).toMatchObject({ x: 200, y: 2 });
+    expect(drag.snap).toMatchObject({ kind: 'free' });
+  });
+
+  it('serves a Ruler endpoint too', () => {
+    const { plan } = twoWalls();
+    const [withRuler, id] = addRuler(plan, at(0, 700), at(200, 700));
+    const drag = aimPlanDrag(
+      beginPlanDrag(withRuler, {
+        kind: 'rulerEnd',
+        id,
+        end: 'b',
+        grabDelta: at(0, 0),
+        origin: at(200, 700),
+        axes: HORIZONTAL,
+      }),
+      // Past the far wall's end, so the wall rung has nothing to catch
+      at(598, 900),
+      AIM,
+    );
+    expect(drag.plan.rulers[id].b).toMatchObject({ x: 600, y: 900 });
+    // The far wall's own column, offered by whichever of its two ends is nearer
+    expect(drag.snap).toMatchObject({ kind: 'alignment', guides: [{ held: 'x', at: 600 }] });
   });
 });
