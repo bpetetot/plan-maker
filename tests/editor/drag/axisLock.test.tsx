@@ -45,9 +45,8 @@ const roomPlan = (labeled: boolean): Plan => ({
   roomLabels: labeled ? { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } } : {},
 });
 
-// An L: the band y ∈ [0,300] over x ∈ [0,600], plus the band x ∈ [0,300] down
-// to y = 600. Its re-entrant corner sits at (300,300), and the label starts in
-// the leg below it.
+// An L: the band y ∈ [0,300] over x ∈ [0,600], plus x ∈ [0,300] down to y = 600.
+// Its re-entrant corner sits at (300,300); the label starts in the leg below it.
 const lShapedRoom = (): Plan =>
   buildPlan((b) => {
     const p1 = b.point(0, 0);
@@ -186,6 +185,18 @@ describe('a Ruler endpoint under a held Shift', () => {
     // locking against A would have read y = 100
     expect(plan().rulers.r1.b).toMatchObject({ x: 400, y: 300 });
   });
+
+  it('holds its own x on the other axis', async () => {
+    const { svg } = await setup(rulerPlan());
+    const grab = svg.querySelector('.ruler-grab')!;
+    await pointer(grab, 'pointerdown', { button: 0, ...clientAt(svg, 200, 200) });
+    await pointer(svg, 'pointerup');
+    const [, b] = svg.querySelectorAll('.point-handle');
+    await pointer(b, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 330, 500) });
+    await pointer(svg, 'pointerup');
+    expect(plan().rulers.r1.b).toMatchObject({ x: 300, y: 500 });
+  });
 });
 
 describe('a room label under a held Shift', () => {
@@ -198,14 +209,25 @@ describe('a room label under a held Shift', () => {
     expect(plan().roomLabels.l1).toMatchObject({ x: 400, y: 300 });
   });
 
-  it('locks a label born of the gesture too', async () => {
+  it('holds the block’s x on the other axis', async () => {
+    const { container, svg } = await setup(roomPlan(true));
+    const hit = container.querySelector('rect.room-name-hit')!;
+    await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 350, 400) });
+    await pointer(svg, 'pointerup');
+    expect(plan().roomLabels.l1).toMatchObject({ x: 300, y: 400 });
+  });
+
+  it('locks a label born of the gesture too, on either axis', async () => {
     const { container, svg } = await setup(roomPlan(false));
     const hit = container.querySelector('rect.room-area-hit')!;
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 400, 350) });
+    const born = () => Object.values(plan().roomLabels)[0];
+    expect(born()).toMatchObject({ x: 400, y: 300 });
+    await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 350, 400) });
     await pointer(svg, 'pointerup');
-    const born = Object.values(plan().roomLabels)[0];
-    expect(born).toMatchObject({ x: 400, y: 300 });
+    expect(born()).toMatchObject({ x: 300, y: 400 });
   });
 
   // The Room is an invariant, and an invariant outranks the lock: it does not

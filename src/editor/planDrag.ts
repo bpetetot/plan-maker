@@ -88,7 +88,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const spec = drag.spec;
   const tolerance = snapTolerance(env.pxPerCm);
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
-  // A block's aim, brought onto its axis: the two label arms share it.
+  // A block's aim, brought onto its axis: `label` and `newLabel` share it.
   const aimed = (s: { grabDelta: Vec; origin: Vec }) => {
     const target = grabbed(s.grabDelta);
     return lockAim(axisLock(s.origin, target, env.locked), target);
@@ -104,8 +104,8 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
         tolerance,
         exclude: new Set([spec.id]),
         free: env.free,
-        // Resolved per arm, on the arm's own aimed position: the raw pointer
-        // would offset it by `grabDelta` and could flip the axis near 45°.
+        // Against the Point's own aimed position, not the raw pointer: that one
+        // is offset by `grabDelta`, and could flip the axis near 45°.
         lock: axisLock(spec.origin, p, env.locked),
       });
       return { ...drag, plan: movePoint(drag.plan, spec.id, snap.x, snap.y), snap, moved };

@@ -35,8 +35,8 @@ dispatch), `helpers.ts` (plan fixtures), `panel.ts` (tool-panel readers),
 `harness.tsx` (`EditorWithHotkeys`), `setup.browser.ts` (the browser project's
 `setupFiles`).
 
-`tests/editor/` is the one folder that does not mirror module for module: 34 of
-its 40 files drive `Editor.tsx` through its surface, so they are grouped by the
+`tests/editor/` is the one folder that does not mirror module for module: 49 of
+its 52 files drive `Editor.tsx` through its surface, so they are grouped by the
 noun they exercise — `view/`, `drag/`, `tools/`, `text/`, `toggles/`, `ruler/`,
 `room/`, `shortcuts/` — leaving `chrome` and `pointer` at the root as the module
 tests they are. A test named for a module keeps the module's name; a test named

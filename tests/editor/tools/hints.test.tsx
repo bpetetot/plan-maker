@@ -3,10 +3,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-react';
-import { emptyPlan } from '../../src/model/types';
-import { usePlanStore } from '../../src/store/planStore';
-import { EditorWithHotkeys } from '../harness';
-import { clientAt, key, pointer } from '../kit';
+import { emptyPlan } from '../../../src/model/types';
+import { usePlanStore } from '../../../src/store/planStore';
+import { EditorWithHotkeys } from '../../harness';
+import { clientAt, key, pointer } from '../../kit';
 
 beforeEach(() => {
   localStorage.clear();
@@ -14,7 +14,7 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear();
 });
 
-const hint = () => document.querySelector('.hint')?.textContent ?? '';
+const lock = () => page.getByText('Shift locks the axis');
 
 async function setup() {
   const { container } = await render(<EditorWithHotkeys />);
@@ -29,6 +29,10 @@ describe('the idle hint', () => {
 });
 
 describe('the drawing hints', () => {
+  // The absence of a word has no locator to wait on: the hint is one node, read
+  // after an awaited keystroke.
+  const hint = () => document.querySelector('.hint')!.textContent;
+
   it('says nothing of the axis before there is an anchor to lock to', async () => {
     await setup();
     await key('2');
@@ -41,13 +45,13 @@ describe('the drawing hints', () => {
     const { svg } = await setup();
     await key('2');
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 100, 100) });
-    expect(hint()).toContain('Shift locks the axis');
+    await expect.element(lock()).toBeVisible();
   });
 
   it('names the lock once a measurement has its A', async () => {
     const { svg } = await setup();
     await key('5');
     await pointer(svg, 'pointerdown', { button: 0, ...clientAt(svg, 100, 100) });
-    expect(hint()).toContain('Shift locks the axis');
+    await expect.element(lock()).toBeVisible();
   });
 });

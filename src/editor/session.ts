@@ -40,8 +40,7 @@ type Hover = { kind: 'wall' | 'ruler' | 'room'; id: string };
 type Drag =
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
   // CONTEXT.md: Plan drag. Its whole composition — snap, grab point, settle,
-  // selection — lives in planDrag.ts (ADR 0023). `click` stays out of it: the
-  // Selection is editor state, so its policy is not the drag's.
+  // selection — lives in planDrag.ts (ADR 0023); `click` is the Selection's.
   | { kind: 'plan'; g: PlanDrag; click: Click | null };
 
 // The marquee's pair, on the element a grab pressed: the answer is known at

@@ -83,8 +83,8 @@ const snapText = (at: Vec, free: boolean): Snap =>
     ? { x: Math.round(at.x), y: Math.round(at.y), kind: 'free' }
     : { x: Math.round(at.x / GRID) * GRID, y: Math.round(at.y / GRID) * GRID, kind: 'grid' };
 
-/** The anchor the rubber band runs from, which is also the origin a held Shift
- *  locks the axis to. Null before there is one: no origin, no lock. */
+// The anchor the rubber band runs from, and the origin a held Shift locks to.
+// Null before there is one: no origin, no lock.
 const anchorOf = (p: Placement, plan: Plan): Vec | null => {
   if (p.tool === 'wall') {
     if (!p.chain) return null;

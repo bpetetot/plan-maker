@@ -69,9 +69,8 @@ export type PointerIntent =
 
 const NONE: PointerIntent = { type: 'none' };
 
-// Alt inverts the current snap state for the gesture (ADR 0007). Shift needs no
-// such helper, but it is read twice over one gesture and the two never meet:
-// additive at the press, the axis lock at every aim after it.
+// Alt inverts the current snap state for the gesture (ADR 0007). Shift is read
+// twice and the two never meet: additive at the press, locked at every aim.
 const isFree = (input: PointerInput, ctx: PointerCtx) => !ctx.snapEnabled !== input.altKey;
 
 // The click threshold, owned here and nowhere else: euclidean, in screen px,

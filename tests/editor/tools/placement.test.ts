@@ -292,6 +292,21 @@ describe('a ruler', () => {
     expect(aimedSnap(plan, 137, 143)).toMatchObject({ x: 140, y: 140, kind: 'grid' });
     expect(aimedSnap(plan, 137, 143, FREE)).toMatchObject({ x: 137, y: 143, kind: 'free' });
   });
+
+  // A Ruler's B locks against its own A, which is the pending anchor here — the
+  // ghost and the commit read the one origin (tickets 03, 12).
+  it('holds B on the axis of its A, and commits where the ghost was drawn', () => {
+    const LOCKED = { ...ENV, locked: true };
+    const first = stroke(beginPlacement('ruler'), emptyPlan(), 100, 100).placement;
+    const aimed = aimPlacement(first, emptyPlan(), at(400, 130), LOCKED);
+    const ghost = placementChrome(aimed, emptyPlan(), ENV.defaults).rulerGhost!;
+    expect(ghost).toMatchObject({ a: { x: 100, y: 100 }, b: { x: 400, y: 100 } });
+    const committed = clickPlacement(aimed, emptyPlan(), at(400, 130), LOCKED);
+    expect(Object.values(committed.plan!.rulers)[0]).toMatchObject({
+      a: { x: 100, y: 100 },
+      b: { x: ghost.b.x, y: ghost.b.y },
+    });
+  });
 });
 
 describe('a text', () => {
