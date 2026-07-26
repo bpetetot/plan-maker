@@ -1,6 +1,7 @@
 // CONTEXT.md: Placement, as a value (ADR 0025). Pure — no React, no store —
 // and carrying no plan, unlike a Plan drag: the plan is an argument each call.
 import type { Vec } from '../model/geometry';
+import { axisLock } from '../model/axisLock';
 import { nearestWall } from '../model/geometry';
 import { placeOpening, railedOpeningOffset } from '../model/openings';
 import { commitPoint, commitWall, settleEdit } from '../model/settle';
@@ -38,6 +39,8 @@ interface PlacementEnv {
   pxPerCm: number;
   // Alt inverts the snap state for the gesture (ADR 0007).
   free: boolean;
+  // Shift, read the same way. The three tools with no anchor ignore it.
+  locked: boolean;
   defaults: ToolDefaults;
 }
 
@@ -80,8 +83,23 @@ const snapText = (at: Vec, free: boolean): Snap =>
     ? { x: Math.round(at.x), y: Math.round(at.y), kind: 'free' }
     : { x: Math.round(at.x / GRID) * GRID, y: Math.round(at.y / GRID) * GRID, kind: 'grid' };
 
-const aimPoint = (plan: Plan, at: Vec, env: PlacementEnv): Snap =>
-  snapPoint(plan, at.x, at.y, { tolerance: snapTolerance(env.pxPerCm), walls: true, free: env.free });
+/** The anchor the rubber band runs from, which is also the origin a held Shift
+ *  locks the axis to. Null before there is one: no origin, no lock. */
+const anchorOf = (p: Placement, plan: Plan): Vec | null => {
+  if (p.tool === 'wall') {
+    if (!p.chain) return null;
+    return 'pending' in p.chain ? p.chain.pending : plan.points[p.chain.last];
+  }
+  return p.tool === 'ruler' ? p.a : null;
+};
+
+const aimPoint = (p: Placement, plan: Plan, at: Vec, env: PlacementEnv): Snap =>
+  snapPoint(plan, at.x, at.y, {
+    tolerance: snapTolerance(env.pxPerCm),
+    walls: true,
+    free: env.free,
+    lock: axisLock(anchorOf(p, plan), at, env.locked),
+  });
 
 export function beginPlacement(tool: PlacementTool): Placement {
   switch (tool) {
@@ -115,7 +133,7 @@ export function aimPlacement(p: Placement, plan: Plan, at: Vec, env: PlacementEn
   switch (p.tool) {
     case 'wall':
     case 'ruler':
-      return { ...p, snap: aimPoint(plan, at, env) };
+      return { ...p, snap: aimPoint(p, plan, at, env) };
     // The open editor holds the spot: nothing chases the pointer under it.
     case 'text':
       return p.typing ? p : { ...p, snap: snapText(at, env.free) };
@@ -154,7 +172,8 @@ export function clickPlacement(p: Placement, plan: Plan, at: Vec, env: Placement
 type WallPlacement = Extract<Placement, { tool: 'wall' }>;
 
 function clickWall(p: WallPlacement, plan: Plan, at: Vec, env: PlacementEnv): PlacementResult {
-  const s = aimPoint(plan, at, env);
+  // The same origin the aim used, so the click lands where the rubber band did.
+  const s = aimPoint(p, plan, at, env);
   const chain = p.chain;
   // CONTEXT.md: Settle. No `moving` set — a drawing displaces no Point, it
   // creates one; the Room label pass is what commitWall lacked (ADR 0022).
@@ -233,7 +252,7 @@ function clickRuler(
   at: Vec,
   env: PlacementEnv,
 ): PlacementResult {
-  const s = aimPoint(plan, at, env);
+  const s = aimPoint(p, plan, at, env);
   if (!p.a) return { placement: { ...p, a: s, snap: s } };
   // B on A is a mis-click: ignore it, the pending A keeps rubber-banding.
   if (Math.hypot(s.x - p.a.x, s.y - p.a.y) * env.pxPerCm < SAME_POINT_PX) return { placement: p };
@@ -264,7 +283,7 @@ export function placementChrome(p: Placement, plan: Plan, defaults: ToolDefaults
   const none: PlacementChrome = { snap: null, rubber: null, ghost: null, rulerGhost: null };
   switch (p.tool) {
     case 'wall': {
-      const from = p.chain ? ('pending' in p.chain ? p.chain.pending : plan.points[p.chain.last]) : null;
+      const from = anchorOf(p, plan);
       const rubber = from && p.snap ? { from, to: p.snap, thickness: defaults.wallThickness } : null;
       return { ...none, snap: p.snap, rubber };
     }

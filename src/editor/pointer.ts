@@ -58,11 +58,11 @@ export type PointerIntent =
   | { type: 'beginPan'; capture: true }
   | { type: 'beginMarquee'; at: Vec; additive: boolean; capture: true }
   | { type: 'beginGrab'; target: GrabTarget; at: Vec; additive: boolean; capture: true }
-  | { type: 'placementClick'; at: Vec; free: boolean }
+  | { type: 'placementClick'; at: Vec; free: boolean; locked: boolean }
   | { type: 'panBy'; dxPx: number; dyPx: number }
   | { type: 'aimMarquee'; at: Vec }
   | { type: 'aimGrab'; at: Vec; free: boolean; locked: boolean; moved: boolean }
-  | { type: 'aimPlacement'; at: Vec; free: boolean }
+  | { type: 'aimPlacement'; at: Vec; free: boolean; locked: boolean }
   | { type: 'hover'; at: Vec }
   | { type: 'end'; kind: DragKind; moved: boolean }
   | { type: 'cancel'; kind: DragKind };
@@ -100,7 +100,10 @@ export function routePointerDown(
   // must not place anything or start a marquee underneath it.
   if (ctx.placementOpen) {
     if (ctx.textEditing) return [state, NONE];
-    return [state, { type: 'placementClick', at: input.at, free: isFree(input, ctx) }];
+    return [
+      state,
+      { type: 'placementClick', at: input.at, free: isFree(input, ctx), locked: input.shiftKey },
+    ];
   }
   if (target.kind === 'sheet') {
     if (ctx.textEditing) return [state, NONE];
@@ -127,7 +130,12 @@ export function routePointerMove(
   ctx: PointerCtx,
 ): [PointerState, PointerIntent] {
   if (state.phase === 'idle') {
-    if (ctx.placementOpen) return [state, { type: 'aimPlacement', at: input.at, free: isFree(input, ctx) }];
+    if (ctx.placementOpen) {
+      return [
+        state,
+        { type: 'aimPlacement', at: input.at, free: isFree(input, ctx), locked: input.shiftKey },
+      ];
+    }
     return [state, { type: 'hover', at: input.at }];
   }
   if (input.pointerId !== state.pointerId) return [state, NONE];

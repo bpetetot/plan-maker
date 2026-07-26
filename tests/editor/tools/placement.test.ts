@@ -19,7 +19,7 @@ import {
 import { initialToolDefaults } from '../../../src/editor/tools';
 
 // pxPerCm 1 puts the snap tolerance at 14 cm and the mis-click reach at 1 cm.
-const ENV = { pxPerCm: 1, free: false, defaults: initialToolDefaults() };
+const ENV = { pxPerCm: 1, free: false, locked: false, defaults: initialToolDefaults() };
 const FREE = { ...ENV, free: true };
 const at = (x: number, y: number) => ({ x, y });
 
@@ -102,6 +102,67 @@ describe('a wall chain', () => {
     expect(cancelPlacement(started)).toBeNull();
     const chained = stroke(started, emptyPlan(), 0, 0).placement;
     expect(placementStage(cancelPlacement(chained)!)).toBe('wall');
+  });
+});
+
+// CONTEXT.md: Axis lock. The chain's anchor is its origin, so the lock bites
+// from the second click on (ticket 03).
+describe('a wall chain under a held Shift', () => {
+  const LOCKED = { ...ENV, locked: true };
+
+  it('leaves the first click alone: no anchor, no axis', () => {
+    const r = stroke(beginPlacement('wall'), emptyPlan(), 137, 104, LOCKED);
+    const second = stroke(r.placement, emptyPlan(), 300, 300, LOCKED);
+    // the pending start landed on the plain grid, unbent
+    expect(Object.values(second.plan!.points).map((p) => ({ x: p.x, y: p.y }))).toContainEqual({
+      x: 140,
+      y: 100,
+    });
+  });
+
+  it('holds the segment on the axis nearest the aim, and flips across the diagonal', () => {
+    const first = stroke(beginPlacement('wall'), emptyPlan(), 100, 100);
+    const flat = stroke(first.placement, emptyPlan(), 300, 130, LOCKED);
+    expect(Object.values(flat.plan!.points).map((p) => ({ x: p.x, y: p.y }))).toContainEqual({
+      x: 300,
+      y: 100,
+    });
+    const upright = stroke(first.placement, emptyPlan(), 130, 300, LOCKED);
+    expect(Object.values(upright.plan!.points).map((p) => ({ x: p.x, y: p.y }))).toContainEqual({
+      x: 100,
+      y: 300,
+    });
+  });
+
+  it('commits exactly where the rubber band was drawn', () => {
+    const first = stroke(beginPlacement('wall'), emptyPlan(), 100, 100).placement;
+    const aimed = aimPlacement(first, emptyPlan(), at(300, 130), LOCKED);
+    const band = placementChrome(aimed, emptyPlan(), ENV.defaults).rubber!;
+    expect(band).toMatchObject({ from: { x: 100, y: 100 }, to: { x: 300, y: 100 } });
+    const committed = clickPlacement(aimed, emptyPlan(), at(300, 130), LOCKED);
+    expect(Object.values(committed.plan!.points).map((p) => ({ x: p.x, y: p.y }))).toContainEqual({
+      x: band.to.x,
+      y: band.to.y,
+    });
+  });
+
+  // The Point rung cannot see a start Point off the axis, so the chain draws on
+  // instead of closing — and the escape is the finger (ticket 06).
+  it('cannot close on a start Point the axis excludes, and closes once released', () => {
+    const l = draw('wall', [
+      [100, 100],
+      [300, 100],
+      [300, 300],
+    ]);
+    const held = stroke(l.placement, l.plan, 100, 100, LOCKED);
+    expect(Object.keys(held.plan!.walls)).toHaveLength(3);
+    expect(Object.keys(held.plan!.points)).toHaveLength(4);
+    expect(held.tool).toBeUndefined();
+
+    const released = stroke(l.placement, l.plan, 100, 100);
+    expect(Object.keys(released.plan!.walls)).toHaveLength(3);
+    expect(Object.keys(released.plan!.points)).toHaveLength(3);
+    expect(released.tool).toBe('select');
   });
 });
 

@@ -133,7 +133,12 @@ describe('a Placement takes the click, second only to the Pan', () => {
   it('turns a left down into a placement click, whatever was under the pointer', () => {
     for (const target of [SHEET, DIM]) {
       const [state, intent] = down(target, { clientX: 7, clientY: 8 }, ctx({ placementOpen: true }));
-      expect(intent).toEqual({ type: 'placementClick', at: { x: 7, y: 8 }, free: false });
+      expect(intent).toEqual({
+        type: 'placementClick',
+        at: { x: 7, y: 8 },
+        free: false,
+        locked: false,
+      });
       expect(state).toBe(IDLE);
     }
   });

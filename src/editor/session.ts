@@ -125,9 +125,10 @@ export type Intent =
 // A transition that declares nothing: the session alone.
 const just = (session: Session): SessionResult => ({ session });
 
-const placementEnv = (s: Session, env: SessionEnv, free: boolean) => ({
+const placementEnv = (s: Session, env: SessionEnv, free: boolean, locked: boolean) => ({
   pxPerCm: env.pxPerCm,
   free,
+  locked,
   defaults: s.defaults,
 });
 
@@ -322,7 +323,7 @@ function applyPointer(
     }
     case 'placementClick': {
       if (!base.placement) return just(base);
-      const posing = placementEnv(base, env, intent.free);
+      const posing = placementEnv(base, env, intent.free, intent.locked);
       return withPlacementResult(base, clickPlacement(base.placement, env.plan, intent.at, posing));
     }
     case 'panBy':
@@ -348,7 +349,12 @@ function applyPointer(
     }
     case 'aimPlacement': {
       if (!base.placement) return just(base);
-      const next = aimPlacement(base.placement, env.plan, intent.at, placementEnv(base, env, intent.free));
+      const next = aimPlacement(
+        base.placement,
+        env.plan,
+        intent.at,
+        placementEnv(base, env, intent.free, intent.locked),
+      );
       // The same value back bails React out: aiming at nothing must not render.
       return just(next === base.placement ? base : { ...base, placement: next });
     }
