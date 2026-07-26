@@ -1,6 +1,5 @@
-// CONTEXT.md: Session. The rules a transition declares — the cancel ladder, the
-// one-shot, what a Tool does to the Selection, what a gesture writes — asserted
-// without a DOM (ADR 0033).
+// CONTEXT.md: Session. The rules a transition declares — the ladder, the
+// one-shot, what a Tool takes, what a gesture writes — asserted without a DOM.
 import { describe, expect, it } from 'vitest';
 import { emptyPlan } from '../../src/model/types';
 import type { Plan } from '../../src/model/types';
@@ -103,6 +102,18 @@ describe('the editing box', () => {
     });
   });
 
+  it('spends its one shot on the box that opened it, not on any box', () => {
+    const naming: Session = {
+      ...initialSession,
+      inlineEdit: { kind: 'roomLabel', id: null, blockKey: 'b1', at: { x: 0, y: 0 }, initial: '' },
+    };
+    // A label box is not the tool's, so it survives the switch to Text...
+    const onText = run(naming, [{ type: 'selectTool', tool: 'text' }]);
+    expect(onText.inlineEdit).toMatchObject({ kind: 'roomLabel' });
+    // ...and closing it leaves the Text tool exactly where it stands.
+    expect(run(onText, [{ type: 'closeInlineEdit', value: null }]).tool).toBe('text');
+  });
+
   it('opens no box under a drawing tool', () => {
     const e = env({ plan: oneText() });
     expect(run(drawing('wall'), [{ type: 'editText', id: 't1' }], e).inlineEdit).toBeNull();
@@ -144,9 +155,10 @@ describe('a gesture', () => {
       },
       env({ plan }),
     );
-    expect(grab.session.pointer).toEqual({ phase: 'idle' });
-    expect(grab.session.drag).toBeNull();
+    // The very session back, phase included: a dead grab costs no render.
+    expect(grab.session).toBe(initialSession);
     expect(grab.edit).toBeUndefined();
+    expect(grab.capture).toBeUndefined();
   });
 
   it('lands a cancelled drag on the plan it started from', () => {

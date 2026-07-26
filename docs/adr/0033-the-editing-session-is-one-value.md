@@ -41,8 +41,11 @@ which is what they were always acting on. The router keeps the stream and only
 the stream, and its union is now named `PointerIntent` — one of the shapes an
 Intent takes.
 
-`useSession.ts` is the one React binding: `useState` for the value, one mirror
-ref for the value *as of the last transition*, and the `OpenEdit` handle. The
+`useSession.ts` is the one React binding: `useState` for the value, a mirror ref
+holding it *as of the last transition*, and the `OpenEdit` handle. The `Editor`
+owns that ref and hands it in, because the camera needs it too — `useView`'s
+wheel listener asks whether a Pan is under way, and it asks before any render
+of the down that started one has landed. The
 handle cannot be born in a pure function, so the reducer names the moment
 instead — `open`, `aim`, `land`, `commit` — and the hook holds the handle,
 which still ends with the drag (ADR 0028). `open` is a transition of its own
@@ -79,7 +82,8 @@ click-without-motion free in the history.
 
 ## Consequences
 
-- **Fourteen states become eight fields.** Three refs become one, whose job is
+- **Fourteen states become eight fields**, across this ADR's change and the one
+  that unified the editing box before it. Three refs become one, whose job is
   nameable: the session as of the last transition, which the wheel handler
   needs for the pan phase and a second send in one handler needs for the first
   one's result. No value is mutated in place any more.
@@ -91,14 +95,17 @@ click-without-motion free in the history.
 - A transition that changes nothing returns **the same session**, so hovering
   empty space still costs no render — what `setHoverRoom(null)`'s bail-out did
   by luck, the reducer does by rule.
-- `movingOpeningId` and `marquee` are gone, not moved: both are readings.
+- `movingOpeningId` and `marquee` are gone as *state*: what replaces them is a
+  reading each, `movingOpeningId(s)` and the rect drawn off `s.drag`.
 - The rules have one address each: the cancel ladder, the one-shot, "a Selection
   only exists under Select", "the Ruler reveals the measures", "the box hands
   the Text tool back whatever it returns".
-- **No behaviour changed** — the 40 editor test files pass untouched, which is
+- **No behaviour changed** — every editor test file passes untouched, which is
   what the refactor was verified against. `session.test.ts` adds the policy in
-  node, mirroring what `pointer.test.ts` does for the stream.
-- `Editor.tsx` drops from 909 to 580 lines, of which 277 are JSX. The review's
+  node, mirroring what `pointer.test.ts` does for the stream, and it is where
+  the two states no user path reaches are pinned: a label box open under the
+  Text tool, and a grab on a target that has nothing to edit.
+- `Editor.tsx` drops from 969 to 580 lines, of which 277 are JSX. The review's
   "~350" is not reachable this way: what is left is the render, the forwarding,
   and the readings the render needs. Extracting the toolbar is a separate
   chantier, not this one.

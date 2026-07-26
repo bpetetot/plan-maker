@@ -33,7 +33,7 @@ import type { PointerInput, PointerTarget } from './pointer';
 import { placementChrome, placementStage } from './placement';
 import type { PlacementStage } from './placement';
 import type { Session, SessionEnv } from './session';
-import { initialSession, movingOpeningId } from './session';
+import { initialSession, movingOpeningId, reshapingDrag } from './session';
 import { useSession } from './useSession';
 import { togglePreference, usePreferences } from '../preferences/preferences';
 import type { RoomTextBlock } from '../sheet/rooms';
@@ -149,10 +149,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   const rooms = detectRooms(plan);
   // The plan reconciles labels only at gesture end; the display previews it
   // live, so a default-placement block tracks its room's anchor mid-drag.
-  const dragNow = s.drag;
-  const dragKind = dragNow?.kind === 'plan' ? dragNow.g.spec.kind : null;
-  const wallDrag =
-    dragNow?.kind === 'plan' && (dragKind === 'point' || dragKind === 'group') ? dragNow.g : null;
+  const wallDrag = reshapingDrag(s);
   const overlayLabels = useMemo(
     () => Object.values((wallDrag ? reconcileRoomLabels(wallDrag.orig, plan) : plan).roomLabels),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -434,16 +431,24 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
         {typed && (
           <InlineEditor
             key={`${typed.kind}:${typed.id ?? 'new'}`}
-            multiline={typed.kind === 'text'}
-            className={typed.kind === 'text' ? 'text-note-input' : 'room-name-input'}
             initial={typed.initial}
-            style={typed.kind === 'text' ? { fontSize: `${TEXT_SIZE_CM[typed.size]}px` } : undefined}
-            box={(value) =>
-              typed.kind === 'text'
-                ? { x: typed.at.x, y: typed.at.y, ...textEditBox(value, typed.size) }
-                : { x: typed.at.x - 100, y: typed.at.y - 13, width: 200, height: 17 }
-            }
             onClose={(value) => send({ type: 'closeInlineEdit', value })}
+            {...(typed.kind === 'text'
+              ? {
+                  multiline: true,
+                  className: 'text-note-input',
+                  style: { fontSize: `${TEXT_SIZE_CM[typed.size]}px` },
+                  // A Text box grows with what is typed; a label's is fixed.
+                  box: (value: string) => ({
+                    x: typed.at.x,
+                    y: typed.at.y,
+                    ...textEditBox(value, typed.size),
+                  }),
+                }
+              : {
+                  className: 'room-name-input',
+                  box: () => ({ x: typed.at.x - 100, y: typed.at.y - 13, width: 200, height: 17 }),
+                })}
           />
         )}
       </svg>

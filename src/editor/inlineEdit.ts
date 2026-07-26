@@ -14,7 +14,7 @@ export type InlineEdit =
   | { kind: 'roomLabel'; id: string | null; blockKey: string; at: Vec; initial: string }
   | { kind: 'text'; id: string | null; at: Vec; size: TextSize; initial: string };
 
-export interface InlineEditResult {
+interface InlineEditResult {
   plan: Plan;
   /** Only a born Text produces one — the 06 auto-select deferral. */
   selection?: ElementRef[];

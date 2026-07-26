@@ -1,6 +1,5 @@
-// CONTEXT.md: Session — what the editor is doing right now, as one value, and
-// the pure transitions between two of them (ADR 0033). No React, no DOM, no
-// store: the plan is an argument and every write is declared, not performed.
+// CONTEXT.md: Session, and the pure transitions between two of them (ADR 0033).
+// No React, no DOM, no store: every write is declared, never performed.
 import type { Vec } from '../model/geometry';
 import { projectOnWall } from '../model/geometry';
 import { wallDimension } from '../model/dimension';
@@ -32,12 +31,12 @@ import { IDLE, routePointerCancel, routePointerDown, routePointerMove, routePoin
 import type { Tool, ToolDefaults } from './tools';
 import { initialToolDefaults } from './tools';
 
-/** What the hit test found under the pointer. One at a time: a grab zone above
- *  the sheet takes the room's place, never sits beside it. */
+// What the hit test found: one at a time, since a grab zone above the sheet
+// takes the room's place rather than sitting beside it.
 type Hover = { kind: 'wall' | 'ruler' | 'room'; id: string };
 
-/** What the live drag holds; when it begins, aims and ends is the pointer
- *  router's call (ADR 0030). A Pan holds nothing: the router carries its deltas. */
+// What the live drag holds; when it begins, aims and ends is the router's call
+// (ADR 0030). A Pan holds nothing: the router carries its deltas.
 type Drag =
   | { kind: 'marquee'; additive: boolean; prev: ElementRef[]; a: Vec; b: Vec }
   // CONTEXT.md: Plan drag. Its whole composition — snap, grab point, settle,
@@ -79,13 +78,12 @@ export interface SessionEnv {
 }
 
 /** How a plan write reaches the store (ADR 0028). `open` carries no plan: it
- *  takes the pre-drag snapshot, which is what makes a click-without-motion
- *  free in the history. */
+ *  takes the pre-drag snapshot, which is what makes a bare click free. */
 export type PlanWrite = { how: 'open' } | { how: 'aim' | 'land' | 'commit'; plan: Plan };
 
 /** What one transition asks of the outside world, declared so the reducer stays
  *  pure — the caller applies these, in the handler, synchronously. */
-export interface SessionResult {
+interface SessionResult {
   session: Session;
   edit?: PlanWrite;
   capture?: true;
@@ -119,7 +117,8 @@ export type Intent =
   | { type: 'editRoomLabel'; block: RoomTextBlock; label: RoomLabel | null }
   | { type: 'closeInlineEdit'; value: string | null };
 
-const same = (session: Session): SessionResult => ({ session });
+// A transition that declares nothing: the session alone.
+const just = (session: Session): SessionResult => ({ session });
 
 const placementEnv = (s: Session, env: SessionEnv, free: boolean) => ({
   pxPerCm: env.pxPerCm,
@@ -147,7 +146,7 @@ function withTool(s: Session, next: Tool): SessionResult {
 // Everything a placement can ask of the session, in one place. A completion
 // names the Tool it hands back to, which reseeds the placement itself.
 function withPlacementResult(s: Session, r: PlacementResult): SessionResult {
-  const base = r.tool ? withTool(s, r.tool) : same({ ...s, placement: r.placement });
+  const base = r.tool ? withTool(s, r.tool) : just({ ...s, placement: r.placement });
   let session = base.session;
   if (r.selection) session = { ...session, selection: r.selection };
   if (r.editor) session = { ...session, inlineEdit: placeText(r.editor) };
@@ -161,8 +160,8 @@ function withPlacementResult(s: Session, r: PlacementResult): SessionResult {
   };
 }
 
-/** A grabbed member of a multi-selection drags the group; anything else alone.
- *  A single grab also becomes the Selection. */
+// A grabbed member of a multi-selection drags the group; anything else alone,
+// and a lone grab becomes the Selection.
 function grabbed(
   s: Session,
   env: SessionEnv,
@@ -249,7 +248,7 @@ function applyPointer(
   env: SessionEnv,
   phase: PointerState,
   intent: PointerIntent,
-  /** What the hit test found, for the one intent that asks (`hover`). */
+  // What the hit test found, for the one intent that asks: `hover`.
   onSheet = false,
 ): SessionResult {
   // Same phase object back means nothing moved in the machine: keep the very
@@ -257,9 +256,9 @@ function applyPointer(
   const base = phase === s.pointer ? s : { ...s, pointer: phase };
   switch (intent.type) {
     case 'none':
-      return same(base);
+      return just(base);
     case 'toggleSelection':
-      return same({ ...base, selection: toggleRef(base.selection, intent.ref) });
+      return just({ ...base, selection: toggleRef(base.selection, intent.ref) });
     case 'beginPan':
       return { session: base, capture: true };
     case 'beginMarquee':
@@ -278,9 +277,9 @@ function applyPointer(
       };
     case 'beginGrab': {
       const got = grabbed(base, env, intent.target, intent.at, intent.additive);
-      // A target with nothing to edit starts no gesture: the router must not
-      // stay in a grab it would otherwise hold until an unrelated up.
-      if (!got) return same({ ...base, pointer: IDLE });
+      // A target with nothing to edit starts no gesture: the session we were
+      // handed is already the idle one, down to the phase.
+      if (!got) return just(s);
       const selection = got.selection ?? base.selection;
       return {
         // Or the tint flashes back onto the pre-drag room at pointer-up, and
@@ -297,20 +296,20 @@ function applyPointer(
       };
     }
     case 'placementClick': {
-      if (!base.placement) return same(base);
-      const env2 = placementEnv(base, env, intent.free);
-      return withPlacementResult(base, clickPlacement(base.placement, env.plan, intent.at, env2));
+      if (!base.placement) return just(base);
+      const posing = placementEnv(base, env, intent.free);
+      return withPlacementResult(base, clickPlacement(base.placement, env.plan, intent.at, posing));
     }
     case 'panBy':
       return { session: base, panBy: { dxPx: intent.dxPx, dyPx: intent.dyPx } };
     case 'aimMarquee': {
       const g = base.drag;
-      if (g?.kind !== 'marquee') return same(base);
-      return same({ ...base, drag: { ...g, b: intent.at } });
+      if (g?.kind !== 'marquee') return just(base);
+      return just({ ...base, drag: { ...g, b: intent.at } });
     }
     case 'aimGrab': {
       const g = base.drag;
-      if (g?.kind !== 'plan') return same(base);
+      if (g?.kind !== 'plan') return just(base);
       const next = aimPlanDrag(g.g, intent.at, {
         pxPerCm: env.pxPerCm,
         free: intent.free,
@@ -322,18 +321,18 @@ function applyPointer(
       };
     }
     case 'aimPlacement': {
-      if (!base.placement) return same(base);
+      if (!base.placement) return just(base);
       const next = aimPlacement(base.placement, env.plan, intent.at, placementEnv(base, env, intent.free));
       // The same value back bails React out: aiming at nothing must not render.
-      return same(next === base.placement ? base : { ...base, placement: next });
+      return just(next === base.placement ? base : { ...base, placement: next });
     }
     case 'hover': {
       const room = onSheet ? roomAt(detectRooms(env.plan), intent.at.x, intent.at.y) : null;
-      if (!room) return same(withoutRoomHover(base));
+      if (!room) return just(withoutRoomHover(base));
       const id = roomKey(room);
       // Same value bails React out: tracking costs a render only on a change.
-      if (base.hover?.kind === 'room' && base.hover.id === id) return same(base);
-      return same({ ...base, hover: { kind: 'room', id } });
+      if (base.hover?.kind === 'room' && base.hover.id === id) return just(base);
+      return just({ ...base, hover: { kind: 'room', id } });
     }
     case 'end': {
       const g = base.drag;
@@ -344,10 +343,10 @@ function applyPointer(
           const selection = g.additive
             ? [...g.prev, ...captured.filter((r) => !isSelected(g.prev, r))]
             : captured;
-          return same({ ...dropped, selection });
+          return just({ ...dropped, selection });
         }
         const room = roomAt(detectRooms(env.plan), g.a.x, g.a.y);
-        return same({ ...dropped, selection: selectionForRoom(env.plan, room, g.additive, g.prev) });
+        return just({ ...dropped, selection: selectionForRoom(env.plan, room, g.additive, g.prev) });
       }
       if (g?.kind === 'plan') {
         // Settle included (CONTEXT.md: Settle) — inside the same Edit.
@@ -357,7 +356,7 @@ function applyPointer(
           edit: { how: 'land', plan: landed.plan },
         };
       }
-      return same(dropped);
+      return just(dropped);
     }
     case 'cancel': {
       // The browser took the pointer — a scroll gesture, a palm, a rotation.
@@ -366,7 +365,7 @@ function applyPointer(
       const dropped = { ...base, drag: null };
       // Landing on the pre-drag plan closes the Edit and records nothing: it is
       // the snapshot the Edit opened on.
-      return g?.kind === 'plan' ? { session: dropped, edit: { how: 'land', plan: g.g.orig } } : same(dropped);
+      return g?.kind === 'plan' ? { session: dropped, edit: { how: 'land', plan: g.g.orig } } : just(dropped);
     }
   }
 }
@@ -384,17 +383,17 @@ const pointerCtx = (s: Session, env: SessionEnv) => ({
 // naming the room underneath.
 function doubleClicked(s: Session, env: SessionEnv, at: Vec): SessionResult {
   if (s.placement) return withPlacementResult(s, finishPlacement(s.placement, env.plan));
-  if (s.tool !== 'select') return same(s);
+  if (s.tool !== 'select') return just(s);
   const hitText = textAtPoint(Object.values(env.plan.texts), at.x, at.y, env.pxPerCm);
-  if (hitText) return same({ ...s, inlineEdit: openText(hitText) });
+  if (hitText) return just({ ...s, inlineEdit: openText(hitText) });
   const rooms = detectRooms(env.plan);
   const room = roomAt(rooms, at.x, at.y);
   // Off the plan's own labels, not the drag overlay's: a double-click never
   // lands mid-drag, so there is nothing to reconcile here.
   const blocks = roomTextBlocks(rooms, Object.values(env.plan.roomLabels));
   const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
-  if (!block) return same(s);
-  return same({ ...s, inlineEdit: openRoomLabel(block, block.labels[0] ?? null) });
+  if (!block) return just(s);
+  return just({ ...s, inlineEdit: openRoomLabel(block, block.labels[0] ?? null) });
 }
 
 // Null is Escape: the box closes and the tool hands back, but nothing is
@@ -403,8 +402,8 @@ function closedInlineEdit(s: Session, env: SessionEnv, value: string | null): Se
   const ed = s.inlineEdit;
   const closed = { ...s, inlineEdit: null };
   // One-shot: a Text placement hands back to Select whatever the box returns
-  // (ADR 0021); a re-edit is already there, and a Room label never switches.
-  const base = s.tool === 'text' ? withTool(closed, 'select') : same(closed);
+  // (ADR 0021). Only that box spends the shot — a label box outlives the tool.
+  const base = s.tool === 'text' && ed?.kind === 'text' ? withTool(closed, 'select') : just(closed);
   if (!ed) return base;
   const done = commitInlineEdit(env.plan, ed, value);
   if (!done) return base;
@@ -439,8 +438,8 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
     // Selection empties, then the tool falls back to Select (ADR 0018).
     case 'cancel': {
       const dropped = s.placement && cancelPlacement(s.placement);
-      if (dropped) return same({ ...s, placement: dropped });
-      if (s.selection.length > 0) return same({ ...s, selection: [] });
+      if (dropped) return just({ ...s, placement: dropped });
+      if (s.selection.length > 0) return just({ ...s, selection: [] });
       return withTool(s, 'select');
     }
     // Through withTool: a Selection only exists under the Select tool.
@@ -453,39 +452,39 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
       };
     }
     case 'deleteSelection': {
-      if (s.selection.length === 0) return same(s);
+      if (s.selection.length === 0) return just(s);
       return {
         session: { ...s, selection: [] },
         edit: { how: 'commit', plan: deleteSelection(env.plan, s.selection) },
       };
     }
     case 'setDefaults':
-      return same({ ...s, defaults: intent.update(s.defaults) });
+      return just({ ...s, defaults: intent.update(s.defaults) });
     case 'hoverElement':
-      return same({ ...s, hover: { kind: intent.kind, id: intent.id } });
+      return just({ ...s, hover: { kind: intent.kind, id: intent.id } });
     case 'leaveElement':
       // Only if it is still me: the enter of the next zone can land first.
-      return same(s.hover?.kind === intent.kind && s.hover.id === intent.id ? { ...s, hover: null } : s);
+      return just(s.hover?.kind === intent.kind && s.hover.id === intent.id ? { ...s, hover: null } : s);
     // A pointer that left the sheet hovers no room; only pointermove would ever
     // clear the tint otherwise, and it stops arriving.
     case 'leaveSheet':
-      return same(withoutRoomHover(s));
+      return just(withoutRoomHover(s));
     case 'contextMenu': {
-      if (s.pointer.phase !== 'idle') return same(s);
+      if (s.pointer.phase !== 'idle') return just(s);
       const dropped = s.placement && cancelPlacement(s.placement);
-      if (dropped) return same({ ...s, placement: dropped });
-      return s.tool === 'select' ? same(s) : withTool(s, 'select');
+      if (dropped) return just({ ...s, placement: dropped });
+      return s.tool === 'select' ? just(s) : withTool(s, 'select');
     }
     case 'doubleClick':
       return doubleClicked(s, env, intent.at);
     case 'editText': {
-      if (s.tool !== 'select') return same(s);
+      if (s.tool !== 'select') return just(s);
       const text = env.plan.texts[intent.id];
-      return text ? same({ ...s, inlineEdit: openText(text) }) : same(s);
+      return text ? just({ ...s, inlineEdit: openText(text) }) : just(s);
     }
     case 'editRoomLabel':
-      if (s.tool !== 'select') return same(s);
-      return same({ ...s, inlineEdit: openRoomLabel(intent.block, intent.label) });
+      if (s.tool !== 'select') return just(s);
+      return just({ ...s, inlineEdit: openRoomLabel(intent.block, intent.label) });
     case 'closeInlineEdit':
       return closedInlineEdit(s, env, intent.value);
   }
@@ -497,4 +496,13 @@ export function movingOpeningId(s: Session): string | null {
   const g = s.drag;
   if (g?.kind !== 'plan') return null;
   return g.g.spec.kind === 'opening' && g.g.moved ? g.g.spec.id : null;
+}
+
+/** The drag that displaces Points, so the room loops move under it — the plan
+ *  it started from, for the label overlay to reconcile against. */
+export function reshapingDrag(s: Session): PlanDrag | null {
+  const g = s.drag;
+  if (g?.kind !== 'plan') return null;
+  const kind = g.g.spec.kind;
+  return kind === 'point' || kind === 'group' ? g.g : null;
 }

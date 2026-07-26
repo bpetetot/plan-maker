@@ -8,14 +8,13 @@ import type { Intent, PlanWrite, Session, SessionEnv } from './session';
 import { initialSession, reduce } from './session';
 
 interface SessionEffects {
-  /** One capture protocol: whatever the source, a gesture holds the svg. */
+  // One capture protocol: whatever the source, a gesture holds the svg.
   capture: (e: React.PointerEvent) => void;
   panBy: (dxPx: number, dyPx: number) => void;
 }
 
-/** `mirror` is the session as of the last transition, not the last render: the
- *  camera reads the pointer phase from it, and a second send in one handler
- *  reads what the first one produced. */
+/** `mirror` holds the session as of the last transition, not the last render:
+ *  the camera reads the pointer phase off it before any render lands. */
 export function useSession(
   mirror: React.RefObject<Session>,
   world: () => SessionEnv,
