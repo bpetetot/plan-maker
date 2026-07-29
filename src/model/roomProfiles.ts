@@ -3,7 +3,7 @@ import { detectRooms, roomAt, roomContains, roomWallIds } from './rooms';
 import type { Plan, RoomProfile } from './types';
 import { newId } from './types';
 
-// What a room carries of its own text block (CONTEXT.md: Room profile): a profile
+// What a room carries of its own (CONTEXT.md: Room profile): a profile
 // belongs to its room, not to a position.
 
 // Reconciliation keeps at most one profile per room (CONTEXT.md: Room profile);
@@ -17,9 +17,37 @@ const sameLoop = (a: Room, b: Room) => {
   return a.pointIds.every((id) => ids.has(id));
 };
 
-// A profile carries a name, a custom placement, or both; one carrying neither
-// does not exist (CONTEXT.md: Room profile).
-const carries = (profile: RoomProfile): boolean => Boolean(profile.name || profile.placed);
+// A profile carries a name, a custom placement, or a condemned mark; one
+// carrying none of them does not exist (CONTEXT.md: Room profile).
+const carries = (profile: RoomProfile): boolean =>
+  Boolean(profile.name || profile.placed || profile.condemned);
+
+/** Sets whether `room` is condemned (CONTEXT.md: Condemned), creating its
+ *  profile at the anchor when it has none and deleting a profile the removal
+ *  leaves carrying nothing. */
+export function setRoomCondemned(plan: Plan, room: Room, condemned: boolean): Plan {
+  const existing = roomProfileAt(plan, room);
+  if (condemned) {
+    if (existing?.condemned) return plan;
+    const profile: RoomProfile = existing
+      ? { ...existing, condemned: true }
+      : {
+          id: newId(),
+          name: '',
+          x: Math.round(room.anchor.x),
+          y: Math.round(room.anchor.y),
+          condemned: true,
+        };
+    return { ...plan, roomProfiles: { ...plan.roomProfiles, [profile.id]: profile } };
+  }
+  if (!existing?.condemned) return plan;
+  const stripped = { ...existing };
+  delete stripped.condemned;
+  const roomProfiles = { ...plan.roomProfiles };
+  if (carries(stripped)) roomProfiles[stripped.id] = stripped;
+  else delete roomProfiles[stripped.id];
+  return { ...plan, roomProfiles };
+}
 
 // A profile belongs to its room, not a position (CONTEXT.md: Room profile): home
 // room matched by loop, not containment, so a passing wall cannot steal it.

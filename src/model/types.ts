@@ -44,7 +44,7 @@ interface Window extends BaseOpening {
 
 export type Opening = Door | Window;
 
-// CONTEXT.md: Room label. `placed` absent = renders at the live centroid,
+// CONTEXT.md: Room profile. `placed` absent = renders at the live centroid,
 // (x, y) is only the association anchor; `placed: true` = (x, y) renders.
 export interface RoomProfile {
   id: string;
@@ -52,6 +52,7 @@ export interface RoomProfile {
   x: Cm;
   y: Cm;
   placed?: true;
+  condemned?: true;
 }
 
 // A hand-placed measurement (CONTEXT.md: Ruler). Free coordinates, not shared

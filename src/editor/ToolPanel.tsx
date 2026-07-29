@@ -1,6 +1,7 @@
 // CONTEXT.md: Tool panel. Selection values derived on render, never stored —
 // the panel cannot disagree with the canvas, drags included.
 import {
+  Ban,
   BrickWall,
   DoorClosed,
   FlipHorizontal2,
@@ -18,7 +19,7 @@ import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
 import { setOpeningWidth, toggleHingeSide, toggleSwing } from '../model/openings';
 import { setWallThickness } from '../model/walls';
-import { roomProfileAt } from '../model/roomProfiles';
+import { roomProfileAt, setRoomCondemned } from '../model/roomProfiles';
 import { detectRooms, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
@@ -135,6 +136,12 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
             // sticky preset (CONTEXT.md: Tool defaults) — last used wins
             setDefaults((d) => ({ ...d, textSize: size }));
           }}
+        />
+      )}
+      {room && (
+        <CondemnedSection
+          condemned={Boolean(roomProfileAt(plan, room)?.condemned)}
+          onToggle={(condemned) => editPlan((p) => setRoomCondemned(p, room, condemned))}
         />
       )}
       {contents && <ContentsRows contents={contents} zeros={room !== null} />}
@@ -299,6 +306,31 @@ function SizeSection({ value, onSelect }: { value: TextSize; onSelect: (size: Te
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+// A state the room is in, not an action on it (CONTEXT.md: Condemned), so the
+// pressed button reads as the mark itself.
+function CondemnedSection({
+  condemned,
+  onToggle,
+}: {
+  condemned: boolean;
+  onToggle: (condemned: boolean) => void;
+}) {
+  return (
+    <section>
+      <div className="panel-section-label">State</div>
+      <button
+        type="button"
+        className="flip"
+        title="Condemn the room (hatched, no area)"
+        aria-pressed={condemned}
+        onClick={() => onToggle(!condemned)}
+      >
+        <Ban size={14} aria-hidden /> Condemned
+      </button>
     </section>
   );
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { detectRooms } from '../../src/model/rooms';
 import {
   addRoomProfile,
   moveRoomProfile,
   reconcileRoomProfiles,
   renameRoomProfile,
+  setRoomCondemned,
 } from '../../src/model/roomProfiles';
 import { commitWall } from '../../src/model/settle';
 import { deleteWall, setPoints } from '../../src/model/walls';
@@ -223,5 +225,85 @@ describe('a profile that carries neither a name nor a placement', () => {
     const square = squareRoomPlan();
     const plan = { ...square, roomProfiles: { l: { id: 'l', name: '', x: 200, y: 200 } } };
     expect(reconcileRoomProfiles(plan, plan).roomProfiles).toEqual({});
+  });
+});
+
+describe('setRoomCondemned', () => {
+  it('condemning a room with no profile creates one at the anchor, carrying the mark alone', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const next = setRoomCondemned(plan, room, true);
+    const profiles = Object.values(next.roomProfiles);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({
+      name: '',
+      x: Math.round(room.anchor.x),
+      y: Math.round(room.anchor.y),
+      condemned: true,
+    });
+    expect(profiles[0].placed).toBeUndefined();
+  });
+
+  it('condemning a room with a named profile marks that profile, creating nothing', () => {
+    const { plan, profileId } = roomWithProfile();
+    const room = detectRooms(plan)[0];
+    const next = setRoomCondemned(plan, room, true);
+    expect(Object.keys(next.roomProfiles)).toEqual([profileId]);
+    expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen', condemned: true });
+  });
+
+  it('lifting the mark keeps a profile that still carries a name', () => {
+    const { plan, profileId } = roomWithProfile();
+    const room = detectRooms(plan)[0];
+    const next = setRoomCondemned(setRoomCondemned(plan, room, true), room, false);
+    expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen' });
+    expect(next.roomProfiles[profileId].condemned).toBeUndefined();
+  });
+
+  it('lifting the mark deletes a profile that carries nothing else', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const condemned = setRoomCondemned(plan, room, true);
+    expect(setRoomCondemned(condemned, room, false).roomProfiles).toEqual({});
+  });
+
+  it('is a no-op when the room is already in the asked state', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    expect(setRoomCondemned(plan, room, false)).toBe(plan);
+    const condemned = setRoomCondemned(plan, room, true);
+    expect(setRoomCondemned(condemned, detectRooms(condemned)[0], true)).toBe(condemned);
+  });
+});
+
+describe('reconciliation carries the condemned mark', () => {
+  it('keeps a condemned-only profile when reconciling a plan against itself', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const condemned = setRoomCondemned(plan, room, true);
+    expect(reconcileRoomProfiles(condemned, condemned)).toBe(condemned);
+  });
+
+  it('re-pins a condemned-only profile to the live centroid when the room deforms', () => {
+    let right: string[] = [];
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      b.wall(p1, p2);
+      b.wall(p2, p3);
+      b.wall(p3, p4);
+      b.wall(p4, p1);
+      right = [p2.id, p3.id];
+    });
+    const condemned = setRoomCondemned(plan, detectRooms(plan)[0], true);
+    const after = setPoints(condemned, {
+      [right[0]]: { x: 300, y: 0 },
+      [right[1]]: { x: 300, y: 400 },
+    });
+    const next = reconcileRoomProfiles(condemned, after);
+    const marked = Object.values(next.roomProfiles).find((p) => p.condemned);
+    expect(marked).toMatchObject({ x: 150, y: 200, condemned: true });
   });
 });

@@ -6,7 +6,7 @@ import { DimLabel, RulerLabel } from './measures';
 import { OpeningGlyph } from './openings';
 import { COLORS } from './paint';
 import type { RoomTextBlock } from './rooms';
-import { RoomOverlay } from './rooms';
+import { CondemnedHatching, RoomOverlay } from './rooms';
 import { TextNoteView } from './texts';
 import { JunctionPatches, WallLine } from './walls';
 
@@ -51,8 +51,11 @@ export function PlanScene({
   // Read here rather than received: the rooms are the plan's, and reading them
   // twice costs nothing (ADR 0029).
   const rooms = detectRooms(plan);
+  const profiles = decor?.profiles ?? Object.values(plan.roomProfiles);
   return (
     <>
+      {/* Under the walls: a floor marking, not a stroke over them. */}
+      <CondemnedHatching rooms={rooms} profiles={profiles} />
       {Object.values(plan.walls).map((wall) => {
         const d = dress('wall', wall.id);
         return (
@@ -75,7 +78,7 @@ export function PlanScene({
       ))}
       <RoomOverlay
         rooms={rooms}
-        profiles={decor?.profiles ?? Object.values(plan.roomProfiles)}
+        profiles={profiles}
         measuresVisible={measuresVisible}
         editingKey={decor?.editingKey}
         onLinePointerDown={decor?.onLinePointerDown}

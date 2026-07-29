@@ -15,13 +15,14 @@
   --snap: #16a34a;
   --label: #334155;
   /* free-text ink: its own token, seeded to the label value (ticket 03) so a
-     future "notes are grey" tweak never has to touch room labels */
+     future "notes are grey" tweak never has to touch room profiles */
   --text-note: var(--label);
   /* the measure register reads in its own teal ink — a hue apart from the
      slate greys of the grid and walls, and from the interaction blue */
   --dim-line: #93c9c3;
   --dim-text: #1d7d74;
   --room-area-text: #64748b;
+  --condemned-hatch: rgba(100, 116, 139, 0.45);
   --marquee-fill: rgba(37, 99, 235, 0.08);
   --room-hover-fill: rgba(37, 99, 235, 0.05);
   --room-selected-fill: rgba(37, 99, 235, 0.12);

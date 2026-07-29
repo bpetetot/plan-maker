@@ -296,4 +296,23 @@ describe('decodePlanPayload — profile placement state', () => {
     const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, placed: 'yes' } } };
     expect(decode(bad).ok).toBe(false);
   });
+
+  it('accepts condemned: true and rejects other values', () => {
+    const base = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.profile('Kitchen', 200, 150);
+    });
+    const profile = Object.values(base.roomProfiles)[0];
+    const marked = { ...base, roomProfiles: { [profile.id]: { ...profile, condemned: true } } };
+    expect(decode(marked).ok).toBe(true);
+    const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, condemned: 1 } } };
+    expect(decode(bad).ok).toBe(false);
+  });
 });

@@ -114,6 +114,7 @@ function validatePlan(value: unknown): Plan | null {
     if (!isRecord(profile) || profile.id !== id) return null;
     if (typeof profile.name !== 'string' || !isCm(profile.x) || !isCm(profile.y)) return null;
     if (profile.placed !== undefined && profile.placed !== true) return null;
+    if (profile.condemned !== undefined && profile.condemned !== true) return null;
   }
 
   // Rulers arrived after v2 (pre-production, no migration): plans without the

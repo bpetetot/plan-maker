@@ -4,7 +4,7 @@
    styles.css instead. */
 
 /* Measures read in a mono font — the instrument register, apart from the
-   Room label titles; mono digits are tabular by construction. The size is set
+   Room profile titles; mono digits are tabular by construction. The size is set
    by the component (editor and export differ), and the masking is done by the
    rounded sheet plate DimText draws — the text carries no halo. */
 svg text.dim {
@@ -17,7 +17,7 @@ svg text.dim-selected {
   fill: var(--accent);
 }
 
-/* Semi-bold, as typed — the Room label's name is the sheet's one title
+/* Semi-bold, as typed — the Room profile's name is the sheet's one title
    register, kept typographically apart from every number on the sheet */
 svg text.room-name {
   font:
@@ -48,4 +48,11 @@ svg text.text-note {
   stroke-linejoin: round;
   cursor: default;
   user-select: none;
+}
+
+/* Condemned floor (CONTEXT.md: Condemned): hatch strokes only, no ground —
+   the editor's room tints lie under the sheet and must show through. */
+svg .condemned-hatch-line {
+  stroke: var(--condemned-hatch);
+  stroke-width: 1;
 }

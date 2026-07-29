@@ -183,3 +183,32 @@ describe('thickness beyond a single wall', () => {
     expect(numberField()).toBeNull();
   });
 });
+
+describe('the condemned toggle', () => {
+  it('condemns the selected room and lifts the mark again', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    const toggle = page.getByRole('button', { name: 'Condemned' });
+    await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.click();
+    await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+    // the sheet hatches; the panel, an inspection instrument, keeps the area
+    expect(svg.querySelector('path.room-condemned')).not.toBeNull();
+    expect(rowValue('Area')).toBe('15,21 m²');
+    await toggle.click();
+    await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(svg.querySelector('path.room-condemned')).toBeNull();
+    expect(usePlanStore.getState().plan.roomProfiles).toEqual({});
+  });
+
+  it('marks the existing profile of a named room, and undo takes one step back', async () => {
+    const { svg } = await setup(namedRoomPlan('Kitchen'));
+    await clickAt(svg, 200, 150);
+    await page.getByRole('button', { name: 'Condemned' }).click();
+    const profiles = Object.values(usePlanStore.getState().plan.roomProfiles);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({ name: 'Kitchen', condemned: true });
+    usePlanStore.temporal.getState().undo();
+    expect(Object.values(usePlanStore.getState().plan.roomProfiles)[0].condemned).toBeUndefined();
+  });
+});

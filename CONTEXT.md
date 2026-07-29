@@ -97,9 +97,9 @@ own to delete, so deleting it does nothing (ADR 0015).
 _Avoid_: Zone, area, space
 
 **Room profile**:
-What a room carries of its own: a name, a custom placement, or
-both — a profile that carries neither does not exist, and is deleted the
-moment it loses the last one it had. The name shows with the room's area as
+What a room carries of its own: a name, a custom placement, a Condemned
+mark, or any of them together — a profile that carries none of them does not
+exist, and is deleted the moment it loses the last one it had. The name shows with the room's area as
 one text block — name and area always share one position and one behavior,
 so an unnamed room whose area block was dragged carries a nameless profile to
 hold that placement. A profile belongs to its room, not to a position: it
@@ -123,10 +123,24 @@ translates every wall of its room, a custom placement translates with the
 room, keeping its position relative to the room — a default placement
 simply follows the anchor. A room with no profile, or one whose profile carries
 no name, shows its area alone — at the anchor by default, at the block's
-position when the profile holds one. A room never keeps more than one profile: when a
+position when the profile holds one — unless the room is Condemned. A room
+never keeps more than one profile: when a
 wall change leaves several profiles in one room (e.g. deleting a dividing wall
 merges two named rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room label, room name, tag
+
+**Condemned**:
+A mark a room carries stating that its floor is out of use — a chimney
+shaft, a lost corner, a void the walls enclose but the dwelling does not
+inhabit. The Sheet states it and nothing else changes: the floor is hatched,
+and the area line is not printed — an area is a claim of usable surface,
+which a condemned room no longer makes — while the name, if it has one,
+still shows. The room stays a full Room in every other respect: selectable,
+deletable, its walls measured, its contents counted, and the Tool panel
+still states the area as a fact of inspection. The mark lives on the Room
+profile and obeys its laws: it follows the room through every wall change,
+and when rooms merge, the oldest profile wins whole — mark included.
+_Avoid_: Closed, void, unused, disabled
 
 **Edit**:
 What one undo takes back. Most edits are a single change to the plan, but a

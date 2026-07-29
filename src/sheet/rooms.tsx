@@ -1,7 +1,53 @@
 import { formatArea } from '../model/format';
+import type { Vec } from '../model/geometry';
 import type { Room } from '../model/rooms';
 import { roomAt, roomKey } from '../model/rooms';
 import type { RoomProfile } from '../model/types';
+
+// A condemned room's floor is out of use (CONTEXT.md: Condemned): its area is
+// no claim the sheet should print, and its hatching says why.
+function condemnedRooms(rooms: Room[], profiles: RoomProfile[]): Set<Room> {
+  const condemned = new Set<Room>();
+  for (const profile of profiles) {
+    if (!profile.condemned) continue;
+    const room = roomAt(rooms, profile.x, profile.y);
+    if (room) condemned.add(room);
+  }
+  return condemned;
+}
+
+// Lines only, no ground: the editor's tints lie under the sheet and must keep
+// showing through the hatching.
+export function CondemnedHatching({ rooms, profiles }: { rooms: Room[]; profiles: RoomProfile[] }) {
+  const condemned = [...condemnedRooms(rooms, profiles)];
+  if (condemned.length === 0) return null;
+  const loop = (points: Vec[]) => `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')} Z`;
+  return (
+    <g>
+      <defs>
+        <pattern
+          id="condemned-hatch"
+          patternUnits="userSpaceOnUse"
+          width="14"
+          height="14"
+          patternTransform="rotate(45)"
+        >
+          <line className="condemned-hatch-line" x1="7" y1="0" x2="7" y2="14" />
+        </pattern>
+      </defs>
+      {condemned.map((room) => (
+        <path
+          key={roomKey(room)}
+          className="room-condemned"
+          d={[room.polygon, ...room.holes].map(loop).join(' ')}
+          fill="url(#condemned-hatch)"
+          fillRule="evenodd"
+          pointerEvents="none"
+        />
+      ))}
+    </g>
+  );
+}
 
 // CONTEXT.md: Room profile. Reconciliation keeps one profile per room and none
 // outside a room; the extra cases here only guard injected state.
@@ -19,6 +65,7 @@ export interface RoomTextBlock {
 
 export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomTextBlock[] {
   const blocks: RoomTextBlock[] = [];
+  const silenced = condemnedRooms(rooms, profiles);
   const defaultsByRoom = new Map<Room, RoomProfile[]>();
   const oldestByRoom = new Map<Room, RoomProfile>();
   for (const profile of profiles) {
@@ -35,7 +82,7 @@ export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomText
         y: profile.y,
         profiles: [profile],
         room: room ?? undefined,
-        area: room && oldestByRoom.get(room) === profile ? room.areaCm2 : undefined,
+        area: room && !silenced.has(room) && oldestByRoom.get(room) === profile ? room.areaCm2 : undefined,
       });
     }
   }
@@ -49,7 +96,7 @@ export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomText
       y: room.anchor.y,
       profiles: defaults,
       room,
-      area: !oldest || defaults.includes(oldest) ? room.areaCm2 : undefined,
+      area: !silenced.has(room) && (!oldest || defaults.includes(oldest)) ? room.areaCm2 : undefined,
     });
   }
   return blocks;
