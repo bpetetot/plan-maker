@@ -1,20 +1,9 @@
 import { formatArea } from '../model/format';
 import type { Vec } from '../model/geometry';
+import { condemnedRooms } from '../model/roomProfiles';
 import type { Room } from '../model/rooms';
 import { roomAt, roomKey } from '../model/rooms';
 import type { RoomProfile } from '../model/types';
-
-// A condemned room's floor is out of use (CONTEXT.md: Condemned): its area is
-// no claim the sheet should print, and its hatching says why.
-function condemnedRooms(rooms: Room[], profiles: RoomProfile[]): Set<Room> {
-  const condemned = new Set<Room>();
-  for (const profile of profiles) {
-    if (!profile.condemned) continue;
-    const room = roomAt(rooms, profile.x, profile.y);
-    if (room) condemned.add(room);
-  }
-  return condemned;
-}
 
 // Lines only, no ground: the editor's tints lie under the sheet and must keep
 // showing through the hatching.
@@ -59,7 +48,9 @@ export interface RoomTextBlock {
   profiles: RoomProfile[];
   // unset for an orphan profile
   room?: Room;
-  // set only on the block carrying the room's area
+  // the block that speaks for its room: a floor double-click opens this one
+  own: boolean;
+  // set only on the own block, and never on a condemned room's
   area?: number;
 }
 
@@ -76,13 +67,15 @@ export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomText
       if (defaults) defaults.push(profile);
       else defaultsByRoom.set(room, [profile]);
     } else {
+      const own = Boolean(room && oldestByRoom.get(room) === profile);
       blocks.push({
         key: profile.id,
         x: profile.x,
         y: profile.y,
         profiles: [profile],
         room: room ?? undefined,
-        area: room && !silenced.has(room) && oldestByRoom.get(room) === profile ? room.areaCm2 : undefined,
+        own,
+        area: room && own && !silenced.has(room) ? room.areaCm2 : undefined,
       });
     }
   }
@@ -90,13 +83,15 @@ export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomText
     const defaults = defaultsByRoom.get(room) ?? [];
     const oldest = oldestByRoom.get(room);
     if (defaults.length === 0 && oldest) continue;
+    const own = !oldest || defaults.includes(oldest);
     blocks.push({
       key: defaults[0]?.id ?? `room-${roomKey(room)}`,
       x: room.anchor.x,
       y: room.anchor.y,
       profiles: defaults,
       room,
-      area: !silenced.has(room) && (!oldest || defaults.includes(oldest)) ? room.areaCm2 : undefined,
+      own,
+      area: own && !silenced.has(room) ? room.areaCm2 : undefined,
     });
   }
   return blocks;

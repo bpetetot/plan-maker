@@ -22,9 +22,8 @@ const sameLoop = (a: Room, b: Room) => {
 const carries = (profile: RoomProfile): boolean =>
   Boolean(profile.name || profile.placed || profile.condemned);
 
-/** Sets whether `room` is condemned (CONTEXT.md: Condemned), creating its
- *  profile at the anchor when it has none and deleting a profile the removal
- *  leaves carrying nothing. */
+// Creates the profile at the anchor when the room has none; lifting the mark
+// deletes a profile it leaves carrying nothing (CONTEXT.md: Condemned).
 export function setRoomCondemned(plan: Plan, room: Room, condemned: boolean): Plan {
   const existing = roomProfileAt(plan, room);
   if (condemned) {
@@ -47,6 +46,18 @@ export function setRoomCondemned(plan: Plan, room: Room, condemned: boolean): Pl
   if (carries(stripped)) roomProfiles[stripped.id] = stripped;
   else delete roomProfiles[stripped.id];
   return { ...plan, roomProfiles };
+}
+
+/** The rooms among `rooms` marked condemned by a profile they contain
+ *  (CONTEXT.md: Condemned). */
+export function condemnedRooms(rooms: Room[], profiles: RoomProfile[]): Set<Room> {
+  const condemned = new Set<Room>();
+  for (const profile of profiles) {
+    if (!profile.condemned) continue;
+    const room = roomAt(rooms, profile.x, profile.y);
+    if (room) condemned.add(room);
+  }
+  return condemned;
 }
 
 // A profile belongs to its room, not a position (CONTEXT.md: Room profile): home

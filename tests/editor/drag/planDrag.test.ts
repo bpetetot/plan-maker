@@ -276,7 +276,7 @@ describe('a dimension-placement drag', () => {
     expect(drag.selection).toEqual([{ type: 'wall', id: wall }]);
   });
 
-  it('travels along the wall, further aim putting the label further along', () => {
+  it('travels along the wall, further aim putting the profile further along', () => {
     const { plan, wall } = wallPlan();
     const near = aimPlanDrag(dimDrag(plan, wall), at(120, 10), AIM);
     const far = aimPlanDrag(dimDrag(plan, wall), at(300, 10), AIM);
@@ -298,17 +298,17 @@ describe('a dimension-placement drag', () => {
   });
 });
 
-// CONTEXT.md: Room label. Never selected — dragged and edited directly; the
+// CONTEXT.md: Room profile. Never selected — dragged and edited directly; the
 // click that does not drag selects the Room the block names.
-describe('a room-label drag', () => {
-  const labelPlan = () => {
+describe('a room-profile drag', () => {
+  const profilePlan = () => {
     const square = squareRoomPlan();
     const room = detectRooms(square)[0];
     const [plan, id] = addRoomProfile(square, 'Kitchen', 200, 200);
     return { plan, room, id };
   };
 
-  const labelDrag = (plan: Plan, id: string, room: Room, additive = false, prev: ElementRef[] = []) =>
+  const profileDrag = (plan: Plan, id: string, room: Room, additive = false, prev: ElementRef[] = []) =>
     beginPlanDrag(plan, {
       kind: 'profile',
       id,
@@ -321,36 +321,36 @@ describe('a room-label drag', () => {
     });
 
   it('stays put below the click threshold and selects the Room it names', () => {
-    const { plan, room, id } = labelPlan();
-    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(202, 201), CLICK));
+    const { plan, room, id } = profilePlan();
+    const drag = commitPlanDrag(aimPlanDrag(profileDrag(plan, id, room), at(202, 201), CLICK));
     expect(drag.plan.roomProfiles[id]).toMatchObject({ x: 200, y: 200 });
     expect(drag.selection).toEqual(selectionForRoom(plan, room, false, []));
     expect(drag.selection).toHaveLength(4);
   });
 
   it('moves past the threshold and then takes no selection', () => {
-    const { plan, room, id } = labelPlan();
-    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(250, 260), AIM));
+    const { plan, room, id } = profilePlan();
+    const drag = commitPlanDrag(aimPlanDrag(profileDrag(plan, id, room), at(250, 260), AIM));
     expect(drag.plan.roomProfiles[id]).toMatchObject({ x: 250, y: 260 });
     expect(drag.selection).toBeNull();
   });
 
   it('clamps the block inside its room', () => {
-    const { plan, room, id } = labelPlan();
-    const drag = aimPlanDrag(labelDrag(plan, id, room), at(9000, 200), AIM);
+    const { plan, room, id } = profilePlan();
+    const drag = aimPlanDrag(profileDrag(plan, id, room), at(9000, 200), AIM);
     expect(drag.plan.roomProfiles[id].x).toBeLessThan(400);
   });
 
   it('unions rather than replaces when the click is additive', () => {
-    const { plan, room, id } = labelPlan();
+    const { plan, room, id } = profilePlan();
     const prev: ElementRef[] = [{ type: 'text', id: 'keep-me' }];
-    const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room, true, prev), at(201, 200), CLICK));
+    const drag = commitPlanDrag(aimPlanDrag(profileDrag(plan, id, room, true, prev), at(201, 200), CLICK));
     expect(drag.selection).toContainEqual(prev[0]);
     expect(drag.selection).toHaveLength(5);
   });
 });
 
-describe('a new-label drag', () => {
+describe('a new-profile drag', () => {
   const newProfileDrag = (plan: Plan, room: Room) =>
     beginPlanDrag(plan, {
       kind: 'newProfile',
@@ -374,7 +374,7 @@ describe('a new-label drag', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
     const born = aimPlanDrag(newProfileDrag(plan, room), at(250, 260), AIM);
-    expect(born.labelId).not.toBeNull();
+    expect(born.profileId).not.toBeNull();
     expect(Object.values(born.plan.roomProfiles)).toEqual([
       expect.objectContaining({ name: '', x: 250, y: 260 }),
     ]);

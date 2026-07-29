@@ -468,7 +468,9 @@ function doubleClicked(s: Session, env: SessionEnv, at: Vec): SessionResult {
   // Off the plan's own profiles, not the drag overlay's: a double-click never
   // lands mid-drag, so there is nothing to reconcile here.
   const blocks = roomTextBlocks(rooms, Object.values(env.plan.roomProfiles));
-  const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
+  // By `own`, not by area: a condemned room prints no area line yet its floor
+  // still answers (CONTEXT.md: Condemned).
+  const block = room ? blocks.find((b) => b.room === room && b.own) : undefined;
   if (!block) return just(s);
   return just({ ...s, inlineEdit: openRoomProfile(block, block.profiles[0] ?? null) });
 }

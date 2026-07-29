@@ -497,7 +497,7 @@ svg foreignObject textarea.text-note-input {
   display: flex;
   gap: 6px;
 }
-.panel-flips .flip {
+.panel-flips .panel-toggle {
   flex: 1;
   justify-content: center;
   padding: 6px 8px;
@@ -527,7 +527,7 @@ svg foreignObject textarea.text-note-input {
   justify-content: center;
   padding: 7px 10px;
 }
-.flip {
+.panel-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -536,6 +536,10 @@ svg foreignObject textarea.text-note-input {
   border: none;
   border-radius: 6px;
   padding: 4px 10px;
+}
+.panel-toggle[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 .danger {
   display: inline-flex;

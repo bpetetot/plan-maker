@@ -27,8 +27,8 @@ const wallPlan = (): Plan => ({
   walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
 });
 
-// Square room (100,100)–(500,500), its label placed at the centre.
-const roomPlan = (labeled: boolean): Plan => ({
+// Square room (100,100)–(500,500), its profile placed at the centre.
+const roomPlan = (named: boolean): Plan => ({
   ...emptyPlan(),
   points: {
     a: { id: 'a', x: 100, y: 100 },
@@ -42,11 +42,11 @@ const roomPlan = (labeled: boolean): Plan => ({
     w3: { id: 'w3', startPointId: 'c', endPointId: 'd', thickness: 10 },
     w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
   },
-  roomProfiles: labeled ? { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } } : {},
+  roomProfiles: named ? { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } } : {},
 });
 
 // An L: the band y ∈ [0,300] over x ∈ [0,600], plus x ∈ [0,300] down to y = 600.
-// Its re-entrant corner sits at (300,300); the label starts in the leg below it.
+// Its re-entrant corner sits at (300,300); the block starts in the leg below it.
 const lShapedRoom = (): Plan =>
   buildPlan((b) => {
     const p1 = b.point(0, 0);
@@ -270,7 +270,7 @@ describe('a Ruler endpoint under a held Shift', () => {
   });
 });
 
-describe('a room label under a held Shift', () => {
+describe('a room profile under a held Shift', () => {
   it('slides a placed label along the axis of its own block', async () => {
     const { container, svg } = await setup(roomPlan(true));
     const hit = container.querySelector('rect.room-name-hit')!;

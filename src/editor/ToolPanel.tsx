@@ -73,8 +73,9 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
   // marquee over the same walls reads the same room.
   const room = selectedRoom(plan, detectRooms(plan), sel);
 
+  const profile = room ? roomProfileAt(plan, room) : null;
   const [Icon, title]: [LucideIcon, string] = room
-    ? [Scan, roomProfileAt(plan, room)?.name || 'Room']
+    ? [Scan, profile?.name || 'Room']
     : !only
       ? [Layers, `${sel.length} elements`]
       : ruler
@@ -140,7 +141,7 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
       )}
       {room && (
         <CondemnedSection
-          condemned={Boolean(roomProfileAt(plan, room)?.condemned)}
+          condemned={Boolean(profile?.condemned)}
           onToggle={(condemned) => editPlan((p) => setRoomCondemned(p, room, condemned))}
         />
       )}
@@ -324,8 +325,8 @@ function CondemnedSection({
       <div className="panel-section-label">State</div>
       <button
         type="button"
-        className="flip"
-        title="Condemn the room (hatched, no area)"
+        className="panel-toggle"
+        title={condemned ? 'Reopen the room' : 'Condemn the room (hatched, no area)'}
         aria-pressed={condemned}
         onClick={() => onToggle(!condemned)}
       >
@@ -340,10 +341,10 @@ function FlipSection({ onHinge, onSwing }: { onHinge: () => void; onSwing: () =>
     <section>
       <div className="panel-section-label">Options</div>
       <div className="panel-flips">
-        <button className="flip" title="Swap hinge side (left/right)" onClick={onHinge}>
+        <button className="panel-toggle" title="Swap hinge side (left/right)" onClick={onHinge}>
           <FlipHorizontal2 size={14} aria-hidden /> Hinge
         </button>
-        <button className="flip" title="Swap swing direction (inside/outside)" onClick={onSwing}>
+        <button className="panel-toggle" title="Swap swing direction (inside/outside)" onClick={onSwing}>
           <FlipVertical2 size={14} aria-hidden /> Swing
         </button>
       </div>

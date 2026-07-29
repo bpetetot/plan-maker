@@ -5,7 +5,7 @@ export interface PlanBuilder {
   point: (x: number, y: number) => Point;
   wall: (a: Point, b: Point) => Wall;
   opening: (wall: Wall, type: Opening['type'], offset: number, width?: number) => Opening;
-  profile: (name: string, x: number, y: number, placed?: true) => RoomProfile;
+  profile: (name: string, x: number, y: number, placed?: true, condemned?: true) => RoomProfile;
 }
 
 let counter = 0;
@@ -34,9 +34,11 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
       plan.openings[id] = opening;
       return opening;
     },
-    profile(name, x, y, placed) {
+    profile(name, x, y, placed, condemned) {
       const id = `l${++counter}`;
-      const profile: RoomProfile = placed ? { id, name, x, y, placed } : { id, name, x, y };
+      const profile: RoomProfile = { id, name, x, y };
+      if (placed) profile.placed = placed;
+      if (condemned) profile.condemned = condemned;
       plan.roomProfiles[id] = profile;
       return profile;
     },

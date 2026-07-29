@@ -151,7 +151,7 @@ describe('parsePlanFile — crossing walls', () => {
   });
 });
 
-describe('parsePlanFile — orphan room labels', () => {
+describe('parsePlanFile — orphan room profiles', () => {
   it('drops labels outside any room and keeps contained ones', () => {
     let inside = '';
     const plan = buildPlan((b) => {

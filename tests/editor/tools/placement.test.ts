@@ -243,7 +243,7 @@ describe('a wall chain under a held Shift', () => {
 });
 
 // CONTEXT.md: Settle. A drawn wall creates one, so the chain settles like every
-// other edit — the pass that can act on it is the Room label reconciliation.
+// other edit — the pass that can act on it is the Room profile reconciliation.
 describe('a wall chain that settles', () => {
   const labelled = (x: number, y: number) => {
     const [plan, id] = addRoomProfile(squareRoomPlan(), 'Kitchen', x, y);

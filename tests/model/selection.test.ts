@@ -339,8 +339,8 @@ describe('refKey', () => {
 
 describe('deleteSelection — room profile cascade', () => {
   // two 3×3 m rooms side by side sharing a divider, one profile in each
-  const twoLabeledRooms = () => {
-    let ids = { leftWalls: [] as string[], divider: '', leftLabel: '', rightLabel: '' };
+  const twoNamedRooms = () => {
+    let ids = { leftWalls: [] as string[], divider: '', leftProfile: '', rightProfile: '' };
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
       const m1 = b.point(300, 0);
@@ -358,27 +358,27 @@ describe('deleteSelection — room profile cascade', () => {
       ids = {
         leftWalls: [w1.id, w5.id, w6.id, divider.id],
         divider: divider.id,
-        leftLabel: b.profile('Kitchen', 150, 150).id,
-        rightLabel: b.profile('Living room', 450, 150).id,
+        leftProfile: b.profile('Kitchen', 150, 150).id,
+        rightProfile: b.profile('Living room', 450, 150).id,
       };
     });
     return { plan, ...ids };
   };
 
   it('deletes the profile of a room whose wall is deleted', () => {
-    const { plan, leftWalls, rightLabel } = twoLabeledRooms();
+    const { plan, leftWalls, rightProfile } = twoNamedRooms();
     const next = deleteSelection(plan, [wallRef(leftWalls[0])]);
-    expect(Object.keys(next.roomProfiles)).toEqual([rightLabel]);
+    expect(Object.keys(next.roomProfiles)).toEqual([rightProfile]);
   });
 
   it('keeps only the oldest profile when deleting the divider merges the rooms', () => {
-    const { plan, divider, leftLabel } = twoLabeledRooms();
+    const { plan, divider, leftProfile } = twoNamedRooms();
     const next = deleteSelection(plan, [wallRef(divider)]);
-    expect(Object.keys(next.roomProfiles)).toEqual([leftLabel]);
+    expect(Object.keys(next.roomProfiles)).toEqual([leftProfile]);
   });
 
   it('deletes every profile when the whole plan is deleted', () => {
-    const { plan } = twoLabeledRooms();
+    const { plan } = twoNamedRooms();
     const refs = Object.keys(plan.walls).map(wallRef);
     expect(deleteSelection(plan, refs).roomProfiles).toEqual({});
   });
@@ -411,7 +411,7 @@ describe('translateElements — room profile rigid move', () => {
   });
 
   it('does not move the profile of an unselected room', () => {
-    let ids = { leftWalls: [] as string[], rightLabel: '' };
+    let ids = { leftWalls: [] as string[], rightProfile: '' };
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
       const c = b.point(300, 0);
@@ -427,10 +427,10 @@ describe('translateElements — room profile rigid move', () => {
       b.wall(h, i);
       b.wall(i, f);
       b.profile('Kitchen', 150, 150);
-      ids = { leftWalls: left.map((w) => w.id), rightLabel: b.profile('Living room', 650, 150).id };
+      ids = { leftWalls: left.map((w) => w.id), rightProfile: b.profile('Living room', 650, 150).id };
     });
     const next = translateElements(plan, ids.leftWalls.map(wallRef), 20, 20);
-    expect(next.roomProfiles[ids.rightLabel]).toMatchObject({ x: 650, y: 150 });
+    expect(next.roomProfiles[ids.rightProfile]).toMatchObject({ x: 650, y: 150 });
   });
 });
 

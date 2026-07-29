@@ -72,7 +72,7 @@ export interface PlanDrag {
   lock: AxisLock | null;
   moved: boolean;
   /** A `newProfile`'s profile, born on the aim that crosses the threshold. */
-  labelId: string | null;
+  profileId: string | null;
   /** What the drag leaves selected, or null to leave the Selection alone. */
   selection: ElementRef[] | null;
 }
@@ -91,7 +91,7 @@ export interface AimEnv {
 }
 
 export function beginPlanDrag(plan: Plan, spec: PlanDragSpec): PlanDrag {
-  return { spec, orig: plan, plan, snap: null, lock: null, moved: false, labelId: null, selection: null };
+  return { spec, orig: plan, plan, snap: null, lock: null, moved: false, profileId: null, selection: null };
 }
 
 export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
@@ -148,14 +148,14 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
     case 'newProfile': {
       const { lock, at: target } = aimed(spec);
       const t = clampToRoom(target, spec.room);
-      if (drag.labelId) {
-        return { ...drag, plan: moveRoomProfile(drag.plan, drag.labelId, t.x, t.y), lock, moved };
+      if (drag.profileId) {
+        return { ...drag, plan: moveRoomProfile(drag.plan, drag.profileId, t.x, t.y), lock, moved };
       }
       if (!moved) return { ...drag, moved };
       // Born of a placement gesture, so born placed: nothing else would keep
       // it alive (CONTEXT.md: Room profile).
-      const [plan, labelId] = addRoomProfile(drag.plan, '', t.x, t.y, true);
-      return { ...drag, plan, labelId, lock, moved };
+      const [plan, profileId] = addRoomProfile(drag.plan, '', t.x, t.y, true);
+      return { ...drag, plan, profileId, lock, moved };
     }
     case 'opening': {
       const opening = drag.plan.openings[spec.id];
@@ -224,7 +224,7 @@ export function commitPlanDrag(drag: PlanDrag): PlanDrag {
     case 'profile':
       return landed(drag.plan, drag.moved ? null : room(spec));
     case 'newProfile':
-      return landed(drag.plan, drag.labelId ? null : room(spec));
+      return landed(drag.plan, drag.profileId ? null : room(spec));
     case 'opening':
     case 'rulerEnd':
       return landed(drag.plan);

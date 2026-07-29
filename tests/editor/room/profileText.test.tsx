@@ -12,7 +12,13 @@ beforeEach(() => {
 });
 
 // A closed square room (100,100)-(500,500); centroid at (300,300).
-function emptySquare(profile?: { name: string; x: number; y: number; placed?: true }): Plan {
+function emptySquare(profile?: {
+  name: string;
+  x: number;
+  y: number;
+  placed?: true;
+  condemned?: true;
+}): Plan {
   return {
     points: {
       a: { id: 'a', x: 100, y: 100 },
@@ -41,7 +47,7 @@ const undoDepth = () => usePlanStore.temporal.getState().pastStates.length;
 const nameInput = () => page.getByRole('textbox');
 const isEditing = () => nameInput().elements().length === 1;
 
-async function setup(profile?: { name: string; x: number; y: number; placed?: true }) {
+async function setup(profile?: { name: string; x: number; y: number; placed?: true; condemned?: true }) {
   usePlanStore.setState({ plan: emptySquare(profile), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
   const { container } = await render(<Editor />);
@@ -216,5 +222,25 @@ describe('dragging the area text', () => {
     await pointer(svg, 'pointermove', clientAt(svg, 650, 200));
     await pointer(svg, 'pointerup');
     expect(profiles()[0]).toMatchObject({ name: 'Kitchen', x: 650, y: 200 });
+  });
+});
+
+// CONTEXT.md: Condemned — presentational only, so the floor still answers a
+// double-click even though the block prints no area line.
+describe('naming a condemned room', () => {
+  it('double-clicking the floor of a condemned unnamed room opens the name box', async () => {
+    const { svg } = await setup({ name: '', x: 300, y: 300, condemned: true });
+    await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
+    expect(isEditing()).toBe(true);
+    await userEvent.fill(nameInput(), 'Cellar');
+    await userEvent.keyboard('{Enter}');
+    expect(profiles()).toHaveLength(1);
+    expect(profiles()[0]).toMatchObject({ name: 'Cellar', condemned: true });
+  });
+
+  it('double-clicking the floor of a condemned named room edits its name', async () => {
+    const { svg } = await setup({ name: 'Cellar', x: 300, y: 300, condemned: true });
+    await mouse(svg, 'dblclick', clientAt(svg, 200, 400));
+    expect(isEditing()).toBe(true);
   });
 });

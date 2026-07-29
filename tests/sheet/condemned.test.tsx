@@ -15,10 +15,7 @@ function squareWithProfile(profile?: { name: string; condemned?: true }): Plan {
     b.wall(p2, p3);
     b.wall(p3, p4);
     b.wall(p4, p1);
-    if (profile) {
-      const stored = b.profile(profile.name, 200, 200);
-      if (profile.condemned) stored.condemned = true;
-    }
+    if (profile) b.profile(profile.name, 200, 200, undefined, profile.condemned);
   });
 }
 
