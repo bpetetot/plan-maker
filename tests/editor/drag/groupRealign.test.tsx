@@ -27,7 +27,7 @@ function offGridWall(): Plan {
       w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 },
     },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };
@@ -94,7 +94,7 @@ function wallNearAPoint(): Plan {
       w2: { id: 'w2', startPointId: 'c', endPointId: 'd', thickness: 10 },
     },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };
@@ -125,7 +125,7 @@ function walledOpenings(): Plan {
       o1: { id: 'o1', wallId: 'w1', type: 'window', offset: 100, width: 120 },
       o2: { id: 'o2', wallId: 'w1', type: 'window', offset: 300, width: 120 },
     },
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };

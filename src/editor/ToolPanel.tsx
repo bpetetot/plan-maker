@@ -18,7 +18,7 @@ import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
 import { setOpeningWidth, toggleHingeSide, toggleSwing } from '../model/openings';
 import { setWallThickness } from '../model/walls';
-import { roomLabelAt } from '../model/roomLabels';
+import { roomProfileAt } from '../model/roomProfiles';
 import { detectRooms, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
@@ -73,7 +73,7 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
   const room = selectedRoom(plan, detectRooms(plan), sel);
 
   const [Icon, title]: [LucideIcon, string] = room
-    ? [Scan, roomLabelAt(plan, room)?.name || 'Room']
+    ? [Scan, roomProfileAt(plan, room)?.name || 'Room']
     : !only
       ? [Layers, `${sel.length} elements`]
       : ruler

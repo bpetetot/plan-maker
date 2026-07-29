@@ -7,7 +7,7 @@ apartment. Simplicity beats precision.
 
 **Plan**:
 The single floor plan the user is editing — the whole document. Holds points,
-walls, openings, room labels, rulers, and texts.
+walls, openings, room profiles, rulers, and texts.
 _Avoid_: Document, project, drawing
 
 **Sheet**:
@@ -24,7 +24,7 @@ _Avoid_: Canvas, page, drawing surface
 Everything the editor draws that the Sheet does not contain: the Grid, room
 tints, Grab zones, point handles, the snap marker, the rubber-band wall,
 Placement dimensions, the live length of a wall being drawn, and the box opened
-on the sheet to type a Room label or a Text. It exists to serve
+on the sheet to type a Room profile's name or a Text. It exists to serve
 the gesture, so it has no real-world size and obeys no drawing scale (ADR 0005),
 and it is absent from the export by the same rule. Chrome sits above the Sheet,
 save for the Grid and the room tints, which lie under it, and the Grab zones,
@@ -96,37 +96,37 @@ standing. A room whose every wall is another room's outline has nothing of its
 own to delete, so deleting it does nothing (ADR 0015).
 _Avoid_: Zone, area, space
 
-**Room label**:
-What a room carries of its own text block: a name, a custom placement, or
-both — a label that carries neither does not exist, and is deleted the
+**Room profile**:
+What a room carries of its own: a name, a custom placement, or
+both — a profile that carries neither does not exist, and is deleted the
 moment it loses the last one it had. The name shows with the room's area as
-one text block — label and area always share one position and one behavior,
-so an unnamed room whose area block was dragged carries a nameless label to
-hold that placement. A label belongs to its room, not to a position: it
+one text block — name and area always share one position and one behavior,
+so an unnamed room whose area block was dragged carries a nameless profile to
+hold that placement. A profile belongs to its room, not to a position: it
 follows the room through every wall change — resizing the room, or a wall
-sweeping past the block, never hands the label to a neighbouring room. Its
+sweeping past the block, never hands the profile to a neighbouring room. Its
 placement has two states, like a Dimension's: by default the block sits at
 the room's anchor — the centroid of the room's surface, or, when a contained
 island pushes that centroid out of the room, the point of the room deepest
 inside it — continuously recomputed; a default placement's position is the
-anchor, nothing else; dragging the block gives the label a custom placement,
+anchor, nothing else; dragging the block gives the profile a custom placement,
 which holds exactly as long as the room contains it — a change that leaves
 the block outside its room reverts it to default placement. It is always
-inside a detected room — an orphan label never exists: it cannot be created
-or dragged outside a room, and labels that would arrive orphaned (e.g. from
-an imported plan) are dropped. After every wall change, each label reconciles:
-its room still detected — the label stays with it; its room no longer
+inside a detected room — an orphan profile never exists: it cannot be created
+or dragged outside a room, and profiles that would arrive orphaned (e.g. from
+an imported plan) are dropped. After every wall change, each profile reconciles:
+its room still detected — the profile stays with it; its room no longer
 recognizable (its loop of Points changed — a split added a corner, a merge
-removed one) — the label falls back to whichever detected room contains its
-position; no room contains it — the label is deleted. When a move
+removed one) — the profile falls back to whichever detected room contains its
+position; no room contains it — the profile is deleted. When a move
 translates every wall of its room, a custom placement translates with the
 room, keeping its position relative to the room — a default placement
-simply follows the anchor. A room with no label, or one whose label carries
-no name, shows its area alone — at the anchor by default, at the label's
-position when it holds one. A room never keeps more than one label: when a
-wall change leaves several labels in one room (e.g. deleting a dividing wall
+simply follows the anchor. A room with no profile, or one whose profile carries
+no name, shows its area alone — at the anchor by default, at the block's
+position when the profile holds one. A room never keeps more than one profile: when a
+wall change leaves several profiles in one room (e.g. deleting a dividing wall
 merges two named rooms), only the oldest survives — the others are deleted.
-_Avoid_: Room name, tag
+_Avoid_: Room label, room name, tag
 
 **Edit**:
 What one undo takes back. Most edits are a single change to the plan, but a
@@ -140,12 +140,12 @@ _Avoid_: History group, transaction, batch
 **Settle**:
 Restoring the plan's own invariants: coincident Points merge into one, and walls
 that touch or cross away from a shared Point split at the junction. It happens on
-two occasions, which differ only in what becomes of the Room labels. When an Edit
-that moved or created a Point or a Wall lands, every label reconciles against the
+two occasions, which differ only in what becomes of the Room profiles. When an Edit
+that moved or created a Point or a Wall lands, every profile reconciles against the
 plan that edit started from; the settling belongs whole to that Edit — no edit is
 ever observable half-settled, and one undo takes it back. When a plan arrives
 from outside — opened from a file, restored at startup — there is no plan it
-started from and nothing to reconcile against: labels that arrive orphaned are
+started from and nothing to reconcile against: profiles that arrive orphaned are
 dropped.
 _Avoid_: Normalize, cleanup, heal
 
@@ -246,7 +246,7 @@ in plan coordinates that grows down and to the right, Enter making a newline,
 commit on blur or Mod+Enter, Escape cancelling; an empty commit places nothing.
 After the commit the tool returns to Select with the new Text selected, and a
 double-click on a placed Text re-opens the editor. Its size is one of an S/M/L
-preset — a real size on the sheet that zooms with the plan, like a room label,
+preset — a real size on the sheet that zooms with the plan, like a room name,
 chosen in the Tool panel with the last used becoming the tool default. Horizontal
 only, one style for all: no rotation, no rich runs, no per-text color or font.
 _Avoid_: Label, note, caption, annotation, callout
@@ -315,7 +315,7 @@ sits, not about posing an element
 
 **Selection**:
 The set of elements — walls, openings, rulers, texts — the user is currently
-acting on in the editor. Room labels are never selected: they are manipulated
+acting on in the editor. Room profiles are never selected: they are manipulated
 directly (dragged, edited in place). Group actions (delete, move) apply to every element in
 it. Openings have no position of their own: they follow their wall and never
 move on their own in a group move. A junction reads as selected — never
@@ -388,7 +388,7 @@ _Avoid_: Tool options, tool settings, presets
 
 **Plan drag**:
 A drag that edits the Plan: moving a Point, a group, an Opening along its Rail,
-a Ruler endpoint, a Room label, or a Dimension's placement. It is grabbed, then
+a Ruler endpoint, a Room profile, or a Dimension's placement. It is grabbed, then
 aimed for as long as the pointer is down, then lands — Settling if it moved a
 Point or a Wall, and taking at most one undo entry whole. Below the click
 threshold it was a click, not a drag: it leaves the plan alone and selects
@@ -507,7 +507,7 @@ takes the directions of the elements that hold it — one per wall meeting that
 Point, the A→B line for a Ruler endpoint — so a wall is lengthened or shortened
 without being bent, and a junction offers the line of each of its walls.
 Everything else takes the two world axes, horizontal and vertical: a wall being
-drawn, a Ruler's B, a group, a Room label. Among the candidates the active one
+drawn, a Ruler's B, a group, a Room profile. Among the candidates the active one
 is whichever line passes nearest the current aim, decided again at every aim, so
 it changes hands without the key ever being released; a tie between the world
 axes falls to the horizontal. A gesture aiming at a position invented from
@@ -532,7 +532,7 @@ the position the guide yields. A group move has no position to hold,
 only a delta: the lock keeps it at zero on the held coordinate and the
 realignment moves the Reference point on the free one alone.
 What outranks the lock is the model's invariants, which do not propose a
-position but define which ones exist: a Room label pushed into a re-entrant
+position but define which ones exist: a Room profile pushed into a re-entrant
 notch leaves the axis rather than leaving its Room, and two Points landing
 within a centimeter of each other merge — making, off the axis, the very
 connection the lock had refused. Pure editor behavior: never part of the plan.

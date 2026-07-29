@@ -1,7 +1,7 @@
 // CONTEXT.md: Placement. The interface is the surface: begin, aim, click,
 // finish, cancel — and the chrome the placement asks the screen to draw.
 import { describe, expect, it } from 'vitest';
-import { addRoomLabel } from '../../../src/model/roomLabels';
+import { addRoomProfile } from '../../../src/model/roomProfiles';
 import { detectRooms } from '../../../src/model/rooms';
 import { emptyPlan } from '../../../src/model/types';
 import { buildPlan, squareRoomPlan } from '../../helpers';
@@ -246,7 +246,7 @@ describe('a wall chain under a held Shift', () => {
 // other edit — the pass that can act on it is the Room label reconciliation.
 describe('a wall chain that settles', () => {
   const labelled = (x: number, y: number) => {
-    const [plan, id] = addRoomLabel(squareRoomPlan(), 'Kitchen', x, y);
+    const [plan, id] = addRoomProfile(squareRoomPlan(), 'Kitchen', x, y);
     return { plan, id };
   };
 
@@ -264,7 +264,7 @@ describe('a wall chain that settles', () => {
     const rooms = detectRooms(plan);
     expect(rooms).toHaveLength(2);
     const left = rooms.find((room) => room.anchor.x < 300)!;
-    expect(plan.roomLabels[id]).toMatchObject({
+    expect(plan.roomProfiles[id]).toMatchObject({
       x: Math.round(left.anchor.x),
       y: Math.round(left.anchor.y),
     });
@@ -285,7 +285,7 @@ describe('a wall chain that settles', () => {
 
     const rooms = detectRooms(plan);
     expect(rooms).toHaveLength(2);
-    const label = plan.roomLabels[id];
+    const label = plan.roomProfiles[id];
     expect(rooms.map((room) => Math.round(room.anchor.x))).toContain(label.x);
   });
 });

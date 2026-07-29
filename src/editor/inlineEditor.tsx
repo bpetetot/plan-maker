@@ -1,5 +1,5 @@
 // CONTEXT.md: Interaction chrome — the box opened on the sheet to type a Room
-// label or a Text. It commits on blur, whatever ended it: a key or a click away.
+// profile or a Text. It commits on blur, whatever ended it: a key or a click away.
 import { useRef, useState } from 'react';
 
 type Field = HTMLInputElement | HTMLTextAreaElement;

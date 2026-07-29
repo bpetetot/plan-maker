@@ -331,16 +331,16 @@ describe('settleEdit', () => {
     expect(next.points[dragged]).toBeUndefined();
   });
 
-  it('reads each label home room from `before`, not from the settled plan', () => {
+  it('reads each profile home room from `before`, not from the settled plan', () => {
     const { plan, shared, top, bottom } = stackedRoomsPlan();
     // the shared wall sweeps down past BBB, which must stay with its own room
     const moved = { [shared[0]]: { x: 250, y: 250 }, [shared[1]]: { x: 450, y: 250 } };
     const next = settleEdit(plan, setPoints(plan, moved), new Set(shared));
-    expect(next.roomLabels[top]).toMatchObject({ name: 'AAA', x: 350, y: 80 });
-    expect(next.roomLabels[bottom]).toMatchObject({ name: 'BBB', x: 350, y: 275 });
+    expect(next.roomProfiles[top]).toMatchObject({ name: 'AAA', x: 350, y: 80 });
+    expect(next.roomProfiles[bottom]).toMatchObject({ name: 'BBB', x: 350, y: 275 });
   });
 
-  it('returns the same plan when the edit settled nothing, labels included', () => {
+  it('returns the same plan when the edit settled nothing, profiles included', () => {
     const plan = namedRoomPlan();
     expect(settleEdit(plan, plan)).toBe(plan);
   });

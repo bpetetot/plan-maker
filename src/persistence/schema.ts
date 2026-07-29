@@ -88,8 +88,8 @@ function isValidOpening(value: unknown, wallIds: Set<string>): value is Opening 
 // Assumes the plan is already migrated to SCHEMA_VERSION.
 function validatePlan(value: unknown): Plan | null {
   if (!isRecord(value)) return null;
-  const { points, walls, openings, roomLabels } = value;
-  if (!isRecord(points) || !isRecord(walls) || !isRecord(openings) || !isRecord(roomLabels)) return null;
+  const { points, walls, openings, roomProfiles } = value;
+  if (!isRecord(points) || !isRecord(walls) || !isRecord(openings) || !isRecord(roomProfiles)) return null;
 
   for (const [id, point] of Object.entries(points)) {
     if (!isRecord(point) || point.id !== id || !isCm(point.x) || !isCm(point.y)) return null;
@@ -110,10 +110,10 @@ function validatePlan(value: unknown): Plan | null {
   for (const [id, opening] of Object.entries(openings)) {
     if (!isValidOpening(opening, wallIds) || opening.id !== id) return null;
   }
-  for (const [id, label] of Object.entries(roomLabels)) {
-    if (!isRecord(label) || label.id !== id) return null;
-    if (typeof label.name !== 'string' || !isCm(label.x) || !isCm(label.y)) return null;
-    if (label.placed !== undefined && label.placed !== true) return null;
+  for (const [id, profile] of Object.entries(roomProfiles)) {
+    if (!isRecord(profile) || profile.id !== id) return null;
+    if (typeof profile.name !== 'string' || !isCm(profile.x) || !isCm(profile.y)) return null;
+    if (profile.placed !== undefined && profile.placed !== true) return null;
   }
 
   // Rulers arrived after v2 (pre-production, no migration): plans without the

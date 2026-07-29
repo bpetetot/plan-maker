@@ -38,7 +38,7 @@ const ELEMENT: PointerTarget = { kind: 'element', ref: { type: 'wall', id: 'w1' 
 const HANDLE: PointerTarget = { kind: 'handle', handle: { type: 'point', id: 'p1' } };
 const RULER_HANDLE: PointerTarget = { kind: 'handle', handle: { type: 'rulerEnd', id: 'r1', end: 'a' } };
 const DIM: PointerTarget = { kind: 'dim', wallId: 'w1' };
-const LABEL: PointerTarget = { kind: 'label', block: { x: 0, y: 0 } as RoomTextBlock, label: null };
+const PROFILE: PointerTarget = { kind: 'profile', block: { x: 0, y: 0 } as RoomTextBlock, profile: null };
 
 const down = (target: PointerTarget, over: Partial<PointerInput> = {}, c = ctx()) =>
   routePointerDown(IDLE, input(over), target, c);
@@ -71,7 +71,7 @@ const track = (target: PointerTarget, over: Partial<PointerInput> = {}, c = ctx(
 describe('the button and Space policy', () => {
   it('starts a Pan on Space + drag from every target — the sheet, an element, a handle', () => {
     // CONTEXT.md: Pan — "Space + drag" has no exception for what sits under it.
-    for (const target of [SHEET, ELEMENT, HANDLE, RULER_HANDLE, DIM, LABEL]) {
+    for (const target of [SHEET, ELEMENT, HANDLE, RULER_HANDLE, DIM, PROFILE]) {
       const [state, intent] = down(target, {}, ctx({ space: true }));
       expect(intent).toEqual({ type: 'beginPan', capture: true });
       expect(state.phase).toBe('pan');
@@ -79,7 +79,7 @@ describe('the button and Space policy', () => {
   });
 
   it('starts a Pan on middle-click from every target', () => {
-    for (const target of [SHEET, ELEMENT, HANDLE, RULER_HANDLE, DIM, LABEL]) {
+    for (const target of [SHEET, ELEMENT, HANDLE, RULER_HANDLE, DIM, PROFILE]) {
       const [, intent] = down(target, { button: 1 });
       expect(intent).toEqual({ type: 'beginPan', capture: true });
     }

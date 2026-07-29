@@ -22,7 +22,7 @@ const square = (): Plan => ({
     w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
   },
   openings: {},
-  roomLabels: {},
+  roomProfiles: {},
   rulers: {},
   texts: {},
 });

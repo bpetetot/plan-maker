@@ -98,7 +98,7 @@ describe('measure visibility toggle', () => {
   });
 
   it('leaves an unlabeled room blank, with no drag target behind', async () => {
-    const { svg } = await setup({ ...namedRoomPlan(), roomLabels: {} });
+    const { svg } = await setup({ ...namedRoomPlan(), roomProfiles: {} });
     expect(areas(svg)).toHaveLength(1);
     expect(svg.querySelectorAll('rect.room-area-hit')).toHaveLength(1);
 

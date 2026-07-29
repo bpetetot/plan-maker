@@ -7,7 +7,7 @@ import { projectOnWall, wallLength, wallSide } from '../model/geometry';
 import { moveOpening } from '../model/openings';
 import { settleEdit } from '../model/settle';
 import type { Room } from '../model/rooms';
-import { addRoomLabel, moveRoomLabel } from '../model/roomLabels';
+import { addRoomProfile, moveRoomProfile } from '../model/roomProfiles';
 import { clampToRoom } from '../model/rooms';
 import { moveRulerEndpoint } from '../model/rulers';
 import type { Snap } from '../model/snap';
@@ -32,10 +32,10 @@ export type PlanDragSpec =
       // another candidate became the nearest.
       refPoint: Vec | null;
     }
-  // `room` clamps the block; null (orphan label, impossible per CONTEXT.md:
-  // Room label) is defensive and moves freely.
+  // `room` clamps the block; null (orphan profile, impossible per CONTEXT.md:
+  // Room profile) is defensive and moves freely.
   | {
-      kind: 'label';
+      kind: 'profile';
       id: string;
       room: Room | null;
       grabDelta: Vec;
@@ -44,10 +44,10 @@ export type PlanDragSpec =
       additive: boolean;
       prev: ElementRef[];
     }
-  // The label is created only once the gesture moved: a plain click must not
+  // The profile is created only once the gesture moved: a plain click must not
   // touch the plan.
   | {
-      kind: 'newLabel';
+      kind: 'newProfile';
       room: Room;
       grabDelta: Vec;
       origin: Vec;
@@ -71,7 +71,7 @@ export interface PlanDrag {
    *  nothing — kept for the Debug mode to draw (ADR 0036). */
   lock: AxisLock | null;
   moved: boolean;
-  /** A `newLabel`'s label, born on the aim that crosses the threshold. */
+  /** A `newProfile`'s profile, born on the aim that crosses the threshold. */
   labelId: string | null;
   /** What the drag leaves selected, or null to leave the Selection alone. */
   selection: ElementRef[] | null;
@@ -99,7 +99,7 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
   const tolerance = snapTolerance(env.pxPerCm);
   const guides = { guideTolerance: guideTolerance(env.pxPerCm), viewport: env.view };
   const grabbed = (d: Vec) => ({ x: at.x + d.x, y: at.y + d.y });
-  // A block's aim, brought onto its axis: `label` and `newLabel` share it.
+  // A block's aim, brought onto its axis: `profile` and `newProfile` share it.
   const aimed = (s: { grabDelta: Vec; origin: Vec; axes: Vec[] }) => {
     const target = grabbed(s.grabDelta);
     const lock = axisLock(s.origin, target, s.axes, env.locked);
@@ -137,24 +137,24 @@ export function aimPlanDrag(drag: PlanDrag, at: Vec, env: AimEnv): PlanDrag {
       });
       return { ...drag, plan: translateElements(drag.orig, spec.refs, delta.dx, delta.dy), lock, moved };
     }
-    case 'label': {
+    case 'profile': {
       if (!moved) return { ...drag, moved };
       // The Room clamps last: an invariant does not propose a position, it
       // defines which ones exist, so the lock chooses inside what it allows.
       const { lock, at: target } = aimed(spec);
       const t = spec.room ? clampToRoom(target, spec.room) : target;
-      return { ...drag, plan: moveRoomLabel(drag.plan, spec.id, t.x, t.y), lock, moved };
+      return { ...drag, plan: moveRoomProfile(drag.plan, spec.id, t.x, t.y), lock, moved };
     }
-    case 'newLabel': {
+    case 'newProfile': {
       const { lock, at: target } = aimed(spec);
       const t = clampToRoom(target, spec.room);
       if (drag.labelId) {
-        return { ...drag, plan: moveRoomLabel(drag.plan, drag.labelId, t.x, t.y), lock, moved };
+        return { ...drag, plan: moveRoomProfile(drag.plan, drag.labelId, t.x, t.y), lock, moved };
       }
       if (!moved) return { ...drag, moved };
       // Born of a placement gesture, so born placed: nothing else would keep
-      // it alive (CONTEXT.md: Room label).
-      const [plan, labelId] = addRoomLabel(drag.plan, '', t.x, t.y, true);
+      // it alive (CONTEXT.md: Room profile).
+      const [plan, labelId] = addRoomProfile(drag.plan, '', t.x, t.y, true);
       return { ...drag, plan, labelId, lock, moved };
     }
     case 'opening': {
@@ -221,9 +221,9 @@ export function commitPlanDrag(drag: PlanDrag): PlanDrag {
       return landed(settled(movedPointIds(drag.plan, spec.refs)));
     case 'dim':
       return landed(drag.plan, drag.moved ? null : [{ type: 'wall', id: spec.id }]);
-    case 'label':
+    case 'profile':
       return landed(drag.plan, drag.moved ? null : room(spec));
-    case 'newLabel':
+    case 'newProfile':
       return landed(drag.plan, drag.labelId ? null : room(spec));
     case 'opening':
     case 'rulerEnd':

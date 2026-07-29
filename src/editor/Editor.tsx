@@ -18,11 +18,11 @@ import {
 import { useStore } from 'zustand';
 import { wallPoints } from '../model/geometry';
 import { DIM_FONT_PX } from '../model/rail';
-import { reconcileRoomLabels } from '../model/roomLabels';
+import { reconcileRoomProfiles } from '../model/roomProfiles';
 import { detectRooms, roomKey, roomWallIds } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
 import { refKey, selectedRoom } from '../model/selection';
-import type { Opening, RoomLabel } from '../model/types';
+import type { Opening, RoomProfile } from '../model/types';
 import { redo, undo, usePlanStore } from '../store/planStore';
 import { AxisLockLine } from './debug';
 import { GridLines } from './grid';
@@ -141,11 +141,11 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
   // No useMemo: a reading of the plan is already computed once per plan
   // (ADR 0029), and that memo outlives this component's renders.
   const rooms = detectRooms(plan);
-  // The plan reconciles labels only at gesture end; the display previews it
+  // The plan reconciles profiles only at gesture end; the display previews it
   // live, so a default-placement block tracks its room's anchor mid-drag.
   const wallDrag = reshapingDrag(s);
-  const overlayLabels = useMemo(
-    () => Object.values((wallDrag ? reconcileRoomLabels(wallDrag.orig, plan) : plan).roomLabels),
+  const overlayProfiles = useMemo(
+    () => Object.values((wallDrag ? reconcileRoomProfiles(wallDrag.orig, plan) : plan).roomProfiles),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [wallDrag, plan],
   );
@@ -239,19 +239,19 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     return [...byId.values()];
   }, [placementOpening, s.selection, plan.openings]);
 
-  // Room labels are never selected (CONTEXT.md: Selection): a line is dragged
+  // Room profiles are never selected (CONTEXT.md: Selection): a line is dragged
   // and double-click-edited directly.
-  const onLinePointerDown = (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => {
+  const onLinePointerDown = (block: RoomTextBlock, profile: RoomProfile | null, e: React.PointerEvent) => {
     e.stopPropagation();
-    onDown(e, { kind: 'label', block, label });
+    onDown(e, { kind: 'profile', block, profile });
   };
 
-  const onLineDoubleClick = (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => {
+  const onLineDoubleClick = (block: RoomTextBlock, profile: RoomProfile | null, e: React.MouseEvent) => {
     // Under a drawing tool the bubble belongs to the sheet, where a
     // double-click ends the chain.
     if (s.tool !== 'select') return;
     e.stopPropagation();
-    send({ type: 'editRoomLabel', block, label });
+    send({ type: 'editRoomProfile', block, profile });
   };
 
   // How the screen dresses each element of the sheet (ADR 0024). A wall's only
@@ -320,7 +320,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
           decor={{
             element: dressElement,
             pxPerCm: zoomScale,
-            labels: overlayLabels,
+            profiles: overlayProfiles,
             editingKey: editedSlot(s.inlineEdit),
             onLinePointerDown,
             onLineDoubleClick,
@@ -434,7 +434,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
                   multiline: true,
                   className: 'text-note-input',
                   style: { fontSize: `${TEXT_SIZE_CM[typed.size]}px` },
-                  // A Text box grows with what is typed; a label's is fixed.
+                  // A Text box grows with what is typed; a profile's is fixed.
                   box: (value: string) => ({
                     x: typed.at.x,
                     y: typed.at.y,

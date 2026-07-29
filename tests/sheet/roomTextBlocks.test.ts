@@ -1,7 +1,7 @@
-// CONTEXT.md: Room label
+// CONTEXT.md: Room profile
 import { describe, expect, it } from 'vitest';
 import { detectRooms } from '../../src/model/rooms';
-import type { Plan, RoomLabel } from '../../src/model/types';
+import type { Plan, RoomProfile } from '../../src/model/types';
 import type { PlanBuilder } from '../helpers';
 import { buildPlan } from '../helpers';
 import { roomTextBlocks } from '../../src/sheet/rooms';
@@ -20,44 +20,44 @@ const square = (build: (b: PlanBuilder) => void) =>
     build(b);
   });
 
-const blocksOf = (plan: Plan) => roomTextBlocks(detectRooms(plan), Object.values(plan.roomLabels));
+const blocksOf = (plan: Plan) => roomTextBlocks(detectRooms(plan), Object.values(plan.roomProfiles));
 
 describe('roomTextBlocks', () => {
-  it('renders a default-placement label at the room centroid, not its anchor', () => {
-    let label!: RoomLabel;
+  it('renders a default-placement profile at the room centroid, not its anchor', () => {
+    let profile!: RoomProfile;
     const plan = square((b) => {
-      label = b.label('Kitchen', 350, 120);
+      profile = b.profile('Kitchen', 350, 120);
     });
     const blocks = blocksOf(plan);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ x: 200, y: 200, labels: [label], area: 390 * 390 });
+    expect(blocks[0]).toMatchObject({ x: 200, y: 200, profiles: [profile], area: 390 * 390 });
   });
 
   it('renders a custom placement where it was dragged', () => {
-    let label!: RoomLabel;
+    let profile!: RoomProfile;
     const plan = square((b) => {
-      label = b.label('Kitchen', 350, 120, true);
+      profile = b.profile('Kitchen', 350, 120, true);
     });
     const blocks = blocksOf(plan);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ x: 350, y: 120, labels: [label], area: 390 * 390 });
+    expect(blocks[0]).toMatchObject({ x: 350, y: 120, profiles: [profile], area: 390 * 390 });
   });
 
   it('shows the area alone at the centroid of an unlabeled room', () => {
     const plan = square(() => {});
     const blocks = blocksOf(plan);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ x: 200, y: 200, labels: [], area: 390 * 390 });
+    expect(blocks[0]).toMatchObject({ x: 200, y: 200, profiles: [], area: 390 * 390 });
   });
 
-  it('defensively renders an orphan label at its anchor, name only', () => {
-    let orphan!: RoomLabel;
+  it('defensively renders an orphan profile at its anchor, name only', () => {
+    let orphan!: RoomProfile;
     const plan = square((b) => {
-      orphan = b.label('Lost', 900, 900);
+      orphan = b.profile('Lost', 900, 900);
     });
     const blocks = blocksOf(plan);
     const block = blocks.find((b) => b.x === 900)!;
-    expect(block).toMatchObject({ y: 900, labels: [orphan] });
+    expect(block).toMatchObject({ y: 900, profiles: [orphan] });
     expect(block.area).toBeUndefined();
     expect(block.room).toBeUndefined();
   });

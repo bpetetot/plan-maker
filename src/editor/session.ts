@@ -20,13 +20,13 @@ import {
   toggleRef,
 } from '../model/selection';
 import type { Snap } from '../model/snap';
-import type { Plan, RoomLabel } from '../model/types';
+import type { Plan, RoomProfile } from '../model/types';
 import { wallAxesAt } from '../model/walls';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { roomTextBlocks } from '../sheet/rooms';
 import { textAtPoint } from '../sheet/texts';
 import type { InlineEdit } from './inlineEdit';
-import { commitInlineEdit, openRoomLabel, openText, placeText } from './inlineEdit';
+import { commitInlineEdit, openRoomProfile, openText, placeText } from './inlineEdit';
 import type { Placement, PlacementResult } from './placement';
 import { aimPlacement, beginPlacement, cancelPlacement, clickPlacement, finishPlacement } from './placement';
 import type { PlanDrag, PlanDragSpec } from './planDrag';
@@ -126,7 +126,7 @@ export type Intent =
   | { type: 'contextMenu' }
   | { type: 'doubleClick'; at: Vec }
   | { type: 'editText'; id: string }
-  | { type: 'editRoomLabel'; block: RoomTextBlock; label: RoomLabel | null }
+  | { type: 'editRoomProfile'; block: RoomTextBlock; profile: RoomProfile | null }
   | { type: 'closeInlineEdit'; value: string | null };
 
 // A transition that declares nothing: the session alone.
@@ -145,7 +145,7 @@ const placementEnv = (s: Session, env: SessionEnv, free: boolean, locked: boolea
 const withoutRoomHover = (s: Session): Session => (s.hover?.kind === 'room' ? { ...s, hover: null } : s);
 
 // A Selection only exists under Select, and a Text box belongs to the tool that
-// opened it — a Room label box outlives a tool change (CONTEXT.md: Tool).
+// opened it — a Room profile box outlives a tool change (CONTEXT.md: Tool).
 function withTool(s: Session, next: Tool): SessionResult {
   const session: Session = {
     ...s,
@@ -268,19 +268,19 @@ function grabbed(
         spec: { kind: 'dim', id: wall.id, grabDelta: dim.plateAt - projectOnWall(plan, wall, c.x, c.y).t },
       };
     }
-    case 'label': {
-      const { block, label } = target;
+    case 'profile': {
+      const { block, profile } = target;
       const grabDelta = { x: block.x - c.x, y: block.y - c.y };
-      // The block's own position, drawn: a label that is not placed sits on the
+      // The block's own position, drawn: a profile that is not placed sits on the
       // room anchor, which the plan does not hold for it.
       const origin = { x: block.x, y: block.y };
       const axes = WORLD_AXES;
       const prev = s.selection;
-      if (label) {
+      if (profile) {
         return {
           spec: {
-            kind: 'label',
-            id: label.id,
+            kind: 'profile',
+            id: profile.id,
             room: block.room ?? null,
             grabDelta,
             origin,
@@ -291,7 +291,7 @@ function grabbed(
         };
       }
       return block.room
-        ? { spec: { kind: 'newLabel', room: block.room, grabDelta, origin, axes, additive, prev } }
+        ? { spec: { kind: 'newProfile', room: block.room, grabDelta, origin, axes, additive, prev } }
         : null;
     }
   }
@@ -451,7 +451,7 @@ const pointerCtx = (s: Session, env: SessionEnv) => ({
   space: env.space,
   gridVisible: env.gridVisible,
   placementOpen: s.placement !== null,
-  // Only a Text box swallows the click: a Room label box coexists with a
+  // Only a Text box swallows the click: a Room profile box coexists with a
   // marquee, which its own blur-commit does not disturb.
   textEditing: s.inlineEdit?.kind === 'text',
 });
@@ -465,12 +465,12 @@ function doubleClicked(s: Session, env: SessionEnv, at: Vec): SessionResult {
   if (hitText) return just({ ...s, inlineEdit: openText(hitText) });
   const rooms = detectRooms(env.plan);
   const room = roomAt(rooms, at.x, at.y);
-  // Off the plan's own labels, not the drag overlay's: a double-click never
+  // Off the plan's own profiles, not the drag overlay's: a double-click never
   // lands mid-drag, so there is nothing to reconcile here.
-  const blocks = roomTextBlocks(rooms, Object.values(env.plan.roomLabels));
+  const blocks = roomTextBlocks(rooms, Object.values(env.plan.roomProfiles));
   const block = room ? blocks.find((b) => b.room === room && b.area !== undefined) : undefined;
   if (!block) return just(s);
-  return just({ ...s, inlineEdit: openRoomLabel(block, block.labels[0] ?? null) });
+  return just({ ...s, inlineEdit: openRoomProfile(block, block.profiles[0] ?? null) });
 }
 
 // Null is Escape: the box closes and the tool hands back, but nothing is
@@ -479,7 +479,7 @@ function closedInlineEdit(s: Session, env: SessionEnv, value: string | null): Se
   const ed = s.inlineEdit;
   const closed = { ...s, inlineEdit: null };
   // One-shot: a Text placement hands back to Select whatever the box returns
-  // (ADR 0021). Only that box spends the shot — a label box outlives the tool.
+  // (ADR 0021). Only that box spends the shot — a profile box outlives the tool.
   const base = s.tool === 'text' && ed?.kind === 'text' ? withTool(closed, 'select') : just(closed);
   if (!ed) return base;
   const done = commitInlineEdit(env.plan, ed, value);
@@ -559,9 +559,9 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
       const text = env.plan.texts[intent.id];
       return text ? just({ ...s, inlineEdit: openText(text) }) : just(s);
     }
-    case 'editRoomLabel':
+    case 'editRoomProfile':
       if (s.tool !== 'select') return just(s);
-      return just({ ...s, inlineEdit: openRoomLabel(intent.block, intent.label) });
+      return just({ ...s, inlineEdit: openRoomProfile(intent.block, intent.profile) });
     case 'closeInlineEdit':
       return closedInlineEdit(s, env, intent.value);
   }
@@ -590,7 +590,7 @@ export function gestureLock(s: Session): AxisLock | null {
 }
 
 /** The drag that displaces Points, so the room loops move under it — the plan
- *  it started from, for the label overlay to reconcile against. */
+ *  it started from, for the profile overlay to reconcile against. */
 export function reshapingDrag(s: Session): PlanDrag | null {
   const g = s.drag;
   if (g?.kind !== 'plan') return null;

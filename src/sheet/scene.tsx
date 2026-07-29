@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { detectRooms } from '../model/rooms';
 import type { ElementRef } from '../model/selection';
-import type { Plan, RoomLabel } from '../model/types';
+import type { Plan, RoomProfile } from '../model/types';
 import { DimLabel, RulerLabel } from './measures';
 import { OpeningGlyph } from './openings';
 import { COLORS } from './paint';
@@ -20,16 +20,16 @@ export interface ElementDecor {
   onDoubleClick?: (e: React.MouseEvent) => void;
 }
 
-// A Room label is not an ElementRef, so the overlay's wiring rides beside
+// A Room profile is not an ElementRef, so the overlay's wiring rides beside
 // `element` rather than through it.
 export interface SheetDecor {
   element: (ref: ElementRef) => ElementDecor | undefined;
   pxPerCm: number;
-  /** Reconciled mid-drag, so the labels shown are not always the plan's. */
-  labels?: RoomLabel[];
+  /** Reconciled mid-drag, so the profiles shown are not always the plan's. */
+  profiles?: RoomProfile[];
   editingKey?: string;
-  onLinePointerDown?: (block: RoomTextBlock, label: RoomLabel | null, e: React.PointerEvent) => void;
-  onLineDoubleClick?: (block: RoomTextBlock, label: RoomLabel | null, e: React.MouseEvent) => void;
+  onLinePointerDown?: (block: RoomTextBlock, profile: RoomProfile | null, e: React.PointerEvent) => void;
+  onLineDoubleClick?: (block: RoomTextBlock, profile: RoomProfile | null, e: React.MouseEvent) => void;
 }
 
 // The Sheet (CONTEXT.md), called by both adapters — which is what keeps them in
@@ -75,7 +75,7 @@ export function PlanScene({
       ))}
       <RoomOverlay
         rooms={rooms}
-        labels={decor?.labels ?? Object.values(plan.roomLabels)}
+        profiles={decor?.profiles ?? Object.values(plan.roomProfiles)}
         measuresVisible={measuresVisible}
         editingKey={decor?.editingKey}
         onLinePointerDown={decor?.onLinePointerDown}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reconcileRoomLabels } from '../../src/model/roomLabels';
+import { reconcileRoomProfiles } from '../../src/model/roomProfiles';
 import { commitWall } from '../../src/model/settle';
 import {
   clampToRoom,
@@ -304,29 +304,29 @@ describe('nested rooms (an island punches a hole in its containing room)', () =>
     const { plan: bare } = nestedPlan();
     const plan: Plan = {
       ...bare,
-      roomLabels: {
+      roomProfiles: {
         li: { id: 'li', name: 'Inner', x: 175, y: 150 },
         lo: { id: 'lo', name: 'Outer', x: 320, y: 300 },
       },
     };
-    const next = reconcileRoomLabels(plan, plan);
-    expect(next.roomLabels.li).toMatchObject({ name: 'Inner', x: 175, y: 150 });
-    expect(next.roomLabels.lo).toMatchObject({ name: 'Outer', x: 203, y: 205 });
+    const next = reconcileRoomProfiles(plan, plan);
+    expect(next.roomProfiles.li).toMatchObject({ name: 'Inner', x: 175, y: 150 });
+    expect(next.roomProfiles.lo).toMatchObject({ name: 'Outer', x: 203, y: 205 });
   });
 
   it('reverts a custom placement swallowed by a newly drawn island', () => {
     const { plan: bare, islandWallIds, islandPointIds } = nestedPlan();
     const after: Plan = {
       ...bare,
-      roomLabels: { l: { id: 'l', name: 'Kitchen', x: 175, y: 150, placed: true } },
+      roomProfiles: { l: { id: 'l', name: 'Kitchen', x: 175, y: 150, placed: true } },
     };
     const before: Plan = {
       ...after,
       points: Object.fromEntries(Object.entries(after.points).filter(([id]) => !islandPointIds.includes(id))),
       walls: Object.fromEntries(Object.entries(after.walls).filter(([id]) => !islandWallIds.includes(id))),
     };
-    const next = reconcileRoomLabels(before, after);
-    expect(next.roomLabels.l).toEqual({ id: 'l', name: 'Kitchen', x: 203, y: 205 });
+    const next = reconcileRoomProfiles(before, after);
+    expect(next.roomProfiles.l).toEqual({ id: 'l', name: 'Kitchen', x: 203, y: 205 });
   });
 });
 

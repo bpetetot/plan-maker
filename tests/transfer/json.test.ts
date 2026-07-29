@@ -115,7 +115,7 @@ describe('parsePlanFile — coincident points', () => {
         ]),
       ),
       openings: {},
-      roomLabels: {},
+      roomProfiles: {},
     };
     const result = parsePlanFile(JSON.stringify({ format: 'plan-maker', version: SCHEMA_VERSION, plan }));
     expect(result.ok).toBe(true);
@@ -163,11 +163,11 @@ describe('parsePlanFile — orphan room labels', () => {
       b.wall(c, d);
       b.wall(d, e);
       b.wall(e, a);
-      inside = b.label('Kitchen', 200, 150).id;
-      b.label('Orphan', 900, 900);
+      inside = b.profile('Kitchen', 200, 150).id;
+      b.profile('Orphan', 900, 900);
     });
     const result = parsePlanFile(serializePlanFile(plan));
     expect(result.ok).toBe(true);
-    if (result.ok) expect(Object.keys(result.plan.roomLabels)).toEqual([inside]);
+    if (result.ok) expect(Object.keys(result.plan.roomProfiles)).toEqual([inside]);
   });
 });

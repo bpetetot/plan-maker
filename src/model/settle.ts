@@ -3,7 +3,7 @@
 import type { Vec } from './geometry';
 import { distance, nearestWall, segmentIntersection, wallLength, wallPoints } from './geometry';
 import { railedOpeningOffset } from './openings';
-import { dropOrphanRoomLabels, reconcileRoomLabels } from './roomLabels';
+import { dropOrphanRoomProfiles, reconcileRoomProfiles } from './roomProfiles';
 import type { Snap } from './snap';
 import type { Opening, Plan, Wall } from './types';
 import { newId, WALL_THICKNESS } from './types';
@@ -313,11 +313,11 @@ function planarize(plan: Plan): Plan {
 /** CONTEXT.md: Settle. `before` is the plan the edit started from — the caller
  *  holds it; `moving` lists the Points it displaced (ADR 0022). */
 export function settleEdit(before: Plan, after: Plan, moving?: Set<string>): Plan {
-  return reconcileRoomLabels(before, planarize(mergeCoincidentPoints(after, moving)));
+  return reconcileRoomProfiles(before, planarize(mergeCoincidentPoints(after, moving)));
 }
 
-/** CONTEXT.md: Settle, the form with no `before`: nothing to reconcile labels
+/** CONTEXT.md: Settle, the form with no `before`: nothing to reconcile profiles
  *  against. Orphans drop last — a split can close a loop and give one its room. */
 export function settlePlan(plan: Plan): Plan {
-  return dropOrphanRoomLabels(planarize(mergeCoincidentPoints(plan)));
+  return dropOrphanRoomProfiles(planarize(mergeCoincidentPoints(plan)));
 }

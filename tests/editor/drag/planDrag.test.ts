@@ -1,7 +1,7 @@
 // CONTEXT.md: Plan drag. The interface is the surface: begin, aim, commit.
 import { describe, expect, it } from 'vitest';
 import type { Vec } from '../../../src/model/geometry';
-import { addRoomLabel } from '../../../src/model/roomLabels';
+import { addRoomProfile } from '../../../src/model/roomProfiles';
 import { addRuler } from '../../../src/model/rulers';
 import type { Room } from '../../../src/model/rooms';
 import { detectRooms } from '../../../src/model/rooms';
@@ -304,13 +304,13 @@ describe('a room-label drag', () => {
   const labelPlan = () => {
     const square = squareRoomPlan();
     const room = detectRooms(square)[0];
-    const [plan, id] = addRoomLabel(square, 'Kitchen', 200, 200);
+    const [plan, id] = addRoomProfile(square, 'Kitchen', 200, 200);
     return { plan, room, id };
   };
 
   const labelDrag = (plan: Plan, id: string, room: Room, additive = false, prev: ElementRef[] = []) =>
     beginPlanDrag(plan, {
-      kind: 'label',
+      kind: 'profile',
       id,
       room,
       grabDelta: at(0, 0),
@@ -323,7 +323,7 @@ describe('a room-label drag', () => {
   it('stays put below the click threshold and selects the Room it names', () => {
     const { plan, room, id } = labelPlan();
     const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(202, 201), CLICK));
-    expect(drag.plan.roomLabels[id]).toMatchObject({ x: 200, y: 200 });
+    expect(drag.plan.roomProfiles[id]).toMatchObject({ x: 200, y: 200 });
     expect(drag.selection).toEqual(selectionForRoom(plan, room, false, []));
     expect(drag.selection).toHaveLength(4);
   });
@@ -331,14 +331,14 @@ describe('a room-label drag', () => {
   it('moves past the threshold and then takes no selection', () => {
     const { plan, room, id } = labelPlan();
     const drag = commitPlanDrag(aimPlanDrag(labelDrag(plan, id, room), at(250, 260), AIM));
-    expect(drag.plan.roomLabels[id]).toMatchObject({ x: 250, y: 260 });
+    expect(drag.plan.roomProfiles[id]).toMatchObject({ x: 250, y: 260 });
     expect(drag.selection).toBeNull();
   });
 
   it('clamps the block inside its room', () => {
     const { plan, room, id } = labelPlan();
     const drag = aimPlanDrag(labelDrag(plan, id, room), at(9000, 200), AIM);
-    expect(drag.plan.roomLabels[id].x).toBeLessThan(400);
+    expect(drag.plan.roomProfiles[id].x).toBeLessThan(400);
   });
 
   it('unions rather than replaces when the click is additive', () => {
@@ -351,9 +351,9 @@ describe('a room-label drag', () => {
 });
 
 describe('a new-label drag', () => {
-  const newLabelDrag = (plan: Plan, room: Room) =>
+  const newProfileDrag = (plan: Plan, room: Room) =>
     beginPlanDrag(plan, {
-      kind: 'newLabel',
+      kind: 'newProfile',
       room,
       grabDelta: at(0, 0),
       origin: at(200, 200),
@@ -365,30 +365,30 @@ describe('a new-label drag', () => {
   it('creates nothing below the threshold: a plain click must not touch the plan', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const drag = commitPlanDrag(aimPlanDrag(newLabelDrag(plan, room), at(202, 201), CLICK));
-    expect(Object.keys(drag.plan.roomLabels)).toHaveLength(0);
+    const drag = commitPlanDrag(aimPlanDrag(newProfileDrag(plan, room), at(202, 201), CLICK));
+    expect(Object.keys(drag.plan.roomProfiles)).toHaveLength(0);
     expect(drag.selection).toHaveLength(4);
   });
 
   it('is born unnamed past the threshold, then follows the cursor', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const born = aimPlanDrag(newLabelDrag(plan, room), at(250, 260), AIM);
+    const born = aimPlanDrag(newProfileDrag(plan, room), at(250, 260), AIM);
     expect(born.labelId).not.toBeNull();
-    expect(Object.values(born.plan.roomLabels)).toEqual([
+    expect(Object.values(born.plan.roomProfiles)).toEqual([
       expect.objectContaining({ name: '', x: 250, y: 260 }),
     ]);
 
     const drag = commitPlanDrag(aimPlanDrag(born, at(270, 280), AIM));
-    expect(Object.values(drag.plan.roomLabels)).toEqual([expect.objectContaining({ x: 270, y: 280 })]);
+    expect(Object.values(drag.plan.roomProfiles)).toEqual([expect.objectContaining({ x: 270, y: 280 })]);
     expect(drag.selection).toBeNull();
   });
 
   it('is born already placed, on the aim that crosses the threshold', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const drag = commitPlanDrag(aimPlanDrag(newLabelDrag(plan, room), at(250, 260), AIM));
-    expect(Object.values(drag.plan.roomLabels)).toEqual([
+    const drag = commitPlanDrag(aimPlanDrag(newProfileDrag(plan, room), at(250, 260), AIM));
+    expect(Object.values(drag.plan.roomProfiles)).toEqual([
       expect.objectContaining({ name: '', x: 250, y: 260, placed: true }),
     ]);
   });

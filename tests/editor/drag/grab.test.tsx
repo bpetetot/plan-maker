@@ -19,7 +19,7 @@ const openingPlan = (): Plan => ({
   },
   walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
   openings: { o1: { id: 'o1', wallId: 'w1', type: 'window', offset: 150, width: 120 } },
-  roomLabels: {},
+  roomProfiles: {},
   rulers: {},
   texts: {},
 });
@@ -102,7 +102,7 @@ const labeledRoomPlan = (): Plan => ({
     w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
   },
   openings: {},
-  roomLabels: { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } },
+  roomProfiles: { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } },
   rulers: {},
   texts: {},
 });
@@ -115,21 +115,21 @@ describe('dragging a room label keeps the grab point under the cursor', () => {
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 320, 295) });
     await pointer(svg, 'pointermove', clientAt(svg, 400, 400));
     // cursor +80,+105 → block 380,405
-    expect(usePlanStore.getState().plan.roomLabels.l1).toMatchObject({ x: 380, y: 405 });
+    expect(usePlanStore.getState().plan.roomProfiles.l1).toMatchObject({ x: 380, y: 405 });
   });
 });
 
 describe('dragging an unlabeled room block keeps the grab point under the cursor', () => {
   it('creates the label at block position + cursor travel, not at the cursor', async () => {
     const plan = labeledRoomPlan();
-    plan.roomLabels = {};
+    plan.roomProfiles = {};
     const { container, svg } = await renderEditor(plan);
     // bare area block at the room anchor (300,300); 280 grabs it 20 left
     const hit = container.querySelector('rect.room-area-hit')!;
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 280, 300) });
     await pointer(svg, 'pointermove', clientAt(svg, 400, 350));
     // cursor +120,+50 from the anchor → 420,350
-    const created = Object.values(usePlanStore.getState().plan.roomLabels)[0];
+    const created = Object.values(usePlanStore.getState().plan.roomProfiles)[0];
     expect(created).toMatchObject({ x: 420, y: 350 });
   });
 });

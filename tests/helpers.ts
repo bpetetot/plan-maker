@@ -1,11 +1,11 @@
-import type { Opening, Plan, Point, RoomLabel, Wall } from '../src/model/types';
+import type { Opening, Plan, Point, RoomProfile, Wall } from '../src/model/types';
 import { defaultOpeningWidth, emptyPlan, WALL_THICKNESS } from '../src/model/types';
 
 export interface PlanBuilder {
   point: (x: number, y: number) => Point;
   wall: (a: Point, b: Point) => Wall;
   opening: (wall: Wall, type: Opening['type'], offset: number, width?: number) => Opening;
-  label: (name: string, x: number, y: number, placed?: true) => RoomLabel;
+  profile: (name: string, x: number, y: number, placed?: true) => RoomProfile;
 }
 
 let counter = 0;
@@ -34,11 +34,11 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
       plan.openings[id] = opening;
       return opening;
     },
-    label(name, x, y, placed) {
+    profile(name, x, y, placed) {
       const id = `l${++counter}`;
-      const label: RoomLabel = placed ? { id, name, x, y, placed } : { id, name, x, y };
-      plan.roomLabels[id] = label;
-      return label;
+      const profile: RoomProfile = placed ? { id, name, x, y, placed } : { id, name, x, y };
+      plan.roomProfiles[id] = profile;
+      return profile;
     },
   };
   build(builder);
@@ -139,8 +139,8 @@ export function stackedRoomsPlan(topName = 'AAA'): {
     ids = {
       shared: [ml.id, mr.id],
       sharedWall: shared.id,
-      top: b.label(topName, 350, -15).id,
-      bottom: b.label('BBB', 350, 180).id,
+      top: b.profile(topName, 350, -15).id,
+      bottom: b.profile('BBB', 350, 180).id,
     };
   });
   return { plan, ...ids };
@@ -157,7 +157,7 @@ export function namedRoomPlan(name = 'Kitchen'): Plan {
     b.wall(p2, p3);
     b.wall(p3, p4);
     b.wall(p4, p1);
-    b.label(name, 200, 150);
+    b.profile(name, 200, 150);
   });
 }
 
@@ -178,7 +178,7 @@ export function oneWallPlan(
     },
     walls: { w: wall },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };

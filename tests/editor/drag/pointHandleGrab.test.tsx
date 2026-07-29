@@ -23,7 +23,7 @@ function onePlan(): Plan {
       w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 },
     },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };

@@ -44,7 +44,7 @@ describe('space held', () => {
         points: { a: { id: 'a', x: 0, y: 0 }, b: { id: 'b', x: 400, y: 0 } },
         walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
         openings: {},
-        roomLabels: {},
+        roomProfiles: {},
         rulers: {},
         texts: {},
       },

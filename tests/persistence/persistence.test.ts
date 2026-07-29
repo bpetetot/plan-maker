@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { clear, get, set } from 'idb-keyval';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addRoomLabel } from '../../src/model/roomLabels';
+import { addRoomProfile } from '../../src/model/roomProfiles';
 import { detectRooms } from '../../src/model/rooms';
 import { buildPlan } from '../helpers';
 import { emptyPlan } from '../../src/model/types';
@@ -196,13 +196,13 @@ describe('autosave', () => {
     usePlanStore.setState({ plan: emptyPlan() });
     const stop = startAutosave({ debounceMs: 400 });
 
-    editPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
-    editPlan((p) => addRoomLabel(p, 'Two', 2, 2)[0]);
+    editPlan((p) => addRoomProfile(p, 'One', 1, 1)[0]);
+    editPlan((p) => addRoomProfile(p, 'Two', 2, 2)[0]);
     expect(await get(CURRENT_KEY)).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(500);
     const record = (await get(CURRENT_KEY)) as StoredRecord;
-    expect(Object.keys(record.plan.roomLabels)).toHaveLength(2);
+    expect(Object.keys(record.plan.roomProfiles)).toHaveLength(2);
     stop();
   });
 
@@ -212,7 +212,7 @@ describe('autosave', () => {
     const stop = startAutosave({ debounceMs: 400 });
 
     const edit = beginEdit();
-    edit.aim(addRoomLabel(usePlanStore.getState().plan, 'Aimed', 1, 1)[0]);
+    edit.aim(addRoomProfile(usePlanStore.getState().plan, 'Aimed', 1, 1)[0]);
     await vi.advanceTimersByTimeAsync(500);
     expect(await get(CURRENT_KEY)).toBeUndefined();
 
@@ -221,7 +221,7 @@ describe('autosave', () => {
     edit.land(usePlanStore.getState().plan);
     await vi.advanceTimersByTimeAsync(500);
     const record = (await get(CURRENT_KEY)) as StoredRecord;
-    expect(Object.keys(record.plan.roomLabels)).toHaveLength(1);
+    expect(Object.keys(record.plan.roomProfiles)).toHaveLength(1);
     stop();
   });
 
@@ -229,7 +229,7 @@ describe('autosave', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     usePlanStore.setState({ plan: emptyPlan() });
     const stop = startAutosave({ debounceMs: 400 });
-    editPlan((p) => addRoomLabel(p, 'One', 1, 1)[0]);
+    editPlan((p) => addRoomProfile(p, 'One', 1, 1)[0]);
     stop();
     await vi.advanceTimersByTimeAsync(0);
     vi.useRealTimers();
@@ -237,8 +237,8 @@ describe('autosave', () => {
   });
 });
 
-describe('loadPlan — orphan room labels', () => {
-  it('drops labels outside any room and keeps contained ones', async () => {
+describe('loadPlan — orphan room profiles', () => {
+  it('drops profiles outside any room and keeps contained ones', async () => {
     let inside = '';
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -249,12 +249,12 @@ describe('loadPlan — orphan room labels', () => {
       b.wall(c, d);
       b.wall(d, e);
       b.wall(e, a);
-      inside = b.label('Kitchen', 200, 150).id;
-      b.label('Orphan', 900, 900);
+      inside = b.profile('Kitchen', 200, 150).id;
+      b.profile('Orphan', 900, 900);
     });
     await savePlan(plan);
     const loaded = await loadPlan();
-    expect(Object.keys(loaded?.roomLabels ?? {})).toEqual([inside]);
+    expect(Object.keys(loaded?.roomProfiles ?? {})).toEqual([inside]);
   });
 });
 
@@ -278,7 +278,7 @@ describe('loadPlan — coincident points', () => {
   });
 });
 
-describe('decodePlanPayload — label placement state', () => {
+describe('decodePlanPayload — profile placement state', () => {
   it('accepts placed: true and rejects other values', () => {
     const base = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -289,11 +289,11 @@ describe('decodePlanPayload — label placement state', () => {
       b.wall(c, d);
       b.wall(d, e);
       b.wall(e, a);
-      b.label('Kitchen', 200, 150, true);
+      b.profile('Kitchen', 200, 150, true);
     });
     expect(decode(base).ok).toBe(true);
-    const label = Object.values(base.roomLabels)[0];
-    const bad = { ...base, roomLabels: { [label.id]: { ...label, placed: 'yes' } } };
+    const profile = Object.values(base.roomProfiles)[0];
+    const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, placed: 'yes' } } };
     expect(decode(bad).ok).toBe(false);
   });
 });

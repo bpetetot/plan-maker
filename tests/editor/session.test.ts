@@ -107,11 +107,11 @@ describe('the editing box', () => {
   it('spends its one shot on the box that opened it, not on any box', () => {
     const naming: Session = {
       ...initialSession,
-      inlineEdit: { kind: 'roomLabel', id: null, blockKey: 'b1', at: { x: 0, y: 0 }, initial: '' },
+      inlineEdit: { kind: 'roomProfile', id: null, blockKey: 'b1', at: { x: 0, y: 0 }, initial: '' },
     };
     // A label box is not the tool's, so it survives the switch to Text...
     const onText = run(naming, [{ type: 'selectTool', tool: 'text' }]);
-    expect(onText.inlineEdit).toMatchObject({ kind: 'roomLabel' });
+    expect(onText.inlineEdit).toMatchObject({ kind: 'roomProfile' });
     // ...and closing it leaves the Text tool exactly where it stands.
     expect(run(onText, [{ type: 'closeInlineEdit', value: null }]).tool).toBe('text');
   });

@@ -84,9 +84,9 @@ describe('elementsInRect', () => {
     expect(isSelected(refs, openingRef(opening.id))).toBe(false);
   });
 
-  it('never captures room labels (they are not selectable)', () => {
+  it('never captures room profiles (they are not selectable)', () => {
     const plan = buildPlan((b) => {
-      b.label('Kitchen', 50, 50);
+      b.profile('Kitchen', 50, 50);
     });
     const refs = elementsInRect(plan, { x: 0, y: 0 }, { x: 100, y: 100 });
     expect(refs).toEqual([]);
@@ -337,8 +337,8 @@ describe('refKey', () => {
   });
 });
 
-describe('deleteSelection — room label cascade', () => {
-  // two 3×3 m rooms side by side sharing a divider, one label in each
+describe('deleteSelection — room profile cascade', () => {
+  // two 3×3 m rooms side by side sharing a divider, one profile in each
   const twoLabeledRooms = () => {
     let ids = { leftWalls: [] as string[], divider: '', leftLabel: '', rightLabel: '' };
     const plan = buildPlan((b) => {
@@ -358,59 +358,59 @@ describe('deleteSelection — room label cascade', () => {
       ids = {
         leftWalls: [w1.id, w5.id, w6.id, divider.id],
         divider: divider.id,
-        leftLabel: b.label('Kitchen', 150, 150).id,
-        rightLabel: b.label('Living room', 450, 150).id,
+        leftLabel: b.profile('Kitchen', 150, 150).id,
+        rightLabel: b.profile('Living room', 450, 150).id,
       };
     });
     return { plan, ...ids };
   };
 
-  it('deletes the label of a room whose wall is deleted', () => {
+  it('deletes the profile of a room whose wall is deleted', () => {
     const { plan, leftWalls, rightLabel } = twoLabeledRooms();
     const next = deleteSelection(plan, [wallRef(leftWalls[0])]);
-    expect(Object.keys(next.roomLabels)).toEqual([rightLabel]);
+    expect(Object.keys(next.roomProfiles)).toEqual([rightLabel]);
   });
 
-  it('keeps only the oldest label when deleting the divider merges the rooms', () => {
+  it('keeps only the oldest profile when deleting the divider merges the rooms', () => {
     const { plan, divider, leftLabel } = twoLabeledRooms();
     const next = deleteSelection(plan, [wallRef(divider)]);
-    expect(Object.keys(next.roomLabels)).toEqual([leftLabel]);
+    expect(Object.keys(next.roomProfiles)).toEqual([leftLabel]);
   });
 
-  it('deletes every label when the whole plan is deleted', () => {
+  it('deletes every profile when the whole plan is deleted', () => {
     const { plan } = twoLabeledRooms();
     const refs = Object.keys(plan.walls).map(wallRef);
-    expect(deleteSelection(plan, refs).roomLabels).toEqual({});
+    expect(deleteSelection(plan, refs).roomProfiles).toEqual({});
   });
 });
 
-describe('translateElements — room label rigid move', () => {
-  const labeledSquare = () => {
-    let ids = { walls: [] as string[], label: '' };
+describe('translateElements — room profile rigid move', () => {
+  const namedSquare = () => {
+    let ids = { walls: [] as string[], profile: '' };
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0);
       const p2 = b.point(400, 0);
       const p3 = b.point(400, 400);
       const p4 = b.point(0, 400);
       const walls = [b.wall(p1, p2), b.wall(p2, p3), b.wall(p3, p4), b.wall(p4, p1)];
-      ids = { walls: walls.map((w) => w.id), label: b.label('Kitchen', 350, 120).id };
+      ids = { walls: walls.map((w) => w.id), profile: b.profile('Kitchen', 350, 120).id };
     });
     return { plan, ...ids };
   };
 
-  it('moves the label with the room when every boundary wall is selected', () => {
-    const { plan, walls, label } = labeledSquare();
+  it('moves the profile with the room when every boundary wall is selected', () => {
+    const { plan, walls, profile } = namedSquare();
     const next = translateElements(plan, walls.map(wallRef), 50, -30);
-    expect(next.roomLabels[label]).toMatchObject({ x: 400, y: 90 });
+    expect(next.roomProfiles[profile]).toMatchObject({ x: 400, y: 90 });
   });
 
-  it('leaves the label in place when the room only deforms (partial selection)', () => {
-    const { plan, walls, label } = labeledSquare();
+  it('leaves the profile in place when the room only deforms (partial selection)', () => {
+    const { plan, walls, profile } = namedSquare();
     const next = translateElements(plan, [wallRef(walls[0])], 50, -30);
-    expect(next.roomLabels[label]).toMatchObject({ x: 350, y: 120 });
+    expect(next.roomProfiles[profile]).toMatchObject({ x: 350, y: 120 });
   });
 
-  it('does not move the label of an unselected room', () => {
+  it('does not move the profile of an unselected room', () => {
     let ids = { leftWalls: [] as string[], rightLabel: '' };
     const plan = buildPlan((b) => {
       const a = b.point(0, 0);
@@ -426,11 +426,11 @@ describe('translateElements — room label rigid move', () => {
       b.wall(g, h);
       b.wall(h, i);
       b.wall(i, f);
-      b.label('Kitchen', 150, 150);
-      ids = { leftWalls: left.map((w) => w.id), rightLabel: b.label('Living room', 650, 150).id };
+      b.profile('Kitchen', 150, 150);
+      ids = { leftWalls: left.map((w) => w.id), rightLabel: b.profile('Living room', 650, 150).id };
     });
     const next = translateElements(plan, ids.leftWalls.map(wallRef), 20, 20);
-    expect(next.roomLabels[ids.rightLabel]).toMatchObject({ x: 650, y: 150 });
+    expect(next.roomProfiles[ids.rightLabel]).toMatchObject({ x: 650, y: 150 });
   });
 });
 
@@ -445,14 +445,14 @@ describe('translateElements — placement state', () => {
       const walls = [b.wall(p1, p2), b.wall(p2, p3), b.wall(p3, p4), b.wall(p4, p1)];
       ids = {
         walls: walls.map((w) => w.id),
-        byDefault: b.label('Kitchen', 200, 200).id,
-        custom: b.label('Nook', 350, 120, true).id,
+        byDefault: b.profile('Kitchen', 200, 200).id,
+        custom: b.profile('Nook', 350, 120, true).id,
       };
     });
     const next = translateElements(plan, ids.walls.map(wallRef), 50, -30);
-    expect(next.roomLabels[ids.byDefault]).toMatchObject({ x: 250, y: 170 });
-    expect(next.roomLabels[ids.byDefault].placed).toBeUndefined();
-    expect(next.roomLabels[ids.custom]).toMatchObject({ x: 400, y: 90, placed: true });
+    expect(next.roomProfiles[ids.byDefault]).toMatchObject({ x: 250, y: 170 });
+    expect(next.roomProfiles[ids.byDefault].placed).toBeUndefined();
+    expect(next.roomProfiles[ids.custom]).toMatchObject({ x: 400, y: 90, placed: true });
   });
 });
 

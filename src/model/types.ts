@@ -46,7 +46,7 @@ export type Opening = Door | Window;
 
 // CONTEXT.md: Room label. `placed` absent = renders at the live centroid,
 // (x, y) is only the association anchor; `placed: true` = (x, y) renders.
-export interface RoomLabel {
+export interface RoomProfile {
   id: string;
   name: string;
   x: Cm;
@@ -81,7 +81,7 @@ export interface Plan {
   points: Record<string, Point>;
   walls: Record<string, Wall>;
   openings: Record<string, Opening>;
-  roomLabels: Record<string, RoomLabel>;
+  roomProfiles: Record<string, RoomProfile>;
   rulers: Record<string, Ruler>;
   texts: Record<string, TextNote>;
 }
@@ -109,7 +109,7 @@ export const defaultOpeningWidth = (type: Opening['type']): Cm =>
   type === 'door' ? DOOR_WIDTH : WINDOW_WIDTH;
 
 export function emptyPlan(): Plan {
-  return { points: {}, walls: {}, openings: {}, roomLabels: {}, rulers: {}, texts: {} };
+  return { points: {}, walls: {}, openings: {}, roomProfiles: {}, rulers: {}, texts: {} };
 }
 
 export function isPlanEmpty(plan: Plan): boolean {
@@ -117,7 +117,7 @@ export function isPlanEmpty(plan: Plan): boolean {
     Object.keys(plan.points).length === 0 &&
     Object.keys(plan.walls).length === 0 &&
     Object.keys(plan.openings).length === 0 &&
-    Object.keys(plan.roomLabels).length === 0 &&
+    Object.keys(plan.roomProfiles).length === 0 &&
     Object.keys(plan.rulers).length === 0 &&
     Object.keys(plan.texts).length === 0
   );

@@ -1,4 +1,4 @@
-// CONTEXT.md: Room label — no orphan label: a deforming drag re-snaps it to the
+// CONTEXT.md: Room profile — no orphan profile: a deforming drag re-snaps it to the
 // centroid, a group move carries a custom-placed one.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -12,8 +12,8 @@ beforeEach(() => {
   usePlanStore.temporal.getState().clear();
 });
 
-// A closed square room (100,100)-(500,500) with a label near its right wall.
-function labeledSquare(placed?: true): Plan {
+// A closed square room (100,100)-(500,500) with a profile near its right wall.
+function namedSquare(placed?: true): Plan {
   return {
     points: {
       a: { id: 'a', x: 100, y: 100 },
@@ -28,7 +28,7 @@ function labeledSquare(placed?: true): Plan {
       w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
     },
     openings: {},
-    roomLabels: {
+    roomProfiles: {
       l1: placed
         ? { id: 'l1', name: 'Kitchen', x: 480, y: 250, placed }
         : { id: 'l1', name: 'Kitchen', x: 480, y: 250 },
@@ -38,11 +38,11 @@ function labeledSquare(placed?: true): Plan {
   };
 }
 
-const label = () => usePlanStore.getState().plan.roomLabels.l1;
+const profile = () => usePlanStore.getState().plan.roomProfiles.l1;
 const undoDepth = () => usePlanStore.temporal.getState().pastStates.length;
 
 async function setup(placed?: true) {
-  usePlanStore.setState({ plan: labeledSquare(placed), planEpoch: 0 });
+  usePlanStore.setState({ plan: namedSquare(placed), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
   const { container } = await render(<Editor />);
   const svg = container.querySelector('svg')!;
@@ -55,38 +55,38 @@ async function marqueeSelect(svg: SVGSVGElement, a: { x: number; y: number }, b:
   await pointer(svg, 'pointerup');
 }
 
-describe('label reconciliation at the end of a wall gesture', () => {
-  it('snaps the label to the room centroid when a point drag deforms the room away from it', async () => {
+describe('profile reconciliation at the end of a wall gesture', () => {
+  it('snaps the profile to the room centroid when a point drag deforms the room away from it', async () => {
     const { svg } = await setup();
     await marqueeSelect(svg, { x: 450, y: 50 }, { x: 550, y: 550 });
     const handles = svg.querySelectorAll('.point-handle');
     expect(handles).toHaveLength(2);
-    // drag the corner (500,500) to (300,300): the label at (480,250) leaves the room
+    // drag the corner (500,500) to (300,300): the profile at (480,250) leaves the room
     await pointer(handles[1], 'pointerdown', { button: 0, ...clientAt(svg, 500, 500) });
     await pointer(svg, 'pointermove', clientAt(svg, 300, 300));
-    expect(label()).toMatchObject({ x: 480, y: 250 });
+    expect(profile()).toMatchObject({ x: 480, y: 250 });
     await pointer(svg, 'pointerup');
     // centroid of (100,100) (500,100) (300,300) (100,500), rounded
-    expect(label()).toMatchObject({ name: 'Kitchen', x: 233, y: 233 });
+    expect(profile()).toMatchObject({ name: 'Kitchen', x: 233, y: 233 });
     expect(undoDepth()).toBe(1);
   });
 
-  it('moves a custom-placed label with the room on a select-all group move', async () => {
+  it('moves a custom-placed profile with the room on a select-all group move', async () => {
     const { svg } = await setup(true);
     await marqueeSelect(svg, { x: 0, y: 0 }, { x: 600, y: 600 });
     const wallHit = svg.querySelectorAll('line[stroke="transparent"]')[0];
     await pointer(wallHit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 100) });
     await pointer(svg, 'pointermove', clientAt(svg, 350, 150));
     await pointer(svg, 'pointerup');
-    expect(label()).toMatchObject({ name: 'Kitchen', x: 530, y: 300, placed: true });
+    expect(profile()).toMatchObject({ name: 'Kitchen', x: 530, y: 300, placed: true });
     expect(undoDepth()).toBe(1);
   });
 });
 
 describe('default placement follows the live centroid', () => {
-  async function setupUnlabeled() {
-    const base = labeledSquare();
-    usePlanStore.setState({ plan: { ...base, roomLabels: {} }, planEpoch: 0 });
+  async function setupUnnamed() {
+    const base = namedSquare();
+    usePlanStore.setState({ plan: { ...base, roomProfiles: {} }, planEpoch: 0 });
     usePlanStore.temporal.getState().clear();
     const { container } = await render(<Editor />);
     const svg = container.querySelector('svg')!;
@@ -97,11 +97,11 @@ describe('default placement follows the live centroid', () => {
     container.querySelector('text.room-name')!.closest('g')!.getAttribute('transform');
 
   it('naming a room does not freeze its block: it tracks the centroid through a wall drag', async () => {
-    const { container, svg } = await setupUnlabeled();
+    const { container, svg } = await setupUnnamed();
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await userEvent.fill(page.getByRole('textbox'), 'Kitchen');
     await userEvent.keyboard('{Enter}');
-    expect(usePlanStore.getState().plan.roomLabels).not.toEqual({});
+    expect(usePlanStore.getState().plan.roomProfiles).not.toEqual({});
 
     // drag the right wall inward: the room becomes (100,100)-(250,500)
     const wallHits = svg.querySelectorAll('line[stroke="transparent"]');
@@ -110,7 +110,7 @@ describe('default placement follows the live centroid', () => {
     expect(blockTransform(container)).toBe('translate(175,300)');
     await pointer(svg, 'pointerup');
     expect(blockTransform(container)).toBe('translate(175,300)');
-    const created = Object.values(usePlanStore.getState().plan.roomLabels)[0];
+    const created = Object.values(usePlanStore.getState().plan.roomProfiles)[0];
     expect(created).toMatchObject({ name: 'Kitchen', x: 175, y: 300 });
     expect(created.placed).toBeUndefined();
   });

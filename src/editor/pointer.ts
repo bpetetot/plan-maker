@@ -2,7 +2,7 @@
 // Pure, no DOM: capture is an instruction in the intent, applied by the Editor.
 import type { Vec } from '../model/geometry';
 import type { ElementRef } from '../model/selection';
-import type { RoomLabel } from '../model/types';
+import type { RoomProfile } from '../model/types';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { CLICK_PX } from './gesture';
 
@@ -16,7 +16,7 @@ export type PointerTarget =
       handle: { type: 'point'; id: string } | { type: 'rulerEnd'; id: string; end: 'a' | 'b' };
     }
   | { kind: 'dim'; wallId: string }
-  | { kind: 'label'; block: RoomTextBlock; label: RoomLabel | null };
+  | { kind: 'profile'; block: RoomTextBlock; profile: RoomProfile | null };
 
 export type GrabTarget = Exclude<PointerTarget, { kind: 'sheet' }>;
 

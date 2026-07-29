@@ -19,7 +19,7 @@ function hostPlan(): Plan {
     },
     walls: { w1: { id: 'w1', startPointId: 'a', endPointId: 'b', thickness: 10 } },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };
@@ -74,7 +74,7 @@ describe('dragging a point during a free move', () => {
           w2: { id: 'w2', startPointId: 'c', endPointId: 'd', thickness: 10 },
         },
         openings: {},
-        roomLabels: {},
+        roomProfiles: {},
         rulers: {},
         texts: {},
       },

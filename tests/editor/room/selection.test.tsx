@@ -145,7 +145,7 @@ describe('moving a selected room', () => {
 describe('clicking the room text block', () => {
   const nameHit = () => document.querySelector('.room-name-hit')!;
   const areaHit = () => document.querySelector('.room-area-hit')!;
-  const label = () => Object.values(usePlanStore.getState().plan.roomLabels)[0];
+  const label = () => Object.values(usePlanStore.getState().plan.roomProfiles)[0];
 
   it('selects the room carrying the name', async () => {
     const { svg } = await setup(namedRoomPlan('Kitchen'));

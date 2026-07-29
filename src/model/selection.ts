@@ -2,7 +2,7 @@ import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { deleteOpening, openingPlacement } from './openings';
 import { settleEdit } from './settle';
-import { translateRoomLabelsWithRooms } from './roomLabels';
+import { translateRoomProfilesWithRooms } from './roomProfiles';
 import type { Room } from './rooms';
 import { detectRooms, openingsOnWalls, roomDeletionWallIds, roomOpenings, roomWallIds } from './rooms';
 import { deleteRuler, translateRuler } from './rulers';
@@ -10,7 +10,7 @@ import { deleteText, translateText } from './texts';
 import { deleteWall, setPoints } from './walls';
 import type { Opening, Plan, Point } from './types';
 
-// CONTEXT.md: Selection. Editor state, never the plan; room labels are never
+// CONTEXT.md: Selection. Editor state, never the plan; room profiles are never
 // selected.
 
 export interface ElementRef {
@@ -151,7 +151,7 @@ export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Roo
 }
 
 // Every edit settles in the same place (ADR 0022); a delete displaces no Point,
-// so only the label reconciliation can act.
+// so only the profile reconciliation can act.
 function deleteElements(plan: Plan, refs: ElementRef[]): Plan {
   let next = plan;
   for (const ref of refs) {
@@ -234,7 +234,7 @@ export function translateElements(plan: Plan, refs: ElementRef[], dx: number, dy
 
   if (movesWalls) {
     const movedWallIds = new Set(refs.filter((r) => r.type === 'wall').map((r) => r.id));
-    next = translateRoomLabelsWithRooms(plan, next, movedWallIds, dx, dy);
+    next = translateRoomProfilesWithRooms(plan, next, movedWallIds, dx, dy);
   }
   return next;
 }

@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 // A closed square room (100,100)-(500,500); centroid at (300,300).
-function emptySquare(label?: { name: string; x: number; y: number; placed?: true }): Plan {
+function emptySquare(profile?: { name: string; x: number; y: number; placed?: true }): Plan {
   return {
     points: {
       a: { id: 'a', x: 100, y: 100 },
@@ -27,22 +27,22 @@ function emptySquare(label?: { name: string; x: number; y: number; placed?: true
       w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
     },
     openings: {},
-    roomLabels: label ? { l1: { id: 'l1', ...label } } : {},
+    roomProfiles: profile ? { l1: { id: 'l1', ...profile } } : {},
     rulers: {},
     texts: {},
   };
 }
 
 const plan = () => usePlanStore.getState().plan;
-const labels = () => Object.values(plan().roomLabels);
+const profiles = () => Object.values(plan().roomProfiles);
 const undoDepth = () => usePlanStore.temporal.getState().pastStates.length;
 
 // Role, not label: the inline editor carries no accessible name.
 const nameInput = () => page.getByRole('textbox');
 const isEditing = () => nameInput().elements().length === 1;
 
-async function setup(label?: { name: string; x: number; y: number; placed?: true }) {
-  usePlanStore.setState({ plan: emptySquare(label), planEpoch: 0 });
+async function setup(profile?: { name: string; x: number; y: number; placed?: true }) {
+  usePlanStore.setState({ plan: emptySquare(profile), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
   const { container } = await render(<Editor />);
   const svg = container.querySelector('svg')!;
@@ -58,8 +58,8 @@ describe('inline room-name editing', () => {
     await userEvent.fill(nameInput(), 'Kitchen');
     await userEvent.keyboard('{Enter}');
     expect(isEditing()).toBe(false);
-    expect(labels()).toHaveLength(1);
-    expect(labels()[0]).toMatchObject({ name: 'Kitchen', x: 300, y: 300 });
+    expect(profiles()).toHaveLength(1);
+    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', x: 300, y: 300 });
     expect(undoDepth()).toBe(1);
   });
 
@@ -69,15 +69,15 @@ describe('inline room-name editing', () => {
     await userEvent.fill(nameInput(), 'Kitchen');
     await userEvent.keyboard('{Escape}');
     expect(isEditing()).toBe(false);
-    expect(labels()).toHaveLength(0);
+    expect(profiles()).toHaveLength(0);
     expect(undoDepth()).toBe(0);
   });
 
-  it('committing an empty name on an unlabeled room creates nothing', async () => {
+  it('committing an empty name on an unnamed room creates nothing', async () => {
     const { svg } = await setup();
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await userEvent.keyboard('{Enter}');
-    expect(labels()).toHaveLength(0);
+    expect(profiles()).toHaveLength(0);
     expect(undoDepth()).toBe(0);
   });
 
@@ -87,17 +87,17 @@ describe('inline room-name editing', () => {
     await expect.element(nameInput()).toHaveValue('Kitchen');
     await userEvent.clear(nameInput());
     await userEvent.keyboard('{Enter}');
-    expect(labels()[0]).toMatchObject({ name: '', x: 250, y: 260, placed: true });
+    expect(profiles()[0]).toMatchObject({ name: '', x: 250, y: 260, placed: true });
     expect(undoDepth()).toBe(1);
   });
 
-  it('emptying the text on an undragged block leaves the room unlabeled', async () => {
+  it('emptying the text on an undragged block leaves the room unnamed', async () => {
     const { svg } = await setup({ name: 'Kitchen', x: 300, y: 300 });
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await expect.element(nameInput()).toHaveValue('Kitchen');
     await userEvent.clear(nameInput());
     await userEvent.keyboard('{Enter}');
-    expect(labels()).toHaveLength(0);
+    expect(profiles()).toHaveLength(0);
     expect(undoDepth()).toBe(1);
   });
 
@@ -110,7 +110,7 @@ describe('inline room-name editing', () => {
 });
 
 describe('a room inside a room', () => {
-  // The bug's plan: outer room (130,40)-(520,430) labeled 'AAA', with a
+  // The bug's plan: outer room (130,40)-(520,430) named 'AAA', with a
   // disconnected island room (250,80)-(400,180) inside it.
   function nestedRooms(): Plan {
     return {
@@ -135,7 +135,7 @@ describe('a room inside a room', () => {
         w8: { id: 'w8', startPointId: 'h', endPointId: 'e', thickness: 10 },
       },
       openings: {},
-      roomLabels: { l1: { id: 'l1', name: 'AAA', x: 325, y: 235 } },
+      roomProfiles: { l1: { id: 'l1', name: 'AAA', x: 325, y: 235 } },
       rulers: {},
       texts: {},
     };
@@ -149,19 +149,19 @@ describe('a room inside a room', () => {
     return { svg };
   }
 
-  it('double-clicking inside the inner room edits its own label, not the outer one', async () => {
+  it('double-clicking inside the inner room edits its own profile, not the outer one', async () => {
     const { svg } = await setupNested();
     await mouse(svg, 'dblclick', clientAt(svg, 325, 130));
     await expect.element(nameInput()).toHaveValue('');
     await userEvent.fill(nameInput(), 'Cellier');
     await userEvent.keyboard('{Enter}');
-    const all = labels();
+    const all = profiles();
     expect(all).toHaveLength(2);
     expect(all.find((l) => l.name === 'Cellier')).toMatchObject({ x: 325, y: 130 });
     expect(all.find((l) => l.name === 'AAA')).toMatchObject({ x: 325, y: 235 });
   });
 
-  it('double-clicking in the outer room still edits the outer label', async () => {
+  it('double-clicking in the outer room still edits the outer profile', async () => {
     const { svg } = await setupNested();
     await mouse(svg, 'dblclick', clientAt(svg, 200, 350));
     await expect.element(nameInput()).toHaveValue('AAA');
@@ -169,23 +169,23 @@ describe('a room inside a room', () => {
 });
 
 describe('dragging the area text', () => {
-  it('a drag on an unlabeled room creates a nameless label in one undo entry', async () => {
+  it('a drag on an unnamed room creates a nameless profile in one undo entry', async () => {
     const { svg, areaBlock } = await setup();
     await pointer(areaBlock(), 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', clientAt(svg, 350, 320));
     await pointer(svg, 'pointerup');
-    expect(labels()).toHaveLength(1);
-    expect(labels()[0]).toMatchObject({ name: '', x: 350, y: 320 });
+    expect(profiles()).toHaveLength(1);
+    expect(profiles()[0]).toMatchObject({ name: '', x: 350, y: 320 });
     expect(undoDepth()).toBe(1);
   });
 
   // The block is a handle: a click selects the room it belongs to (ADR 0014)
-  // and never touches the plan — no label is born from a click.
+  // and never touches the plan — no profile is born from a click.
   it('a plain click on the area text selects the room, leaving the plan alone', async () => {
     const { svg, areaBlock } = await setup();
     await pointer(areaBlock(), 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointerup');
-    expect(labels()).toHaveLength(0);
+    expect(profiles()).toHaveLength(0);
     expect(undoDepth()).toBe(0);
     expect(document.querySelector('.panel-title')?.textContent).toBe('Room');
   });
@@ -195,26 +195,26 @@ describe('dragging the area text', () => {
     await pointer(areaBlock(), 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', clientAt(svg, 700, 300));
     await pointer(svg, 'pointerup');
-    expect(labels()).toHaveLength(1);
+    expect(profiles()).toHaveLength(1);
     // clamped to the wall at x=500, nudged one unit inside
-    expect(labels()[0]).toMatchObject({ name: '', x: 499, y: 300 });
+    expect(profiles()[0]).toMatchObject({ name: '', x: 499, y: 300 });
     expect(undoDepth()).toBe(1);
   });
 
-  it('an existing label clamps to its room too', async () => {
+  it('an existing profile clamps to its room too', async () => {
     const { svg, areaBlock } = await setup({ name: 'Kitchen', x: 300, y: 300 });
     await pointer(areaBlock(), 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', clientAt(svg, 700, 300));
     await pointer(svg, 'pointerup');
-    expect(labels()[0]).toMatchObject({ name: 'Kitchen', x: 499, y: 300 });
+    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', x: 499, y: 300 });
   });
 
-  it('a label outside any room (defensive: unreachable via plan operations) drags freely', async () => {
+  it('a profile outside any room (defensive: unreachable via plan operations) drags freely', async () => {
     const { container, svg } = await setup({ name: 'Kitchen', x: 700, y: 300 });
     const nameBlock = container.querySelector('rect.room-name-hit')!;
     await pointer(nameBlock, 'pointerdown', { button: 0, ...clientAt(svg, 700, 300) });
     await pointer(svg, 'pointermove', clientAt(svg, 650, 200));
     await pointer(svg, 'pointerup');
-    expect(labels()[0]).toMatchObject({ name: 'Kitchen', x: 650, y: 200 });
+    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', x: 650, y: 200 });
   });
 });

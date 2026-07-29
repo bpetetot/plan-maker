@@ -25,7 +25,7 @@ function tPlan(): Plan {
       w2: { id: 'w2', startPointId: 'c', endPointId: 'd', thickness: 10 },
     },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };

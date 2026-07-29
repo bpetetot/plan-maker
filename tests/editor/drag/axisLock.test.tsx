@@ -42,7 +42,7 @@ const roomPlan = (labeled: boolean): Plan => ({
     w3: { id: 'w3', startPointId: 'c', endPointId: 'd', thickness: 10 },
     w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
   },
-  roomLabels: labeled ? { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } } : {},
+  roomProfiles: labeled ? { l1: { id: 'l1', name: 'Kitchen', x: 300, y: 300, placed: true } } : {},
 });
 
 // An L: the band y ∈ [0,300] over x ∈ [0,600], plus x ∈ [0,300] down to y = 600.
@@ -61,7 +61,7 @@ const lShapedRoom = (): Plan =>
     b.wall(p4, p5);
     b.wall(p5, p6);
     b.wall(p6, p1);
-    b.label('Corner', 150, 400, true);
+    b.profile('Corner', 150, 400, true);
   });
 
 async function setup(initial: Plan) {
@@ -277,7 +277,7 @@ describe('a room label under a held Shift', () => {
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 400, 350) });
     await pointer(svg, 'pointerup');
-    expect(plan().roomLabels.l1).toMatchObject({ x: 400, y: 300 });
+    expect(plan().roomProfiles.l1).toMatchObject({ x: 400, y: 300 });
   });
 
   it('holds the block’s x on the other axis', async () => {
@@ -286,7 +286,7 @@ describe('a room label under a held Shift', () => {
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 350, 400) });
     await pointer(svg, 'pointerup');
-    expect(plan().roomLabels.l1).toMatchObject({ x: 300, y: 400 });
+    expect(plan().roomProfiles.l1).toMatchObject({ x: 300, y: 400 });
   });
 
   it('locks a label born of the gesture too, on either axis', async () => {
@@ -294,7 +294,7 @@ describe('a room label under a held Shift', () => {
     const hit = container.querySelector('rect.room-area-hit')!;
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 300, 300) });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 400, 350) });
-    const born = () => Object.values(plan().roomLabels)[0];
+    const born = () => Object.values(plan().roomProfiles)[0];
     expect(born()).toMatchObject({ x: 400, y: 300 });
     await pointer(svg, 'pointermove', { shiftKey: true, ...clientAt(svg, 350, 400) });
     await pointer(svg, 'pointerup');
@@ -306,7 +306,7 @@ describe('a room label under a held Shift', () => {
   it('leaves the axis when the Room’s notch pushes it off', async () => {
     const { container, svg } = await setup(lShapedRoom());
     const hit = container.querySelector('rect.room-name-hit')!;
-    const label = () => Object.values(plan().roomLabels)[0];
+    const label = () => Object.values(plan().roomProfiles)[0];
     // held on y = 400, dragged right — first within the leg, then into the
     // notch the L has no floor in
     await pointer(hit, 'pointerdown', { button: 0, ...clientAt(svg, 150, 400) });

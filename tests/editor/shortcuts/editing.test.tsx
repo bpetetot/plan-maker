@@ -25,7 +25,7 @@ const square = (): Plan => ({
     w4: { id: 'w4', startPointId: 'd', endPointId: 'a', thickness: 10 },
   },
   openings: {},
-  roomLabels: {},
+  roomProfiles: {},
   rulers: {},
   texts: {},
 });
@@ -225,12 +225,12 @@ describe('the typing guard', () => {
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await userEvent.fill(nameInput(), 'Kitchen');
     await userEvent.keyboard('{Enter}');
-    expect(Object.values(plan().roomLabels)[0]).toMatchObject({ name: 'Kitchen' });
+    expect(Object.values(plan().roomProfiles)[0]).toMatchObject({ name: 'Kitchen' });
 
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     await userEvent.fill(nameInput(), 'Kitchenette');
     await key('z', { ctrlKey: true });
-    expect(Object.values(plan().roomLabels)[0]).toMatchObject({ name: 'Kitchen' });
+    expect(Object.values(plan().roomProfiles)[0]).toMatchObject({ name: 'Kitchen' });
     await unmount();
   });
 

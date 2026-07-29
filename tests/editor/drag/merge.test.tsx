@@ -24,7 +24,7 @@ function openCorner(): Plan {
       w2: { id: 'w2', startPointId: 'c', endPointId: 'e', thickness: 10 },
     },
     openings: {},
-    roomLabels: {},
+    roomProfiles: {},
     rulers: {},
     texts: {},
   };
