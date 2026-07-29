@@ -12,6 +12,7 @@ export type ShortcutAction =
   | 'deleteSelection'
   | 'toggleGrid'
   | 'toggleMeasures'
+  | 'silenceMeasures'
   | 'zoomIn'
   | 'zoomOut'
   | 'fit'
@@ -79,6 +80,12 @@ const SHORTCUTS: Record<ShortcutAction, Shortcut> = {
     hotkey: 'M',
     name: 'Toggle measures',
     sections: { view: 'Show or hide the measures' },
+  },
+  // A strict match, so the bare 'M' above never fires with Shift held.
+  silenceMeasures: {
+    hotkey: 'Shift+M',
+    name: 'Silence measures',
+    sections: { view: 'Silence or state the measures of the selection' },
   },
   // Registered on the physical key: '+' is Shift+'='. Shift variant aliased below.
   zoomIn: {

@@ -97,9 +97,9 @@ own to delete, so deleting it does nothing (ADR 0015).
 _Avoid_: Zone, area, space
 
 **Room profile**:
-What a room carries of its own: a name, a custom placement, a Condemned
-mark, or any of them together — a profile that carries none of them does not
-exist, and is deleted the moment it loses the last one it had. The name shows with the room's area as
+What a room carries of its own: a name, a custom placement, a Hatching mark, a
+Silenced area, or any of them together — a profile that carries none of them does
+not exist, and is deleted the moment it loses the last one it had. The name shows with the room's area as
 one text block — name and area always share one position and one behavior,
 so an unnamed room whose area block was dragged carries a nameless profile to
 hold that placement. A profile belongs to its room, not to a position: it
@@ -123,24 +123,29 @@ translates every wall of its room, a custom placement translates with the
 room, keeping its position relative to the room — a default placement
 simply follows the anchor. A room with no profile, or one whose profile carries
 no name, shows its area alone — at the anchor by default, at the block's
-position when the profile holds one — unless the room is Condemned. A room
+position when the profile holds one — unless that area is Silenced. A room
 never keeps more than one profile: when a
 wall change leaves several profiles in one room (e.g. deleting a dividing wall
 merges two named rooms), only the oldest survives — the others are deleted.
 _Avoid_: Room label, room name, tag
 
-**Condemned**:
+**Hatching**:
 A mark a room carries stating that its floor is out of use — a chimney
 shaft, a lost corner, a void the walls enclose but the dwelling does not
-inhabit. The Sheet states it and nothing else changes: the floor is hatched,
-and the area line is not printed — an area is a claim of usable surface,
-which a condemned room no longer makes — while the name, if it has one,
-still shows. The room stays a full Room in every other respect: selectable,
-deletable, its walls measured, its contents counted, and the Tool panel
-still states the area as a fact of inspection. The mark lives on the Room
-profile and obeys its laws: it follows the room through every wall change,
-and when rooms merge, the oldest profile wins whole — mark included.
-_Avoid_: Closed, void, unused, disabled
+inhabit. The Sheet states it by hatching the floor, and that is the whole of
+its effect. Whether the area line prints is the Silenced mark's business
+alone: hatching a room silences its area in the same Edit, because that is
+almost always the reading wanted and one undo should take the pair back — but
+only as a default, so a hatched floor can state its area if the user asks for
+it, and un-hatching never brings a silenced area back (ADR 0039). The room
+stays a full Room in every other respect: selectable, deletable, its walls
+measured, its contents counted, and the Tool panel still states the area as a
+fact of inspection. The mark lives on the Room profile and obeys its laws: it
+follows the room through every wall change, and when rooms merge, the oldest
+profile wins whole — marks included.
+_Avoid_: Condemned (retired: once the mark's only effect was the hatching, the
+concept and its graphic became indistinguishable, and a term living only in
+the code is a term nobody speaks), closed, void, unused, disabled
 
 **Edit**:
 What one undo takes back. Most edits are a single change to the plan, but a
@@ -165,14 +170,20 @@ _Avoid_: Normalize, cleanup, heal
 
 **Measure**:
 A number the plan states about itself: the Dimension of each wall, the Room
-area of each detected room. Computed from the plan, never stored. Measures
-show by default and hide together, from a single toggle sitting beside the
-Grid's — a per-device preference, like the Grid and the Theme, never part of
-the plan. Hiding is global and unconditional: selecting a wall does not bring
-its Dimension back, so a hidden plan stays clean whatever is selected, and
-adjusting a Dimension's placement means showing measures again. What hides on
-screen is absent from the export too (ADR 0008) — hiding measures is how a
-clean sheet is produced to share.
+area of each detected room. Computed from the plan, never stored. Two things
+decide whether one is drawn, and they compose as an AND: a measure shows when
+measures are shown *and* it is not Silenced (ADR 0039).
+Measures show by default and hide together, from a single toggle sitting beside
+the Grid's — a per-device preference, like the Grid and the Theme, never part of
+the plan. That toggle is global and unconditional: no selection, hover or
+gesture brings a hidden measure back, so a hidden plan stays entirely bare
+whatever is lit and whatever is individually Silenced. It writes nothing to the
+plan either, so the clean-sheet round trip costs no undo entry and loses none of
+the per-element choices. What hides on screen is absent from the export too
+(ADR 0008) — hiding measures is how a clean sheet is produced to share.
+Formatting a measure — placing a Dimension, silencing one — is work done with
+measures shown, so a formatting gesture that arrives with them hidden turns them
+back on rather than writing into the void.
 The rule that decides what counts: a measure is permanent and exported. A
 number shown only for the duration of a gesture — the live length of the wall
 being drawn, a Placement dimension — is interaction chrome, not a measure, and
@@ -222,6 +233,27 @@ interior Faces of its walls — the real floor surface, not the wall-axis loop. 
 footprint of a contained island, out to its walls' exterior Faces, is not
 floor: it is excluded.
 _Avoid_: Surface, square footage
+
+**Silenced**:
+A mark an element carries stating that the Sheet does not print the Measure it
+would otherwise state about it. A Wall silences its Dimension; a Room silences
+its Room area — nothing else carries the mark: a Ruler is content the user
+placed and is deleted when unwanted rather than muted, and a Text is not a
+number the plan states about itself. Unlike the measures toggle it *is* part of
+the plan, and of the same nature as a Dimension's stored placement: deciding to
+say nothing about a wall is an act of drafting, like deciding where to say it.
+So it survives a reload, travels with a saved file, and one undo takes it back —
+and it composes with the toggle as an AND (ADR 0039). A silenced Dimension
+leaves no plate, no extent line, no arrowheads, and therefore no drag handle,
+the plate *being* the handle: re-placing one means stating it, moving it, and
+silencing it again — while the wall stays selectable by its body. A room whose
+area is silenced still shows its name; one with no name draws no text block at
+all, and is reached again by clicking its floor. Nothing on the canvas says a
+Measure is silenced: the Tool panel's `DISPLAY` switch is the only tell, and it
+is also the remedy. Reached one element at a time from that switch, or on a
+whole Selection with `Shift+M`.
+_Avoid_: Hidden (that is the global toggle — "a hidden measure" must not mean
+two things), muted, off
 
 **Ruler**:
 A measurement the user hand-places between two points, drawn as the same
@@ -389,6 +421,14 @@ refs, so a Shift-click that puts an opening out lowers the count — and lists
 only what it holds: a row with nothing to count does not appear. Thickness is
 offered on a single selected wall and nowhere else: no Selection retypes
 several walls at once.
+A `DISPLAY` section states what the Sheet prints of the element, on one element
+at a time, with switches read positively — up means the thing appears. A single
+wall offers `Dimension`; a Room offers `Area` and `Hatching`, and nothing about
+its boundary walls' Dimensions, which are a wall matter like retyping them. Both
+are marks on the plan, so flipping a switch is an Edit; the batch path is the
+keyboard (`Shift+M`), never the panel. The section is about printing and the
+`DIMENSIONS` rows about what the plan computes, so a wall's lengths and a Room's
+area stay stated there as read-only facts of inspection whatever the marks say.
 _Avoid_: Selection panel, popover, inspector, properties dialog
 
 **Tool defaults**:

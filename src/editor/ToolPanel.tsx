@@ -18,14 +18,15 @@ import { useRef, useState } from 'react';
 import { formatArea, formatLength } from '../model/format';
 import { distance } from '../model/geometry';
 import { setOpeningWidth, toggleHingeSide, toggleSwing } from '../model/openings';
-import { setWallThickness } from '../model/walls';
-import { roomProfileAt, setRoomCondemned } from '../model/roomProfiles';
+import { setDimSilenced, setWallThickness } from '../model/walls';
+import { roomProfileAt, setRoomAreaSilenced, setRoomHatched } from '../model/roomProfiles';
 import { detectRooms, wallMeasures } from '../model/rooms';
 import type { Contents, ElementRef } from '../model/selection';
 import { roomContents, selectedRoom, selectionContents } from '../model/selection';
 import { setTextSize } from '../model/texts';
 import type { Plan, TextSize, Wall } from '../model/types';
 import { WALL_THICKNESS_MAX } from '../model/types';
+import { setPreference } from '../preferences/preferences';
 import { editPlan } from '../store/planStore';
 import type { Tool, ToolDefaults } from './tools';
 
@@ -140,11 +141,36 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
         />
       )}
       {contents && <ContentsRows contents={contents} zeros={room !== null} />}
-      {room && (
-        <CondemnedSection
-          condemned={Boolean(profile?.condemned)}
-          onToggle={(condemned) => editPlan((p) => setRoomCondemned(p, room, condemned))}
-        />
+      {(room || wall) && (
+        <section>
+          <div className="panel-section-label">Display</div>
+          {room && (
+            <>
+              <DisplaySwitch
+                label="Area"
+                shown={!profile?.areaSilenced}
+                title="Print the room area on the sheet"
+                onChange={(shown) => displayEdit((p) => setRoomAreaSilenced(p, room, !shown))}
+              />
+              <DisplaySwitch
+                label="Hatching"
+                shown={Boolean(profile?.hatched)}
+                title="Hatch the floor: out of use — a shaft, a void the dwelling does not inhabit"
+                onChange={(shown) => displayEdit((p) => setRoomHatched(p, room, shown))}
+              />
+            </>
+          )}
+          {/* A room states nothing about its boundary walls' Dimensions: that is
+              a wall matter, reached one wall at a time or with Shift+M. */}
+          {wall && (
+            <DisplaySwitch
+              label="Dimension"
+              shown={!wall.dimSilenced}
+              title="Print this wall's Dimension on the sheet"
+              onChange={(shown) => displayEdit((p) => setDimSilenced(p, wall.id, !shown))}
+            />
+          )}
+        </section>
       )}
       {opening && (
         <section>
@@ -311,30 +337,33 @@ function SizeSection({ value, onSelect }: { value: TextSize; onSelect: (size: Te
   );
 }
 
-// A state the room is in, not an action on it (CONTEXT.md: Condemned), so it
-// reads as a switch, not a command button.
-function CondemnedSection({
-  condemned,
-  onToggle,
+// A formatting gesture shows its result, never writing into a hidden layer
+// (ADR 0039) — which is why turning a switch down can turn measures on.
+const displayEdit = (write: (plan: Plan) => Plan) => {
+  setPreference('measures', true);
+  editPlan(write);
+};
+
+// Read positively — up means the thing appears on the Sheet — and a state the
+// element is in, not an action on it, so it reads as a switch.
+function DisplaySwitch({
+  label,
+  shown,
+  title,
+  onChange,
 }: {
-  condemned: boolean;
-  onToggle: (condemned: boolean) => void;
+  label: string;
+  shown: boolean;
+  title: string;
+  onChange: (shown: boolean) => void;
 }) {
   return (
-    <section>
-      <div className="panel-section-label">State</div>
-      <Field className="panel-row">
-        <Label className="panel-row-label">Condemned</Label>
-        <Switch
-          checked={condemned}
-          onChange={onToggle}
-          className="switch"
-          title={condemned ? 'Reopen the room' : 'Condemn the room (hatched, no area)'}
-        >
-          <span aria-hidden className="switch-knob" />
-        </Switch>
-      </Field>
-    </section>
+    <Field className="panel-row">
+      <Label className="panel-row-label">{label}</Label>
+      <Switch checked={shown} onChange={onChange} className="switch" title={title}>
+        <span aria-hidden className="switch-knob" />
+      </Switch>
+    </Field>
   );
 }
 

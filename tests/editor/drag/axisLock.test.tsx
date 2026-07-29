@@ -61,7 +61,7 @@ const lShapedRoom = (): Plan =>
     b.wall(p4, p5);
     b.wall(p5, p6);
     b.wall(p6, p1);
-    b.profile('Corner', 150, 400, true);
+    b.profile('Corner', 150, 400, { placed: true });
   });
 
 async function setup(initial: Plan) {

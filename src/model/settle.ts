@@ -40,17 +40,22 @@ function splitWall(plan: Plan, wallId: string, pointId: string): Plan {
   if (!wall || !point) return plan;
   if (pointId === wall.startPointId || pointId === wall.endPointId) return plan;
 
+  // Inherited unlike the dropped `dimPlacement`: a placement describes a geometry
+  // that ceased to exist, a silence an intention that holds (ADR 0039).
+  const inherited = wall.dimSilenced ? { dimSilenced: wall.dimSilenced } : {};
   const startHalf: Wall = {
     id: wall.id,
     startPointId: wall.startPointId,
     endPointId: pointId,
     thickness: wall.thickness,
+    ...inherited,
   };
   const endHalf: Wall = {
     id: newId(),
     startPointId: pointId,
     endPointId: wall.endPointId,
     thickness: wall.thickness,
+    ...inherited,
   };
   const walls = { ...plan.walls, [startHalf.id]: startHalf, [endHalf.id]: endHalf };
   const next = { ...plan, walls };

@@ -51,8 +51,10 @@ export function useSession(
       mirror.current = r.session;
       setSession(r.session);
     }
-    if (r.edit) write(r.edit);
+    // Before the write, not after: a formatting gesture shows its result, so it
+    // never writes into the Plan blind (ADR 0039).
     if (r.showMeasures) setPreference('measures', true);
+    if (r.edit) write(r.edit);
     if (r.panBy) effects.panBy(r.panBy.dxPx, r.panBy.dyPx);
     if (e) {
       if (r.capture) effects.capture(e);

@@ -2,7 +2,7 @@ import type { Vec } from './geometry';
 import { wallPoints } from './geometry';
 import { deleteOpening, openingPlacement } from './openings';
 import { settleEdit } from './settle';
-import { translateRoomProfilesWithRooms } from './roomProfiles';
+import { roomProfileAt, translateRoomProfilesWithRooms } from './roomProfiles';
 import type { Room } from './rooms';
 import { detectRooms, openingsOnWalls, roomDeletionWallIds, roomOpenings, roomWallIds } from './rooms';
 import { deleteRuler, translateRuler } from './rulers';
@@ -119,14 +119,17 @@ const tally = (walls: number, openings: Opening[]): Contents => ({
   windows: openings.filter((o) => o.type === 'window').length,
 });
 
-// CONTEXT.md: Tool panel. What is lit and nothing more — a ref the plan no
-// longer holds counts for nothing.
+// What is lit and nothing more — a ref the plan no longer holds counts for
+// nothing (CONTEXT.md: Tool panel).
+const selectedWallIds = (plan: Plan, refs: ElementRef[]): string[] =>
+  refs.filter((ref) => ref.type === 'wall' && plan.walls[ref.id]).map((ref) => ref.id);
+
 export function selectionContents(plan: Plan, refs: ElementRef[]): Contents {
   const openings = refs
     .filter((ref) => ref.type === 'opening')
     .map((ref) => plan.openings[ref.id])
     .filter((o) => o !== undefined);
-  return tally(refs.filter((ref) => ref.type === 'wall' && plan.walls[ref.id]).length, openings);
+  return tally(selectedWallIds(plan, refs).length, openings);
 }
 
 /** What a Room's boundary holds, islands included — read from the room and
@@ -148,6 +151,19 @@ export function selectedRoom(plan: Plan, rooms: Room[], refs: ElementRef[]): Roo
       return refs.every((ref) => ref.type === 'wall' || wallIds.has(plan.openings[ref.id]?.wallId));
     }) ?? null
   );
+}
+
+/** What Measures a Selection carries and whether any is still stated: a Ruler is
+ *  deleted rather than muted, and Openings and Texts carry none (CONTEXT.md: Silenced). */
+export function selectionMeasures(
+  plan: Plan,
+  refs: ElementRef[],
+): { wallIds: string[]; room: Room | null; anyStated: boolean } {
+  const wallIds = selectedWallIds(plan, refs);
+  const room = selectedRoom(plan, detectRooms(plan), refs);
+  const areaStated = room !== null && !roomProfileAt(plan, room)?.areaSilenced;
+  const anyStated = areaStated || wallIds.some((id) => !plan.walls[id].dimSilenced);
+  return { wallIds, room, anyStated };
 }
 
 // Every edit settles in the same place (ADR 0022); a delete displaces no Point,

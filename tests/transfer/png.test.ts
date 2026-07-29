@@ -102,6 +102,18 @@ describe('buildExportSvg', () => {
     expect(svg).toContain('fill="#ffffff"');
   });
 
+  // The Sheet is drawn once and the export is a second reading of it (ADR 0024),
+  // so this only pins the wiring: the behaviour is asserted on PlanScene.
+  it('omits a silenced Dimension and a silenced Room area', () => {
+    const plan = namedRoomPlan();
+    for (const wall of Object.values(plan.walls)) wall.dimSilenced = true;
+    Object.values(plan.roomProfiles)[0].areaSilenced = true;
+    const svg = buildExportSvg(plan, { measuresVisible: true })!;
+    expect(svg).not.toContain('4,10 m');
+    expect(svg).not.toContain('11,31 m²');
+    expect(svg).toContain('Kitchen');
+  });
+
   it('keeps room names when measures are hidden — a name is not a measure', () => {
     const svg = buildExportSvg(namedRoomPlan(), { measuresVisible: false })!;
     expect(svg).toContain('Kitchen');

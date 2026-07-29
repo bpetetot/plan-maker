@@ -1,5 +1,13 @@
 # Hidden measures are hidden from the export too
 
+> **Amended by [ADR 0039](0039-silencing-a-measure-is-an-act-of-drafting.md)** —
+> the "hiding is global and unconditional" consequence below no longer holds: a
+> Measure can be Silenced one element at a time, and `drawn = this preference AND
+> NOT silenced`. The rejected option "store the choice in the plan" is reopened
+> for the per-element mark, which is an act of drafting rather than the per-device
+> preference that option was about; the preference itself, and the biconditional
+> this ADR exists for, are unchanged.
+>
 > **Amended by ADR 0026** — the last consequence below records the three boolean
 > preferences sharing a `booleanPreference` helper. That helper is gone: the four
 > preferences, the Theme included, are entries in one table. The "session holds

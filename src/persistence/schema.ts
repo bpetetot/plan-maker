@@ -105,6 +105,7 @@ function validatePlan(value: unknown): Plan | null {
       if (typeof dp.t !== 'number' || !Number.isFinite(dp.t) || dp.t < 0 || dp.t > 1) return null;
       if (dp.side !== 1 && dp.side !== -1) return null;
     }
+    if (wall.dimSilenced !== undefined && wall.dimSilenced !== true) return null;
   }
   const wallIds = new Set(Object.keys(walls));
   for (const [id, opening] of Object.entries(openings)) {
@@ -114,7 +115,8 @@ function validatePlan(value: unknown): Plan | null {
     if (!isRecord(profile) || profile.id !== id) return null;
     if (typeof profile.name !== 'string' || !isCm(profile.x) || !isCm(profile.y)) return null;
     if (profile.placed !== undefined && profile.placed !== true) return null;
-    if (profile.condemned !== undefined && profile.condemned !== true) return null;
+    if (profile.hatched !== undefined && profile.hatched !== true) return null;
+    if (profile.areaSilenced !== undefined && profile.areaSilenced !== true) return null;
   }
 
   // Rulers arrived after v2 (pre-production, no migration): plans without the

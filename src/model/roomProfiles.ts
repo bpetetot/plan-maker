@@ -17,48 +17,75 @@ const sameLoop = (a: Room, b: Room) => {
   return a.pointIds.every((id) => ids.has(id));
 };
 
-// A profile carries a name, a custom placement, or a condemned mark; one
+// A profile carries a name, a custom placement, or one of the two marks; one
 // carrying none of them does not exist (CONTEXT.md: Room profile).
 const carries = (profile: RoomProfile): boolean =>
-  Boolean(profile.name || profile.placed || profile.condemned);
+  Boolean(profile.name || profile.placed || profile.hatched || profile.areaSilenced);
 
-// Creates the profile at the anchor when the room has none; lifting the mark
-// deletes a profile it leaves carrying nothing (CONTEXT.md: Condemned).
-export function setRoomCondemned(plan: Plan, room: Room, condemned: boolean): Plan {
-  const existing = roomProfileAt(plan, room);
-  if (condemned) {
-    if (existing?.condemned) return plan;
-    const profile: RoomProfile = existing
-      ? { ...existing, condemned: true }
-      : {
-          id: newId(),
-          name: '',
-          x: Math.round(room.anchor.x),
-          y: Math.round(room.anchor.y),
-          condemned: true,
-        };
-    return { ...plan, roomProfiles: { ...plan.roomProfiles, [profile.id]: profile } };
-  }
-  if (!existing?.condemned) return plan;
-  const stripped = { ...existing };
-  delete stripped.condemned;
+type RoomMarks = Pick<RoomProfile, 'hatched' | 'areaSilenced'>;
+
+// Creates the profile at the anchor when the room has none, and deletes one the
+// marks leave carrying nothing (CONTEXT.md: Room profile).
+function writeMarks(plan: Plan, room: Room, existing: RoomProfile | null, marks: RoomMarks): Plan {
+  const profile: RoomProfile = {
+    ...(existing ?? {
+      id: newId(),
+      name: '',
+      x: Math.round(room.anchor.x),
+      y: Math.round(room.anchor.y),
+    }),
+    ...marks,
+  };
+  // Absent, never `false`: the sentinel discipline every optional mark shares.
+  if (!marks.hatched) delete profile.hatched;
+  if (!marks.areaSilenced) delete profile.areaSilenced;
   const roomProfiles = { ...plan.roomProfiles };
-  if (carries(stripped)) roomProfiles[stripped.id] = stripped;
-  else delete roomProfiles[stripped.id];
+  if (carries(profile)) roomProfiles[profile.id] = profile;
+  else delete roomProfiles[profile.id];
   return { ...plan, roomProfiles };
 }
 
-/** The rooms among `rooms` marked condemned by a profile they contain
- *  (CONTEXT.md: Condemned). */
-export function condemnedRooms(rooms: Room[], profiles: RoomProfile[]): Set<Room> {
-  const condemned = new Set<Room>();
-  for (const profile of profiles) {
-    if (!profile.condemned) continue;
-    const room = roomAt(rooms, profile.x, profile.y);
-    if (room) condemned.add(room);
-  }
-  return condemned;
+/** CONTEXT.md: Hatching. Hatching silences the area in the same Edit — an
+ *  ergonomic default, not what the mark means; un-hatching never lifts it. */
+export function setRoomHatched(plan: Plan, room: Room, hatched: boolean): Plan {
+  const existing = roomProfileAt(plan, room);
+  if (Boolean(existing?.hatched) === hatched) return plan;
+  return writeMarks(plan, room, existing, {
+    hatched: hatched || undefined,
+    areaSilenced: hatched ? true : existing?.areaSilenced,
+  });
 }
+
+/** CONTEXT.md: Silenced. Independent of the hatching in both directions, once
+ *  the hatching's own write has landed (ADR 0039). */
+export function setRoomAreaSilenced(plan: Plan, room: Room, silenced: boolean): Plan {
+  const existing = roomProfileAt(plan, room);
+  if (Boolean(existing?.areaSilenced) === silenced) return plan;
+  return writeMarks(plan, room, existing, {
+    hatched: existing?.hatched,
+    areaSilenced: silenced || undefined,
+  });
+}
+
+const roomsMarked = (rooms: Room[], profiles: RoomProfile[], mark: keyof RoomMarks): Set<Room> => {
+  const marked = new Set<Room>();
+  for (const profile of profiles) {
+    if (!profile[mark]) continue;
+    const room = roomAt(rooms, profile.x, profile.y);
+    if (room) marked.add(room);
+  }
+  return marked;
+};
+
+/** The rooms among `rooms` whose floor a profile they contain hatches
+ *  (CONTEXT.md: Hatching). */
+export const hatchedRooms = (rooms: Room[], profiles: RoomProfile[]): Set<Room> =>
+  roomsMarked(rooms, profiles, 'hatched');
+
+/** The rooms among `rooms` whose Room area a profile they contain silences
+ *  (CONTEXT.md: Silenced). */
+export const areaSilencedRooms = (rooms: Room[], profiles: RoomProfile[]): Set<Room> =>
+  roomsMarked(rooms, profiles, 'areaSilenced');
 
 // A profile belongs to its room, not a position (CONTEXT.md: Room profile): home
 // room matched by loop, not containment, so a passing wall cannot steal it.

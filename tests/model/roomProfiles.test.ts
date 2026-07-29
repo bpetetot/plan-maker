@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { detectRooms } from '../../src/model/rooms';
+import { detectRooms, roomAt } from '../../src/model/rooms';
 import {
   addRoomProfile,
   moveRoomProfile,
   reconcileRoomProfiles,
   renameRoomProfile,
-  setRoomCondemned,
+  setRoomAreaSilenced,
+  setRoomHatched,
 } from '../../src/model/roomProfiles';
 import { commitWall } from '../../src/model/settle';
 import { deleteWall, setPoints } from '../../src/model/walls';
@@ -103,7 +104,7 @@ describe('reconcileRoomProfiles — placement state', () => {
       b.wall(p2, p3);
       b.wall(p3, p4);
       b.wall(p4, p1);
-      ids = { right: [p2.id, p3.id], profile: b.profile('Kitchen', 350, 200, true).id };
+      ids = { right: [p2.id, p3.id], profile: b.profile('Kitchen', 350, 200, { placed: true }).id };
     });
     const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
     const next = reconcileRoomProfiles(plan, after);
@@ -121,7 +122,7 @@ describe('reconcileRoomProfiles — placement state', () => {
       b.wall(p2, p3);
       b.wall(p3, p4);
       b.wall(p4, p1);
-      ids = { right: [p2.id, p3.id], profile: b.profile('', 350, 200, true).id };
+      ids = { right: [p2.id, p3.id], profile: b.profile('', 350, 200, { placed: true }).id };
     });
     const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
     expect(reconcileRoomProfiles(plan, after).roomProfiles).toEqual({});
@@ -144,7 +145,7 @@ describe('reconcileRoomProfiles — placement state', () => {
       b.wall(p2, p3);
       b.wall(p3, p4);
       b.wall(p4, p1);
-      ids = { right: [p2.id, p3.id], profile: b.profile('Kitchen', 150, 200, true).id };
+      ids = { right: [p2.id, p3.id], profile: b.profile('Kitchen', 150, 200, { placed: true }).id };
     });
     const after = setPoints(plan, { [ids.right[0]]: { x: 300, y: 0 }, [ids.right[1]]: { x: 300, y: 400 } });
     expect(reconcileRoomProfiles(plan, after)).toBe(after);
@@ -176,7 +177,7 @@ const roomWithProfile = (placed?: true) => {
     b.wall(p2, p3);
     b.wall(p3, p4);
     b.wall(p4, p1);
-    profileId = b.profile('Kitchen', placed ? 350 : 200, placed ? 120 : 200, placed).id;
+    profileId = b.profile('Kitchen', placed ? 350 : 200, placed ? 120 : 200, { placed }).id;
   });
   return { plan, profileId };
 };
@@ -228,63 +229,158 @@ describe('a profile that carries neither a name nor a placement', () => {
   });
 });
 
-describe('setRoomCondemned', () => {
-  it('condemning a room with no profile creates one at the anchor, carrying the mark alone', () => {
+describe('setRoomHatched', () => {
+  it('hatching a room with no profile creates one at the anchor, carrying the mark alone', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const next = setRoomCondemned(plan, room, true);
+    const next = setRoomHatched(plan, room, true);
     const profiles = Object.values(next.roomProfiles);
     expect(profiles).toHaveLength(1);
     expect(profiles[0]).toMatchObject({
       name: '',
       x: Math.round(room.anchor.x),
       y: Math.round(room.anchor.y),
-      condemned: true,
+      hatched: true,
     });
     expect(profiles[0].placed).toBeUndefined();
   });
 
-  it('condemning a room with a named profile marks that profile, creating nothing', () => {
+  it('hatching a room with a named profile marks that profile, creating nothing', () => {
     const { plan, profileId } = roomWithProfile();
     const room = detectRooms(plan)[0];
-    const next = setRoomCondemned(plan, room, true);
+    const next = setRoomHatched(plan, room, true);
     expect(Object.keys(next.roomProfiles)).toEqual([profileId]);
-    expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen', condemned: true });
+    expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen', hatched: true });
+  });
+
+  // An ergonomic default written in the same Edit, not a consequence of what the
+  // mark means (ADR 0039).
+  it('silences the area in the same write', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const profiles = Object.values(setRoomHatched(plan, room, true).roomProfiles);
+    expect(profiles[0]).toMatchObject({ hatched: true, areaSilenced: true });
+  });
+
+  it('un-hatching never lifts the silencing: the app does not overwrite an explicit choice', () => {
+    const { plan, profileId } = roomWithProfile();
+    const room = detectRooms(plan)[0];
+    const next = setRoomHatched(setRoomHatched(plan, room, true), room, false);
+    expect(next.roomProfiles[profileId].hatched).toBeUndefined();
+    expect(next.roomProfiles[profileId].areaSilenced).toBe(true);
   });
 
   it('lifting the mark keeps a profile that still carries a name', () => {
     const { plan, profileId } = roomWithProfile();
     const room = detectRooms(plan)[0];
-    const next = setRoomCondemned(setRoomCondemned(plan, room, true), room, false);
+    const next = setRoomHatched(setRoomHatched(plan, room, true), room, false);
     expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen' });
-    expect(next.roomProfiles[profileId].condemned).toBeUndefined();
+    expect(next.roomProfiles[profileId].hatched).toBeUndefined();
   });
 
-  it('lifting the mark deletes a profile that carries nothing else', () => {
+  // The silencing the hatching wrote is a mark of its own from then on, so the
+  // profile still carries something.
+  it('lifting the mark keeps a profile the silenced area alone justifies', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const condemned = setRoomCondemned(plan, room, true);
-    expect(setRoomCondemned(condemned, room, false).roomProfiles).toEqual({});
+    const hatched = setRoomHatched(plan, room, true);
+    const profiles = Object.values(setRoomHatched(hatched, room, false).roomProfiles);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({ name: '', areaSilenced: true });
+    expect(profiles[0].hatched).toBeUndefined();
+  });
+
+  it('lifting both marks deletes the profile they alone justified', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const bare = setRoomAreaSilenced(setRoomHatched(plan, room, true), room, false);
+    expect(setRoomHatched(bare, room, false).roomProfiles).toEqual({});
   });
 
   it('is a no-op when the room is already in the asked state', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    expect(setRoomCondemned(plan, room, false)).toBe(plan);
-    const condemned = setRoomCondemned(plan, room, true);
-    expect(setRoomCondemned(condemned, detectRooms(condemned)[0], true)).toBe(condemned);
+    expect(setRoomHatched(plan, room, false)).toBe(plan);
+    const hatched = setRoomHatched(plan, room, true);
+    expect(setRoomHatched(hatched, detectRooms(hatched)[0], true)).toBe(hatched);
   });
 });
 
-describe('reconciliation carries the condemned mark', () => {
-  it('keeps a condemned-only profile when reconciling a plan against itself', () => {
+// CONTEXT.md: Silenced — a room area silenced on its own, without declaring the
+// floor out of use.
+describe('setRoomAreaSilenced', () => {
+  it('silencing a room with no profile creates one carrying the mark alone', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
-    const condemned = setRoomCondemned(plan, room, true);
-    expect(reconcileRoomProfiles(condemned, condemned)).toBe(condemned);
+    const profiles = Object.values(setRoomAreaSilenced(plan, room, true).roomProfiles);
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({
+      name: '',
+      x: Math.round(room.anchor.x),
+      y: Math.round(room.anchor.y),
+      areaSilenced: true,
+    });
+    expect(profiles[0].hatched).toBeUndefined();
   });
 
-  it('re-pins a condemned-only profile to the live centroid when the room deforms', () => {
+  it('marks the existing profile of a named room, creating nothing', () => {
+    const { plan, profileId } = roomWithProfile();
+    const room = detectRooms(plan)[0];
+    const next = setRoomAreaSilenced(plan, room, true);
+    expect(Object.keys(next.roomProfiles)).toEqual([profileId]);
+    expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen', areaSilenced: true });
+  });
+
+  it('stating the area again deletes a profile that carries nothing else', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const silenced = setRoomAreaSilenced(plan, room, true);
+    expect(setRoomAreaSilenced(silenced, room, false).roomProfiles).toEqual({});
+  });
+
+  it('leaves a hatched floor hatched: the two marks are independent', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const hatched = setRoomHatched(plan, room, true);
+    const profiles = Object.values(setRoomAreaSilenced(hatched, room, false).roomProfiles);
+    expect(profiles[0]).toMatchObject({ hatched: true });
+    expect(profiles[0].areaSilenced).toBeUndefined();
+  });
+
+  it('is a no-op when the room is already in the asked state', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    expect(setRoomAreaSilenced(plan, room, false)).toBe(plan);
+    const silenced = setRoomAreaSilenced(plan, room, true);
+    expect(setRoomAreaSilenced(silenced, detectRooms(silenced)[0], true)).toBe(silenced);
+  });
+});
+
+describe('reconciliation carries the hatched mark', () => {
+  it('keeps a hatched-only profile when reconciling a plan against itself', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const hatched = setRoomHatched(plan, room, true);
+    expect(reconcileRoomProfiles(hatched, hatched)).toBe(hatched);
+  });
+
+  it('keeps a profile carrying nothing but a silenced area', () => {
+    const plan = squareRoomPlan();
+    const silenced = setRoomAreaSilenced(plan, detectRooms(plan)[0], true);
+    expect(reconcileRoomProfiles(silenced, silenced)).toBe(silenced);
+  });
+
+  // The oldest profile wins whole on a merge, marks included (ADR 0038): a merge
+  // must not scramble the formatting.
+  it('keeps the surviving profile of a merge whole, marks included', () => {
+    const { plan, sharedWall, top } = stackedRoomsPlan();
+    const marked = setRoomAreaSilenced(plan, roomAt(detectRooms(plan), 350, -15)!, true);
+    const next = reconcileRoomProfiles(marked, deleteWall(marked, sharedWall));
+    expect(Object.keys(next.roomProfiles)).toEqual([top]);
+    expect(next.roomProfiles[top]).toMatchObject({ name: 'AAA', areaSilenced: true });
+  });
+
+  it('re-pins a hatched-only profile to the live centroid when the room deforms', () => {
     let right: string[] = [];
     const plan = buildPlan((b) => {
       const p1 = b.point(0, 0);
@@ -297,13 +393,13 @@ describe('reconciliation carries the condemned mark', () => {
       b.wall(p4, p1);
       right = [p2.id, p3.id];
     });
-    const condemned = setRoomCondemned(plan, detectRooms(plan)[0], true);
-    const after = setPoints(condemned, {
+    const hatched = setRoomHatched(plan, detectRooms(plan)[0], true);
+    const after = setPoints(hatched, {
       [right[0]]: { x: 300, y: 0 },
       [right[1]]: { x: 300, y: 400 },
     });
-    const next = reconcileRoomProfiles(condemned, after);
-    const marked = Object.values(next.roomProfiles).find((p) => p.condemned);
-    expect(marked).toMatchObject({ x: 150, y: 200, condemned: true });
+    const next = reconcileRoomProfiles(hatched, after);
+    const marked = Object.values(next.roomProfiles).find((p) => p.hatched);
+    expect(marked).toMatchObject({ x: 150, y: 200, hatched: true });
   });
 });

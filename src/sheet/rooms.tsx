@@ -1,35 +1,35 @@
 import { formatArea } from '../model/format';
 import type { Vec } from '../model/geometry';
-import { condemnedRooms } from '../model/roomProfiles';
+import { areaSilencedRooms, hatchedRooms } from '../model/roomProfiles';
 import type { Room } from '../model/rooms';
 import { roomAt, roomKey } from '../model/rooms';
 import type { RoomProfile } from '../model/types';
 
 // Lines only, no ground: the editor's tints lie under the sheet and must keep
 // showing through the hatching.
-export function CondemnedHatching({ rooms, profiles }: { rooms: Room[]; profiles: RoomProfile[] }) {
-  const condemned = [...condemnedRooms(rooms, profiles)];
-  if (condemned.length === 0) return null;
+export function RoomHatching({ rooms, profiles }: { rooms: Room[]; profiles: RoomProfile[] }) {
+  const hatched = [...hatchedRooms(rooms, profiles)];
+  if (hatched.length === 0) return null;
   const loop = (points: Vec[]) => `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')} Z`;
   return (
     <g>
       <defs>
         <pattern
-          id="condemned-hatch"
+          id="room-hatch"
           patternUnits="userSpaceOnUse"
           width="8"
           height="8"
           patternTransform="rotate(45)"
         >
-          <line className="condemned-hatch-line" x1="4" y1="0" x2="4" y2="8" />
+          <line className="room-hatch-line" x1="4" y1="0" x2="4" y2="8" />
         </pattern>
       </defs>
-      {condemned.map((room) => (
+      {hatched.map((room) => (
         <path
           key={roomKey(room)}
-          className="room-condemned"
+          className="room-hatched"
           d={[room.polygon, ...room.holes].map(loop).join(' ')}
-          fill="url(#condemned-hatch)"
+          fill="url(#room-hatch)"
           fillRule="evenodd"
           pointerEvents="none"
         />
@@ -50,13 +50,13 @@ export interface RoomTextBlock {
   room?: Room;
   // the block that speaks for its room: a floor double-click opens this one
   own: boolean;
-  // set only on the own block, and never on a condemned room's
+  // set only on the own block, and never on a room whose area is silenced
   area?: number;
 }
 
 export function roomTextBlocks(rooms: Room[], profiles: RoomProfile[]): RoomTextBlock[] {
   const blocks: RoomTextBlock[] = [];
-  const silenced = condemnedRooms(rooms, profiles);
+  const silenced = areaSilencedRooms(rooms, profiles);
   const defaultsByRoom = new Map<Room, RoomProfile[]>();
   const oldestByRoom = new Map<Room, RoomProfile>();
   for (const profile of profiles) {

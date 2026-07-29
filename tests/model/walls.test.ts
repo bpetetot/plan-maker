@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { placeOpening } from '../../src/model/openings';
 import { buildPlan } from '../helpers';
-import { deleteWall, movePoint, setDimPlacement, setPoints, setWallThickness } from '../../src/model/walls';
+import {
+  deleteWall,
+  movePoint,
+  setDimPlacement,
+  setDimSilenced,
+  setPoints,
+  setWallThickness,
+} from '../../src/model/walls';
 
 const rectPlan = () =>
   buildPlan((b) => {
@@ -91,5 +98,38 @@ describe('setDimPlacement', () => {
   it('is a no-op for an unknown wall', () => {
     const plan = rectPlan();
     expect(setDimPlacement(plan, 'missing', 0.5, 1)).toBe(plan);
+  });
+});
+
+// CONTEXT.md: Silenced — absent means stated, and `true` is the only value written.
+describe('setDimSilenced', () => {
+  it('marks the wall, and lifting the mark leaves the field absent', () => {
+    const plan = rectPlan();
+    const wallId = Object.keys(plan.walls)[0];
+    const silent = setDimSilenced(plan, wallId, true);
+    expect(silent.walls[wallId].dimSilenced).toBe(true);
+    const stated = setDimSilenced(silent, wallId, false);
+    expect('dimSilenced' in stated.walls[wallId]).toBe(false);
+  });
+
+  it('leaves the placement alone: where to say it and whether to are two marks', () => {
+    const plan = rectPlan();
+    const wallId = Object.keys(plan.walls)[0];
+    const placed = setDimPlacement(plan, wallId, 0.75, -1);
+    const silent = setDimSilenced(placed, wallId, true);
+    expect(silent.walls[wallId].dimPlacement).toEqual({ t: 0.75, side: -1 });
+  });
+
+  it('is a no-op when the wall is already in the asked state', () => {
+    const plan = rectPlan();
+    const wallId = Object.keys(plan.walls)[0];
+    expect(setDimSilenced(plan, wallId, false)).toBe(plan);
+    const silent = setDimSilenced(plan, wallId, true);
+    expect(setDimSilenced(silent, wallId, true)).toBe(silent);
+  });
+
+  it('is a no-op for an unknown wall', () => {
+    const plan = rectPlan();
+    expect(setDimSilenced(plan, 'missing', true)).toBe(plan);
   });
 });

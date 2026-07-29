@@ -16,12 +16,15 @@ interface DimPlacement {
   side: 1 | -1;
 }
 
+// `dimSilenced` sits beside the placement for the same reason: saying nothing at
+// all is a decision of the same nature as where to say it (CONTEXT.md: Silenced).
 export interface Wall {
   id: string;
   startPointId: string;
   endPointId: string;
   thickness: Cm;
   dimPlacement?: DimPlacement;
+  dimSilenced?: true;
 }
 
 interface BaseOpening {
@@ -52,7 +55,8 @@ export interface RoomProfile {
   x: Cm;
   y: Cm;
   placed?: true;
-  condemned?: true;
+  hatched?: true;
+  areaSilenced?: true;
 }
 
 // A hand-placed measurement (CONTEXT.md: Ruler). Free coordinates, not shared

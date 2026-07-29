@@ -84,6 +84,18 @@ describe('decodePlanPayload', () => {
     }
   });
 
+  // CONTEXT.md: Silenced — absent means stated, so a plan saved before the mark
+  // existed validates and states every Measure.
+  it('accepts dimSilenced: true and rejects other values', () => {
+    const plan = structuredClone(squarePlan());
+    expect(decode(plan).ok).toBe(true);
+    Object.values(plan.walls)[0].dimSilenced = true;
+    expect(decode(plan).ok).toBe(true);
+    // @ts-expect-error deliberately malformed mark
+    Object.values(plan.walls)[0].dimSilenced = false;
+    expect(decode(plan).ok).toBe(false);
+  });
+
   it('accepts a plan carrying a valid ruler', () => {
     const plan = structuredClone(squarePlan());
     plan.rulers['r1'] = { id: 'r1', a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, t: 0.5 };
@@ -256,6 +268,24 @@ describe('loadPlan — orphan room profiles', () => {
     const loaded = await loadPlan();
     expect(Object.keys(loaded?.roomProfiles ?? {})).toEqual([inside]);
   });
+
+  // A profile carrying nothing but a mark is a profile like any other: it rides
+  // on the carrier's laws, orphan dropping included.
+  it('drops a silenced area whose room no longer exists', async () => {
+    const plan = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.profile('', 900, 900, { areaSilenced: true });
+    });
+    await savePlan(plan);
+    expect((await loadPlan())?.roomProfiles).toEqual({});
+  });
 });
 
 describe('loadPlan — coincident points', () => {
@@ -289,7 +319,7 @@ describe('decodePlanPayload — profile placement state', () => {
       b.wall(c, d);
       b.wall(d, e);
       b.wall(e, a);
-      b.profile('Kitchen', 200, 150, true);
+      b.profile('Kitchen', 200, 150, { placed: true });
     });
     expect(decode(base).ok).toBe(true);
     const profile = Object.values(base.roomProfiles)[0];
@@ -297,7 +327,7 @@ describe('decodePlanPayload — profile placement state', () => {
     expect(decode(bad).ok).toBe(false);
   });
 
-  it('accepts condemned: true and rejects other values', () => {
+  it('accepts hatched: true and rejects other values', () => {
     const base = buildPlan((b) => {
       const a = b.point(0, 0);
       const c = b.point(400, 0);
@@ -310,9 +340,28 @@ describe('decodePlanPayload — profile placement state', () => {
       b.profile('Kitchen', 200, 150);
     });
     const profile = Object.values(base.roomProfiles)[0];
-    const marked = { ...base, roomProfiles: { [profile.id]: { ...profile, condemned: true } } };
+    const marked = { ...base, roomProfiles: { [profile.id]: { ...profile, hatched: true } } };
     expect(decode(marked).ok).toBe(true);
-    const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, condemned: 1 } } };
+    const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, hatched: 1 } } };
+    expect(decode(bad).ok).toBe(false);
+  });
+
+  it('accepts areaSilenced: true and rejects other values', () => {
+    const base = buildPlan((b) => {
+      const a = b.point(0, 0);
+      const c = b.point(400, 0);
+      const d = b.point(400, 300);
+      const e = b.point(0, 300);
+      b.wall(a, c);
+      b.wall(c, d);
+      b.wall(d, e);
+      b.wall(e, a);
+      b.profile('Kitchen', 200, 150);
+    });
+    const profile = Object.values(base.roomProfiles)[0];
+    const marked = { ...base, roomProfiles: { [profile.id]: { ...profile, areaSilenced: true } } };
+    expect(decode(marked).ok).toBe(true);
+    const bad = { ...base, roomProfiles: { [profile.id]: { ...profile, areaSilenced: 'yes' } } };
     expect(decode(bad).ok).toBe(false);
   });
 });

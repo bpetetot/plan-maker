@@ -78,6 +78,7 @@ export interface EditorCommands {
   cancel: () => void;
   selectAll: () => void;
   deleteSelection: () => void;
+  silenceMeasures: () => void;
   selectTool: (tool: Tool) => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -91,6 +92,7 @@ export const editorCommands = (ref: React.RefObject<EditorCommands | null>) => (
   cancel: () => ref.current?.cancel(),
   selectAll: () => ref.current?.selectAll(),
   deleteSelection: () => ref.current?.deleteSelection(),
+  silenceMeasures: () => ref.current?.silenceMeasures(),
   selectTool: (tool: Tool) => ref.current?.selectTool(tool),
   zoomIn: () => ref.current?.zoomIn(),
   zoomOut: () => ref.current?.zoomOut(),
@@ -168,6 +170,7 @@ export default function Editor({ ref: commands }: { ref?: React.Ref<EditorComman
     cancel: () => send({ type: 'cancel' }),
     selectAll: () => send({ type: 'selectAll' }),
     deleteSelection: () => send({ type: 'deleteSelection' }),
+    silenceMeasures: () => send({ type: 'silenceMeasures' }),
     selectTool: (tool) => send({ type: 'selectTool', tool }),
     zoomIn: () => zoomCenter(1 / 1.25),
     zoomOut: () => zoomCenter(1.25),

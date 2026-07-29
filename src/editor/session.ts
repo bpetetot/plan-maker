@@ -7,6 +7,7 @@ import { projectOnWall } from '../model/geometry';
 import { wallDimension } from '../model/dimension';
 import { openingPlacement } from '../model/openings';
 import { DIM_FONT_PX } from '../model/rail';
+import { setRoomAreaSilenced } from '../model/roomProfiles';
 import { detectRooms, roomAt, roomKey } from '../model/rooms';
 import { rulerAxes } from '../model/rulers';
 import type { ElementRef } from '../model/selection';
@@ -17,11 +18,12 @@ import {
   isSelected,
   referencePoint,
   selectionForRoom,
+  selectionMeasures,
   toggleRef,
 } from '../model/selection';
 import type { Snap } from '../model/snap';
 import type { Plan, RoomProfile } from '../model/types';
-import { wallAxesAt } from '../model/walls';
+import { setDimSilenced, wallAxesAt } from '../model/walls';
 import type { RoomTextBlock } from '../sheet/rooms';
 import { roomTextBlocks } from '../sheet/rooms';
 import { textAtPoint } from '../sheet/texts';
@@ -101,7 +103,8 @@ interface SessionResult {
   capture?: true;
   /** A pointerdown whose compatibility mouse events must not fire. */
   preventDefault?: true;
-  /** ticket 03: a Ruler is measured, so drawing one reveals the measures. */
+  /** A gesture whose result the measures toggle could hide reveals them first:
+   *  drawing a Ruler (ADR 0017), silencing a Measure (ADR 0039). */
   showMeasures?: true;
   panBy?: { dxPx: number; dyPx: number };
 }
@@ -119,6 +122,7 @@ export type Intent =
   | { type: 'cancel' }
   | { type: 'selectAll' }
   | { type: 'deleteSelection' }
+  | { type: 'silenceMeasures' }
   | { type: 'setDefaults'; update: (defaults: ToolDefaults) => ToolDefaults }
   | { type: 'hoverElement'; kind: 'wall' | 'ruler'; id: string }
   | { type: 'leaveElement'; kind: 'wall' | 'ruler'; id: string }
@@ -468,8 +472,8 @@ function doubleClicked(s: Session, env: SessionEnv, at: Vec): SessionResult {
   // Off the plan's own profiles, not the drag overlay's: a double-click never
   // lands mid-drag, so there is nothing to reconcile here.
   const blocks = roomTextBlocks(rooms, Object.values(env.plan.roomProfiles));
-  // By `own`, not by area: a condemned room prints no area line yet its floor
-  // still answers (CONTEXT.md: Condemned).
+  // By `own`, not by area: a room whose area is silenced prints no area line yet
+  // its floor still answers (CONTEXT.md: Silenced).
   const block = room ? blocks.find((b) => b.room === room && b.own) : undefined;
   if (!block) return just(s);
   return just({ ...s, inlineEdit: openRoomProfile(block, block.profiles[0] ?? null) });
@@ -536,6 +540,17 @@ export function reduce(s: Session, intent: Intent, env: SessionEnv): SessionResu
         session: { ...s, selection: [] },
         edit: { how: 'commit', plan: deleteSelection(env.plan, s.selection) },
       };
+    }
+    // Uniformises towards silence, so a widened marquee finishes the batch rather
+    // than undoing it; nothing selected does nothing, `M` meaning "all" (ADR 0039).
+    case 'silenceMeasures': {
+      const m = selectionMeasures(env.plan, s.selection);
+      if (m.wallIds.length === 0 && !m.room) return just(s);
+      const silenced = m.anyStated;
+      let plan = env.plan;
+      for (const id of m.wallIds) plan = setDimSilenced(plan, id, silenced);
+      if (m.room) plan = setRoomAreaSilenced(plan, m.room, silenced);
+      return { session: s, edit: { how: 'commit', plan }, showMeasures: true };
     }
     case 'setDefaults':
       return just({ ...s, defaults: intent.update(s.defaults) });

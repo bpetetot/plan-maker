@@ -1,11 +1,15 @@
 import type { Opening, Plan, Point, RoomProfile, Wall } from '../src/model/types';
 import { defaultOpeningWidth, emptyPlan, WALL_THICKNESS } from '../src/model/types';
 
+// The marks a profile can carry beyond its name and position, named rather than
+// positional: three optional booleans in a row read as nothing at a call site.
+type ProfileMarks = Pick<RoomProfile, 'placed' | 'hatched' | 'areaSilenced'>;
+
 export interface PlanBuilder {
   point: (x: number, y: number) => Point;
   wall: (a: Point, b: Point) => Wall;
   opening: (wall: Wall, type: Opening['type'], offset: number, width?: number) => Opening;
-  profile: (name: string, x: number, y: number, placed?: true, condemned?: true) => RoomProfile;
+  profile: (name: string, x: number, y: number, marks?: ProfileMarks) => RoomProfile;
 }
 
 let counter = 0;
@@ -34,11 +38,12 @@ export function buildPlan(build: (b: PlanBuilder) => void): Plan {
       plan.openings[id] = opening;
       return opening;
     },
-    profile(name, x, y, placed, condemned) {
+    profile(name, x, y, marks) {
       const id = `l${++counter}`;
       const profile: RoomProfile = { id, name, x, y };
-      if (placed) profile.placed = placed;
-      if (condemned) profile.condemned = condemned;
+      if (marks?.placed) profile.placed = marks.placed;
+      if (marks?.hatched) profile.hatched = marks.hatched;
+      if (marks?.areaSilenced) profile.areaSilenced = marks.areaSilenced;
       plan.roomProfiles[id] = profile;
       return profile;
     },

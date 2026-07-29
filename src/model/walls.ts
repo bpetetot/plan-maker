@@ -53,6 +53,17 @@ export function setDimPlacement(plan: Plan, wallId: string, t: number, side: 1 |
   return { ...plan, walls: { ...plan.walls, [wallId]: { ...wall, dimPlacement } } };
 }
 
+// CONTEXT.md: Silenced. Absent means stated, so stating deletes the field rather
+// than writing `false` — `true` is the only value the plan ever holds.
+export function setDimSilenced(plan: Plan, wallId: string, silenced: boolean): Plan {
+  const wall = plan.walls[wallId];
+  if (!wall || Boolean(wall.dimSilenced) === silenced) return plan;
+  const next = { ...wall };
+  if (silenced) next.dimSilenced = true;
+  else delete next.dimSilenced;
+  return { ...plan, walls: { ...plan.walls, [wallId]: next } };
+}
+
 export function setWallThickness(plan: Plan, id: string, thickness: number): Plan {
   const wall = plan.walls[id];
   if (!wall || wall.thickness === thickness) return plan;

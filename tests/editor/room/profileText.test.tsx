@@ -17,7 +17,7 @@ function emptySquare(profile?: {
   x: number;
   y: number;
   placed?: true;
-  condemned?: true;
+  areaSilenced?: true;
 }): Plan {
   return {
     points: {
@@ -47,7 +47,7 @@ const undoDepth = () => usePlanStore.temporal.getState().pastStates.length;
 const nameInput = () => page.getByRole('textbox');
 const isEditing = () => nameInput().elements().length === 1;
 
-async function setup(profile?: { name: string; x: number; y: number; placed?: true; condemned?: true }) {
+async function setup(profile?: { name: string; x: number; y: number; placed?: true; areaSilenced?: true }) {
   usePlanStore.setState({ plan: emptySquare(profile), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
   const { container } = await render(<Editor />);
@@ -225,21 +225,21 @@ describe('dragging the area text', () => {
   });
 });
 
-// CONTEXT.md: Condemned — presentational only, so the floor still answers a
-// double-click even though the block prints no area line.
-describe('naming a condemned room', () => {
-  it('double-clicking the floor of a condemned unnamed room opens the name box', async () => {
-    const { svg } = await setup({ name: '', x: 300, y: 300, condemned: true });
+// CONTEXT.md: Silenced — the floor still answers a double-click even though the
+// block prints no area line, which is the way back to an unnamed silenced room.
+describe('naming a room whose area is silenced', () => {
+  it('double-clicking the floor of an unnamed silenced room opens the name box', async () => {
+    const { svg } = await setup({ name: '', x: 300, y: 300, areaSilenced: true });
     await mouse(svg, 'dblclick', clientAt(svg, 300, 300));
     expect(isEditing()).toBe(true);
     await userEvent.fill(nameInput(), 'Cellar');
     await userEvent.keyboard('{Enter}');
     expect(profiles()).toHaveLength(1);
-    expect(profiles()[0]).toMatchObject({ name: 'Cellar', condemned: true });
+    expect(profiles()[0]).toMatchObject({ name: 'Cellar', areaSilenced: true });
   });
 
-  it('double-clicking the floor of a condemned named room edits its name', async () => {
-    const { svg } = await setup({ name: 'Cellar', x: 300, y: 300, condemned: true });
+  it('double-clicking the floor of a named silenced room edits its name', async () => {
+    const { svg } = await setup({ name: 'Cellar', x: 300, y: 300, areaSilenced: true });
     await mouse(svg, 'dblclick', clientAt(svg, 200, 400));
     expect(isEditing()).toBe(true);
   });

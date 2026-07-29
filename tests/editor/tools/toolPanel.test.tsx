@@ -70,6 +70,49 @@ describe('tool panel on a selected wall', () => {
   });
 });
 
+// CONTEXT.md: Silenced. Read positively — up means it appears on the Sheet —
+// while DIMENSIONS keeps stating what the plan computes, marks or no marks.
+describe('the DISPLAY section on a selected wall', () => {
+  const dimension = () => page.getByRole('switch', { name: 'Dimension' });
+
+  it('silences the Dimension and states it again, the lengths untouched', async () => {
+    const { svg } = await setup(standalonePlan());
+    await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 50 });
+    await expect.element(dimension()).toHaveAttribute('aria-checked', 'true');
+
+    await dimension().click();
+    await expect.element(dimension()).toHaveAttribute('aria-checked', 'false');
+    expect(Object.values(usePlanStore.getState().plan.walls)[0].dimSilenced).toBe(true);
+    expect(svg.querySelectorAll('text.dim:not(.dim-live)')).toHaveLength(0);
+    expect(rowValue('Length')).toBe('4,10 m');
+
+    await dimension().click();
+    await expect.element(dimension()).toHaveAttribute('aria-checked', 'true');
+    expect(Object.values(usePlanStore.getState().plan.walls)[0].dimSilenced).toBeUndefined();
+    expect(svg.querySelectorAll('text.dim:not(.dim-live)')).toHaveLength(1);
+  });
+
+  // The batch path is the keyboard, never the panel: no Selection retypes
+  // several walls at once, and none silences several either.
+  it('is absent from a multi-selection', async () => {
+    const plan = buildPlan((b) => {
+      b.wall(b.point(0, 0), b.point(400, 0));
+      b.wall(b.point(0, 200), b.point(400, 200));
+    });
+    const { svg } = await setup(plan);
+    await marqueeSelect(svg, { x: -50, y: -50 }, { x: 450, y: 450 });
+    await expect.element(page.getByText('2 elements')).toBeInTheDocument();
+    await expect.element(dimension()).not.toBeInTheDocument();
+  });
+
+  it('is absent from a selected opening, which states no Measure of its own', async () => {
+    const { svg } = await setup(doorPlan());
+    await marqueeSelect(svg, { x: 240, y: 60 }, { x: 360, y: 140 });
+    await expect.element(page.getByText('Door', { exact: true })).toBeInTheDocument();
+    await expect.element(dimension()).not.toBeInTheDocument();
+  });
+});
+
 describe('tool panel on selected openings', () => {
   it('shows Width, Hinge/Swing options and Delete for a door', async () => {
     const { svg } = await setup(doorPlan());

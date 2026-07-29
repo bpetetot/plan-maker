@@ -6,7 +6,7 @@ import { DimLabel, RulerLabel } from './measures';
 import { OpeningGlyph } from './openings';
 import { COLORS } from './paint';
 import type { RoomTextBlock } from './rooms';
-import { CondemnedHatching, RoomOverlay } from './rooms';
+import { RoomHatching, RoomOverlay } from './rooms';
 import { TextNoteView } from './texts';
 import { JunctionPatches, WallLine } from './walls';
 
@@ -55,7 +55,7 @@ export function PlanScene({
   return (
     <>
       {/* Under the walls: a floor marking, not a stroke over them. */}
-      <CondemnedHatching rooms={rooms} profiles={profiles} />
+      <RoomHatching rooms={rooms} profiles={profiles} />
       {Object.values(plan.walls).map((wall) => {
         const d = dress('wall', wall.id);
         return (
@@ -103,8 +103,11 @@ export function PlanScene({
       {/* The one place chrome slips inside the sheet: the grab zones belong
           under the measures, or a Dimension plate loses the hit-test to them. */}
       {chrome}
+      {/* Drawn when measures are shown AND the wall does not silence its own
+          (CONTEXT.md: Silenced). The plate is the drag handle, so it goes too. */}
       {measuresVisible &&
         Object.values(plan.walls).map((wall) => {
+          if (wall.dimSilenced) return null;
           const d = dress('wall', wall.id);
           return (
             <DimLabel

@@ -50,9 +50,9 @@ svg text.text-note {
   user-select: none;
 }
 
-/* Condemned floor (CONTEXT.md: Condemned): hatch strokes only, no ground —
+/* A hatched floor (CONTEXT.md: Hatching): hatch strokes only, no ground —
    the editor's room tints lie under the sheet and must show through. */
-svg .condemned-hatch-line {
-  stroke: var(--condemned-hatch);
+svg .room-hatch-line {
+  stroke: var(--room-hatch);
   stroke-width: 1;
 }

@@ -4,17 +4,23 @@ import { render } from 'vitest-browser-react';
 import { doorOn, namedRoomPlan, nestedRoomPlan, squareRoomPlan, twoRoomPlan } from '../../helpers';
 import { emptyPlan } from '../../../src/model/types';
 import { usePlanStore } from '../../../src/store/planStore';
+import { getPreference, reloadPreferences, setPreference } from '../../../src/preferences/preferences';
 import { EditorWithHotkeys } from '../../harness';
 import { clientAt, pointer } from '../../kit';
-import { numberField, panelTitle, rowValue } from '../../panel';
+import { numberField, panel, panelTitle, rowValue } from '../../panel';
 
 beforeEach(() => {
+  localStorage.clear();
+  // the preference is session state: clearing storage alone is not a fresh device
+  reloadPreferences();
   usePlanStore.setState({ plan: emptyPlan(), planEpoch: 0 });
   usePlanStore.temporal.getState().clear();
 });
 
 async function setup(plan = squareRoomPlan()) {
   usePlanStore.setState({ plan });
+  // after the seeding, or the fixture itself counts as an undo entry
+  usePlanStore.temporal.getState().clear();
   const { container } = await render(<EditorWithHotkeys />);
   const svg = container.querySelector('svg')!;
   return { svg };
@@ -184,31 +190,136 @@ describe('thickness beyond a single wall', () => {
   });
 });
 
-describe('the condemned toggle', () => {
-  it('condemns the selected room and lifts the mark again', async () => {
+const hatching = () => page.getByRole('switch', { name: 'Hatching' });
+const areaSwitch = () => page.getByRole('switch', { name: 'Area' });
+const profiles = () => Object.values(usePlanStore.getState().plan.roomProfiles);
+
+describe('the hatching switch', () => {
+  it('hatches the selected room and lifts the mark again', async () => {
     const { svg } = await setup();
     await clickAt(svg, 200, 200);
-    const toggle = page.getByRole('switch', { name: 'Condemned' });
-    await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
-    await toggle.click();
-    await expect.element(toggle).toHaveAttribute('aria-checked', 'true');
+    await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
+    await hatching().click();
+    await expect.element(hatching()).toHaveAttribute('aria-checked', 'true');
     // the sheet hatches; the panel, an inspection instrument, keeps the area
-    expect(svg.querySelector('path.room-condemned')).not.toBeNull();
+    expect(svg.querySelector('path.room-hatched')).not.toBeNull();
     expect(rowValue('Area')).toBe('15,21 m²');
-    await toggle.click();
-    await expect.element(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(svg.querySelector('path.room-condemned')).toBeNull();
-    expect(usePlanStore.getState().plan.roomProfiles).toEqual({});
+    await hatching().click();
+    await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
+    expect(svg.querySelector('path.room-hatched')).toBeNull();
   });
 
   it('marks the existing profile of a named room, and undo takes one step back', async () => {
     const { svg } = await setup(namedRoomPlan('Kitchen'));
     await clickAt(svg, 200, 150);
-    await page.getByRole('switch', { name: 'Condemned' }).click();
-    const profiles = Object.values(usePlanStore.getState().plan.roomProfiles);
-    expect(profiles).toHaveLength(1);
-    expect(profiles[0]).toMatchObject({ name: 'Kitchen', condemned: true });
+    await hatching().click();
+    expect(profiles()).toHaveLength(1);
+    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', hatched: true, areaSilenced: true });
     usePlanStore.temporal.getState().undo();
-    expect(Object.values(usePlanStore.getState().plan.roomProfiles)[0].condemned).toBeUndefined();
+    expect(profiles()[0].hatched).toBeUndefined();
+    expect(profiles()[0].areaSilenced).toBeUndefined();
+  });
+
+  // The coupling is legible instead of hidden: cause and effect in one section.
+  it('drops the Area switch in the same gesture, and one undo takes both back', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
+    await hatching().click();
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
+
+    usePlanStore.temporal.getState().undo();
+    await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
+  });
+
+  // ADR 0039: the two marks are independent once the hatching's write has landed.
+  it('lets a hatched floor state its area again', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await hatching().click();
+    await areaSwitch().click();
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(svg.querySelector('path.room-hatched')).not.toBeNull();
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(1);
+  });
+
+  it('leaves the area silenced when the hatching is lifted', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await hatching().click();
+    await hatching().click();
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(profiles()[0]).toMatchObject({ areaSilenced: true });
+    expect(profiles()[0].hatched).toBeUndefined();
+  });
+});
+
+describe('the Area switch', () => {
+  it('silences a room area on its own, without hatching the floor', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await areaSwitch().click();
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
+    await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
+    expect(svg.querySelector('path.room-hatched')).toBeNull();
+    // the panel keeps stating it as a fact of inspection
+    expect(rowValue('Area')).toBe('15,21 m²');
+  });
+
+  it('keeps showing the room name, so the room is still identified', async () => {
+    const { svg } = await setup(namedRoomPlan('Kitchen'));
+    await clickAt(svg, 200, 150);
+    await areaSwitch().click();
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
+    expect(svg.querySelector('text.room-name')?.textContent).toBe('Kitchen');
+  });
+
+  // The way back to the switch for a room that now draws no text block at all:
+  // its floor still selects it (ADR 0014).
+  it('leaves an unnamed room selectable by its floor once it draws nothing', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await areaSwitch().click();
+    expect(svg.querySelectorAll('rect.room-area-hit')).toHaveLength(0);
+    expect(svg.querySelectorAll('rect.room-name-hit')).toHaveLength(0);
+
+    await clickAt(svg, 600, 600);
+    expect(panel()).toBeNull();
+    await clickAt(svg, 200, 200);
+    expect(panelTitle()).toBe('Room');
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('states the area again, deleting the profile it alone justified', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await areaSwitch().click();
+    await areaSwitch().click();
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(1);
+    expect(usePlanStore.getState().plan.roomProfiles).toEqual({});
+  });
+
+  // Consistent with the panel stating nothing about retyping boundary walls: the
+  // Dimensions of a room's walls are a wall matter (CONTEXT.md: Tool panel).
+  it('leaves the boundary walls to the wall, offering no Dimension row', async () => {
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await expect.element(page.getByRole('switch', { name: 'Dimension' })).not.toBeInTheDocument();
+  });
+
+  // A formatting gesture shows its result (ADR 0039): turning a switch down can
+  // therefore turn measures on.
+  it('turns measures back on and then applies', async () => {
+    setPreference('measures', false);
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
+    await areaSwitch().click();
+    expect(getPreference('measures')).toBe(true);
+    expect(profiles()[0]).toMatchObject({ areaSilenced: true });
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
   });
 });

@@ -36,7 +36,7 @@ describe('roomTextBlocks', () => {
   it('renders a custom placement where it was dragged', () => {
     let profile!: RoomProfile;
     const plan = square((b) => {
-      profile = b.profile('Kitchen', 350, 120, true);
+      profile = b.profile('Kitchen', 350, 120, { placed: true });
     });
     const blocks = blocksOf(plan);
     expect(blocks).toHaveLength(1);

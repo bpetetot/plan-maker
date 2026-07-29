@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commitPoint, commitWall, settleEdit, settlePlan } from '../../src/model/settle';
 import { buildPlan, namedRoomPlan, squareRoomPlan, stackedRoomsPlan } from '../helpers';
-import { setDimPlacement, setPoints } from '../../src/model/walls';
+import { setDimPlacement, setDimSilenced, setPoints } from '../../src/model/walls';
 
 const rectPlan = () =>
   buildPlan((b) => {
@@ -89,6 +89,24 @@ describe('splitting the host wall', () => {
     const wallId = Object.keys(plan.walls)[0];
     const [next] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId });
     for (const wall of Object.values(next.walls)) expect(wall.dimPlacement).toBeUndefined();
+  });
+
+  // Deliberately unlike the placement above: a placement describes a geometry
+  // that ceased to exist, a silence an intention that still holds (ADR 0039).
+  it('carries the silenced dimension onto both halves', () => {
+    const plan = rectPlan();
+    const wallId = Object.keys(plan.walls)[0];
+    const silent = setDimSilenced(plan, wallId, true);
+    const [next] = commitPoint(silent, { x: 200, y: 0, kind: 'wall', wallId });
+    expect(Object.keys(next.walls)).toHaveLength(2);
+    for (const wall of Object.values(next.walls)) expect(wall.dimSilenced).toBe(true);
+  });
+
+  it('leaves both halves of a stated wall stated', () => {
+    const plan = rectPlan();
+    const wallId = Object.keys(plan.walls)[0];
+    const [next] = commitPoint(plan, { x: 200, y: 0, kind: 'wall', wallId });
+    for (const wall of Object.values(next.walls)) expect(wall.dimSilenced).toBeUndefined();
   });
 });
 

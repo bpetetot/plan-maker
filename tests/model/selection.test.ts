@@ -10,6 +10,7 @@ import {
   roomSelection,
   selectedRoom,
   selectionContents,
+  selectionMeasures,
   toggleRef,
   translateElements,
 } from '../../src/model/selection';
@@ -410,6 +411,24 @@ describe('translateElements — room profile rigid move', () => {
     expect(next.roomProfiles[profile]).toMatchObject({ x: 350, y: 120 });
   });
 
+  // The mark belongs to the room, not to a position (CONTEXT.md: Room profile).
+  it('carries the silenced area along with the room', () => {
+    let ids = { walls: [] as string[], profile: '' };
+    const plan = buildPlan((b) => {
+      const p1 = b.point(0, 0);
+      const p2 = b.point(400, 0);
+      const p3 = b.point(400, 400);
+      const p4 = b.point(0, 400);
+      const walls = [b.wall(p1, p2), b.wall(p2, p3), b.wall(p3, p4), b.wall(p4, p1)];
+      ids = {
+        walls: walls.map((w) => w.id),
+        profile: b.profile('', 200, 200, { areaSilenced: true }).id,
+      };
+    });
+    const next = translateElements(plan, ids.walls.map(wallRef), 50, -30);
+    expect(next.roomProfiles[ids.profile]).toMatchObject({ x: 250, y: 170, areaSilenced: true });
+  });
+
   it('does not move the profile of an unselected room', () => {
     let ids = { leftWalls: [] as string[], rightProfile: '' };
     const plan = buildPlan((b) => {
@@ -446,7 +465,7 @@ describe('translateElements — placement state', () => {
       ids = {
         walls: walls.map((w) => w.id),
         byDefault: b.profile('Kitchen', 200, 200).id,
-        custom: b.profile('Nook', 350, 120, true).id,
+        custom: b.profile('Nook', 350, 120, { placed: true }).id,
       };
     });
     const next = translateElements(plan, ids.walls.map(wallRef), 50, -30);
@@ -824,5 +843,95 @@ describe('deleteSelection — a Room reading', () => {
     const next = deleteSelection(plan, roomSelection(plan, left)!);
     expect(next.openings.od).toBeDefined();
     expect(next.openings.ow).toBeUndefined();
+  });
+});
+
+// CONTEXT.md: Silenced. A Ruler is stored content the user placed, so it is
+// deleted rather than silenced; Openings and Texts carry no Measure at all.
+describe('selectionMeasures', () => {
+  it('carries the Dimension of a single selected wall', () => {
+    const plan = squareRoomPlan();
+    const [wall] = Object.values(plan.walls);
+    const m = selectionMeasures(plan, [wallRef(wall.id)]);
+    expect(m.wallIds).toEqual([wall.id]);
+    expect(m.room).toBeNull();
+    expect(m.anyStated).toBe(true);
+  });
+
+  it('carries the Dimension of every selected wall', () => {
+    const plan = twoRoomPlan();
+    const ids = Object.keys(plan.walls).slice(0, 3);
+    const m = selectionMeasures(plan, ids.map(wallRef));
+    expect(m.wallIds.sort()).toEqual([...ids].sort());
+  });
+
+  // Three of the four walls: a Selection that reads as no Room, so the walls
+  // alone decide.
+  it('reads nothing stated once every selected Dimension is silenced', () => {
+    const plan = squareRoomPlan();
+    const walls = Object.values(plan.walls).slice(0, 3);
+    for (const wall of walls) wall.dimSilenced = true;
+    expect(
+      selectionMeasures(
+        plan,
+        walls.map((w) => wallRef(w.id)),
+      ).anyStated,
+    ).toBe(false);
+  });
+
+  it('reads one stated Dimension among silenced ones as stated', () => {
+    const plan = squareRoomPlan();
+    const walls = Object.values(plan.walls).slice(0, 3);
+    for (const wall of walls.slice(1)) wall.dimSilenced = true;
+    expect(
+      selectionMeasures(
+        plan,
+        walls.map((w) => wallRef(w.id)),
+      ).anyStated,
+    ).toBe(true);
+  });
+
+  it('adds the Room area when the Selection reads as a Room (ADR 0014)', () => {
+    const plan = squareRoomPlan();
+    const room = detectRooms(plan)[0];
+    const m = selectionMeasures(plan, roomSelection(plan, room)!);
+    expect(m.room).toBe(room);
+    expect(m.wallIds).toHaveLength(4);
+  });
+
+  it('reads a Room whose area alone is still stated as stated', () => {
+    const plan = squareRoomPlan();
+    for (const wall of Object.values(plan.walls)) wall.dimSilenced = true;
+    const room = detectRooms(plan)[0];
+    expect(selectionMeasures(plan, roomSelection(plan, room)!).anyStated).toBe(true);
+  });
+
+  it('reads a Room with everything silenced as silent', () => {
+    const plan = squareRoomPlan();
+    for (const wall of Object.values(plan.walls)) wall.dimSilenced = true;
+    plan.roomProfiles.l = { id: 'l', name: '', x: 200, y: 200, areaSilenced: true };
+    const room = detectRooms(plan)[0];
+    expect(selectionMeasures(plan, roomSelection(plan, room)!).anyStated).toBe(false);
+  });
+
+  it('carries no area once the Selection stopped reading as a Room', () => {
+    const plan = squareRoomPlan();
+    const ids = Object.keys(plan.walls).slice(0, 3);
+    expect(selectionMeasures(plan, ids.map(wallRef)).room).toBeNull();
+  });
+
+  it('takes nothing from a Ruler or a Text', () => {
+    const plan = squareRoomPlan();
+    plan.rulers.r1 = { id: 'r1', a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, t: 0.5 };
+    plan.texts.t1 = { id: 't1', x: 10, y: 10, content: 'note', size: 'M' };
+    const m = selectionMeasures(plan, [rulerRef('r1'), textRef('t1')]);
+    expect(m.wallIds).toEqual([]);
+    expect(m.room).toBeNull();
+    expect(m.anyStated).toBe(false);
+  });
+
+  it('counts for nothing a ref the plan no longer holds', () => {
+    const plan = squareRoomPlan();
+    expect(selectionMeasures(plan, [wallRef('gone')]).wallIds).toEqual([]);
   });
 });
