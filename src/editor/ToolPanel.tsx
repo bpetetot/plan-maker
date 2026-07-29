@@ -1,7 +1,7 @@
 // CONTEXT.md: Tool panel. Selection values derived on render, never stored —
 // the panel cannot disagree with the canvas, drags included.
+import { Field, Label, Switch } from '@headlessui/react';
 import {
-  Ban,
   BrickWall,
   DoorClosed,
   FlipHorizontal2,
@@ -139,13 +139,13 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
           }}
         />
       )}
+      {contents && <ContentsRows contents={contents} zeros={room !== null} />}
       {room && (
         <CondemnedSection
           condemned={Boolean(profile?.condemned)}
           onToggle={(condemned) => editPlan((p) => setRoomCondemned(p, room, condemned))}
         />
       )}
-      {contents && <ContentsRows contents={contents} zeros={room !== null} />}
       {opening && (
         <section>
           <div className="panel-section-label">Width</div>
@@ -311,8 +311,8 @@ function SizeSection({ value, onSelect }: { value: TextSize; onSelect: (size: Te
   );
 }
 
-// A state the room is in, not an action on it (CONTEXT.md: Condemned), so the
-// pressed button reads as the mark itself.
+// A state the room is in, not an action on it (CONTEXT.md: Condemned), so it
+// reads as a switch, not a command button.
 function CondemnedSection({
   condemned,
   onToggle,
@@ -323,15 +323,17 @@ function CondemnedSection({
   return (
     <section>
       <div className="panel-section-label">State</div>
-      <button
-        type="button"
-        className="panel-toggle"
-        title={condemned ? 'Reopen the room' : 'Condemn the room (hatched, no area)'}
-        aria-pressed={condemned}
-        onClick={() => onToggle(!condemned)}
-      >
-        <Ban size={14} aria-hidden /> Condemned
-      </button>
+      <Field className="panel-row">
+        <Label className="panel-row-label">Condemned</Label>
+        <Switch
+          checked={condemned}
+          onChange={onToggle}
+          className="switch"
+          title={condemned ? 'Reopen the room' : 'Condemn the room (hatched, no area)'}
+        >
+          <span aria-hidden className="switch-knob" />
+        </Switch>
+      </Field>
     </section>
   );
 }

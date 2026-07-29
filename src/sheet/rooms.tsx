@@ -17,11 +17,11 @@ export function CondemnedHatching({ rooms, profiles }: { rooms: Room[]; profiles
         <pattern
           id="condemned-hatch"
           patternUnits="userSpaceOnUse"
-          width="14"
-          height="14"
+          width="8"
+          height="8"
           patternTransform="rotate(45)"
         >
-          <line className="condemned-hatch-line" x1="7" y1="0" x2="7" y2="14" />
+          <line className="condemned-hatch-line" x1="4" y1="0" x2="4" y2="8" />
         </pattern>
       </defs>
       {condemned.map((room) => (

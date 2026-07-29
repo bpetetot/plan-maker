@@ -22,7 +22,7 @@
   --dim-line: #93c9c3;
   --dim-text: #1d7d74;
   --room-area-text: #64748b;
-  --condemned-hatch: rgba(100, 116, 139, 0.45);
+  --condemned-hatch: rgba(100, 116, 139, 0.3);
   --marquee-fill: rgba(37, 99, 235, 0.08);
   --room-hover-fill: rgba(37, 99, 235, 0.05);
   --room-selected-fill: rgba(37, 99, 235, 0.12);
@@ -46,6 +46,8 @@
   --danger-surface: #fee2e2;
   --flip-surface: #eef2ff;
   --flip-text: #3730a3;
+  --switch-track: #d1d5db;
+  --switch-knob: #ffffff;
   --hint-surface: rgba(255, 255, 255, 0.9);
   --banner-surface: #1f2937;
   --banner-text: #f9fafb;
