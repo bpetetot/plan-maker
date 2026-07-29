@@ -24,9 +24,12 @@ const carries = (profile: RoomProfile): boolean =>
 
 type RoomMarks = Pick<RoomProfile, 'hatched' | 'areaSilenced'>;
 
-// Creates the profile at the anchor when the room has none, and deletes one the
-// marks leave carrying nothing (CONTEXT.md: Room profile).
-function writeMarks(plan: Plan, room: Room, existing: RoomProfile | null, marks: RoomMarks): Plan {
+// One mark flips and the other is left exactly as it was: the two are
+// independent (ADR 0039). Creates the profile at the anchor when the room has
+// none, and deletes one the flip leaves carrying nothing.
+function setRoomMark(plan: Plan, room: Room, mark: keyof RoomMarks, on: boolean): Plan {
+  const existing = roomProfileAt(plan, room);
+  if (Boolean(existing?.[mark]) === on) return plan;
   const profile: RoomProfile = {
     ...(existing ?? {
       id: newId(),
@@ -34,38 +37,25 @@ function writeMarks(plan: Plan, room: Room, existing: RoomProfile | null, marks:
       x: Math.round(room.anchor.x),
       y: Math.round(room.anchor.y),
     }),
-    ...marks,
   };
   // Absent, never `false`: the sentinel discipline every optional mark shares.
-  if (!marks.hatched) delete profile.hatched;
-  if (!marks.areaSilenced) delete profile.areaSilenced;
+  if (on) profile[mark] = true;
+  else delete profile[mark];
   const roomProfiles = { ...plan.roomProfiles };
   if (carries(profile)) roomProfiles[profile.id] = profile;
   else delete roomProfiles[profile.id];
   return { ...plan, roomProfiles };
 }
 
-/** CONTEXT.md: Hatching. Hatching silences the area in the same Edit — an
- *  ergonomic default, not what the mark means; un-hatching never lifts it. */
-export function setRoomHatched(plan: Plan, room: Room, hatched: boolean): Plan {
-  const existing = roomProfileAt(plan, room);
-  if (Boolean(existing?.hatched) === hatched) return plan;
-  return writeMarks(plan, room, existing, {
-    hatched: hatched || undefined,
-    areaSilenced: hatched ? true : existing?.areaSilenced,
-  });
-}
+/** CONTEXT.md: Hatching. Draws the floor out of use and changes nothing else —
+ *  whether the area prints is the Silenced mark's business alone. */
+export const setRoomHatched = (plan: Plan, room: Room, hatched: boolean): Plan =>
+  setRoomMark(plan, room, 'hatched', hatched);
 
-/** CONTEXT.md: Silenced. Independent of the hatching in both directions, once
- *  the hatching's own write has landed (ADR 0039). */
-export function setRoomAreaSilenced(plan: Plan, room: Room, silenced: boolean): Plan {
-  const existing = roomProfileAt(plan, room);
-  if (Boolean(existing?.areaSilenced) === silenced) return plan;
-  return writeMarks(plan, room, existing, {
-    hatched: existing?.hatched,
-    areaSilenced: silenced || undefined,
-  });
-}
+/** CONTEXT.md: Silenced, on a Room area. Independent of the hatching, both
+ *  ways. */
+export const setRoomAreaSilenced = (plan: Plan, room: Room, silenced: boolean): Plan =>
+  setRoomMark(plan, room, 'areaSilenced', silenced);
 
 const roomsMarked = (rooms: Room[], profiles: RoomProfile[], mark: keyof RoomMarks): Set<Room> => {
   const marked = new Set<Room>();

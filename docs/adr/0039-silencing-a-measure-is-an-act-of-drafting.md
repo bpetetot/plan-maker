@@ -7,8 +7,9 @@
 >
 > **Amends [ADR 0038](0038-the-room-profile-is-the-single-stored-carrier-of-a-derived-room.md)**
 > — the mark it calls `condemned` is renamed **Hatching**, and hatching a floor no
-> longer drops the Room area as a consequence of what the mark means. The
-> one-carrier-per-room rule it sets is unchanged, and both new marks obey it.
+> longer drops the Room area at all: a second mark, `areaSilenced`, does that, and
+> the two are independent. The one-carrier-per-room rule it sets is unchanged, and
+> both marks obey it.
 
 Measures were all-or-nothing: a single toggle showed every wall Dimension and
 every Room area or hid all of them. ADR 0008 opened by naming the problem this
@@ -69,13 +70,15 @@ a marquee over partitions, and each pass must finish the batch instead of undoin
 the previous one. The price is that restoring everything takes `Mod+A` then
 `Shift+M` twice.
 
-Both surfaces turn the `measures` preference back on and then apply, following
-the Ruler tool (ADR 0017) and ADR 0008's own statement that "adjusting a
-Dimension's placement is formatting work, done with measures shown". Silencing is
-formatting work of the same kind. The accepted oddity, recorded so nobody treats
-it as a bug: turning a switch *down* can turn measures *on*. The rule is that a
-formatting gesture shows its result, not that turning something off never turns
-anything on.
+Every gesture that silences a Measure turns the `measures` preference back on and
+then applies, following the Ruler tool (ADR 0017) and ADR 0008's own statement
+that "adjusting a Dimension's placement is formatting work, done with measures
+shown". Silencing is formatting work of the same kind. The accepted oddity,
+recorded so nobody treats it as a bug: turning a switch *down* can turn measures
+*on*. The rule is that a formatting gesture shows its result, not that turning
+something off never turns anything on. The `Hatching` switch is outside the rule
+because it is outside the toggle: it silences no Measure, so it has nothing to
+reveal.
 
 ## Condemned is retired in favour of Hatching
 
@@ -88,14 +91,23 @@ the old label carried (a chimney shaft, a lost corner, a void the walls enclose
 but the dwelling does not inhabit) moves to the switch's tooltip, where the
 current switch already puts its explanation.
 
-Hatching no longer drops the area as a consequence of what the mark means. The
-coupling becomes an **ergonomic default**: hatching a room writes `areaSilenced`
-in the same Edit, so one gesture still produces the reading almost always wanted
-and one undo takes both back — and the `Area` switch visibly drops in the section
-directly above, which makes the coupling legible instead of hidden. Afterwards
-the two marks are independent: a hatched floor *can* state its area, and
-un-hatching never lifts `areaSilenced`, because the app does not overwrite an
-explicit choice.
+Hatching no longer drops the area at all. The two marks are **fully
+independent**: hatching a floor changes what the Sheet draws under it and makes
+no claim about the number above it, and neither switch ever moves the other. A
+hatched floor states its area unless the user silences it, and un-hatching leaves
+a silenced area silenced.
+
+The coupling was designed as an ergonomic default — one gesture producing the
+reading almost always wanted, one undo taking both back — and was tried in the
+`DISPLAY` section, where the `Area` switch would visibly drop as the `Hatching`
+one rose. It was removed on usage feedback: a switch that moves another switch is
+disturbing however legible the pair is made, and the saving was one click. Two
+independent switches in one section, each doing exactly what its label says, beat
+a default that has to be explained.
+
+A second thing falls out. Hatching is not a Measure and the measures toggle never
+hides it, so the `Hatching` switch has nothing to reveal and does *not* turn
+measures back on — unlike `Area` and `Dimension`, which do.
 
 ## Considered Options
 
@@ -122,6 +134,10 @@ explicit choice.
 - **Per-side silencing of a wall Dimension** — rejected: a wall has one Dimension
   with two readings depending on which side it sits; the mark is on the wall, not
   on a side.
+- **Hatching silencing the area as an ergonomic default**, written in the same
+  Edit so one gesture gives the common reading and one undo takes both back —
+  built, then removed on usage feedback: a switch that moves another switch
+  disturbs more than the click it saves.
 - **Keeping `Condemned` in the glossary** beside Hatching, on the grounds that the
   *reason* a floor is hatched is a fact about a dwelling rather than a rendering
   — rejected once the mark's only effect became the graphic. The `_Avoid_` line is

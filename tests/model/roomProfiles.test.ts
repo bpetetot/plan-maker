@@ -253,21 +253,24 @@ describe('setRoomHatched', () => {
     expect(next.roomProfiles[profileId]).toMatchObject({ name: 'Kitchen', hatched: true });
   });
 
-  // An ergonomic default written in the same Edit, not a consequence of what the
-  // mark means (ADR 0039).
-  it('silences the area in the same write', () => {
+  // The mark draws the floor out of use and changes nothing else (ADR 0039).
+  it('leaves the area stated, hatching being no claim about it', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
     const profiles = Object.values(setRoomHatched(plan, room, true).roomProfiles);
-    expect(profiles[0]).toMatchObject({ hatched: true, areaSilenced: true });
+    expect(profiles[0]).toMatchObject({ hatched: true });
+    expect(profiles[0].areaSilenced).toBeUndefined();
   });
 
-  it('un-hatching never lifts the silencing: the app does not overwrite an explicit choice', () => {
+  it('leaves an already silenced area silenced, either way it is flipped', () => {
     const { plan, profileId } = roomWithProfile();
     const room = detectRooms(plan)[0];
-    const next = setRoomHatched(setRoomHatched(plan, room, true), room, false);
-    expect(next.roomProfiles[profileId].hatched).toBeUndefined();
-    expect(next.roomProfiles[profileId].areaSilenced).toBe(true);
+    const silenced = setRoomAreaSilenced(plan, room, true);
+    const hatched = setRoomHatched(silenced, room, true);
+    expect(hatched.roomProfiles[profileId]).toMatchObject({ hatched: true, areaSilenced: true });
+    const lifted = setRoomHatched(hatched, room, false);
+    expect(lifted.roomProfiles[profileId].hatched).toBeUndefined();
+    expect(lifted.roomProfiles[profileId].areaSilenced).toBe(true);
   });
 
   it('lifting the mark keeps a profile that still carries a name', () => {
@@ -278,23 +281,11 @@ describe('setRoomHatched', () => {
     expect(next.roomProfiles[profileId].hatched).toBeUndefined();
   });
 
-  // The silencing the hatching wrote is a mark of its own from then on, so the
-  // profile still carries something.
-  it('lifting the mark keeps a profile the silenced area alone justifies', () => {
+  it('lifting the mark deletes a profile that carries nothing else', () => {
     const plan = squareRoomPlan();
     const room = detectRooms(plan)[0];
     const hatched = setRoomHatched(plan, room, true);
-    const profiles = Object.values(setRoomHatched(hatched, room, false).roomProfiles);
-    expect(profiles).toHaveLength(1);
-    expect(profiles[0]).toMatchObject({ name: '', areaSilenced: true });
-    expect(profiles[0].hatched).toBeUndefined();
-  });
-
-  it('lifting both marks deletes the profile they alone justified', () => {
-    const plan = squareRoomPlan();
-    const room = detectRooms(plan)[0];
-    const bare = setRoomAreaSilenced(setRoomHatched(plan, room, true), room, false);
-    expect(setRoomHatched(bare, room, false).roomProfiles).toEqual({});
+    expect(setRoomHatched(hatched, room, false).roomProfiles).toEqual({});
   });
 
   it('is a no-op when the room is already in the asked state', () => {

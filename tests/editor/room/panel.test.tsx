@@ -207,6 +207,7 @@ describe('the hatching switch', () => {
     await hatching().click();
     await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
     expect(svg.querySelector('path.room-hatched')).toBeNull();
+    expect(usePlanStore.getState().plan.roomProfiles).toEqual({});
   });
 
   it('marks the existing profile of a named room, and undo takes one step back', async () => {
@@ -214,45 +215,46 @@ describe('the hatching switch', () => {
     await clickAt(svg, 200, 150);
     await hatching().click();
     expect(profiles()).toHaveLength(1);
-    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', hatched: true, areaSilenced: true });
+    expect(profiles()[0]).toMatchObject({ name: 'Kitchen', hatched: true });
     usePlanStore.temporal.getState().undo();
     expect(profiles()[0].hatched).toBeUndefined();
-    expect(profiles()[0].areaSilenced).toBeUndefined();
   });
 
-  // The coupling is legible instead of hidden: cause and effect in one section.
-  it('drops the Area switch in the same gesture, and one undo takes both back', async () => {
+  // ADR 0039: the mark draws the floor out of use and claims nothing about the
+  // area, which is the Silenced mark's business alone.
+  it('leaves the Area switch up, and the area on the sheet', async () => {
     const { svg } = await setup();
     await clickAt(svg, 200, 200);
     await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
     await hatching().click();
-    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
-    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
-
-    usePlanStore.temporal.getState().undo();
-    await expect.element(hatching()).toHaveAttribute('aria-checked', 'false');
-    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
-  });
-
-  // ADR 0039: the two marks are independent once the hatching's write has landed.
-  it('lets a hatched floor state its area again', async () => {
-    const { svg } = await setup();
-    await clickAt(svg, 200, 200);
-    await hatching().click();
-    await areaSwitch().click();
     await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'true');
     expect(svg.querySelector('path.room-hatched')).not.toBeNull();
     expect(svg.querySelectorAll('text.room-area')).toHaveLength(1);
+    expect(profiles()[0].areaSilenced).toBeUndefined();
   });
 
-  it('leaves the area silenced when the hatching is lifted', async () => {
+  it('leaves an area the user silenced silenced, in both directions', async () => {
     const { svg } = await setup();
     await clickAt(svg, 200, 200);
+    await areaSwitch().click();
     await hatching().click();
+    await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
     await hatching().click();
     await expect.element(areaSwitch()).toHaveAttribute('aria-checked', 'false');
     expect(profiles()[0]).toMatchObject({ areaSilenced: true });
     expect(profiles()[0].hatched).toBeUndefined();
+    expect(svg.querySelectorAll('text.room-area')).toHaveLength(0);
+  });
+
+  // The hatching is no Measure and the measures toggle never hides it, so there
+  // is nothing to reveal — unlike the Area and Dimension switches.
+  it('leaves measures hidden, having none to show', async () => {
+    setPreference('measures', false);
+    const { svg } = await setup();
+    await clickAt(svg, 200, 200);
+    await hatching().click();
+    expect(getPreference('measures')).toBe(false);
+    expect(svg.querySelector('path.room-hatched')).not.toBeNull();
   });
 });
 

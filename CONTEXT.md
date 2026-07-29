@@ -134,10 +134,11 @@ A mark a room carries stating that its floor is out of use — a chimney
 shaft, a lost corner, a void the walls enclose but the dwelling does not
 inhabit. The Sheet states it by hatching the floor, and that is the whole of
 its effect. Whether the area line prints is the Silenced mark's business
-alone: hatching a room silences its area in the same Edit, because that is
-almost always the reading wanted and one undo should take the pair back — but
-only as a default, so a hatched floor can state its area if the user asks for
-it, and un-hatching never brings a silenced area back (ADR 0039). The room
+alone, and the two are independent: hatching a floor makes no claim about the
+number above it, so a hatched room states its area until the user silences it,
+and un-hatching leaves a silenced area silenced (ADR 0039). It is not a
+Measure and the measures toggle never hides it, which is why its switch —
+alone in the `DISPLAY` section — does not turn measures back on. The room
 stays a full Room in every other respect: selectable, deletable, its walls
 measured, its contents counted, and the Tool panel still states the area as a
 fact of inspection. The mark lives on the Room profile and obeys its laws: it

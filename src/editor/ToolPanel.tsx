@@ -152,11 +152,13 @@ export function ToolPanel({ plan, sel, tool, defaults, setDefaults, onDelete }: 
                 title="Print the room area on the sheet"
                 onChange={(shown) => displayEdit((p) => setRoomAreaSilenced(p, room, !shown))}
               />
+              {/* Plain editPlan: the hatching is no Measure and the measures
+                  toggle never hides it, so there is nothing to reveal. */}
               <DisplaySwitch
                 label="Hatching"
                 shown={Boolean(profile?.hatched)}
                 title="Hatch the floor: out of use — a shaft, a void the dwelling does not inhabit"
-                onChange={(shown) => displayEdit((p) => setRoomHatched(p, room, shown))}
+                onChange={(shown) => editPlan((p) => setRoomHatched(p, room, shown))}
               />
             </>
           )}
